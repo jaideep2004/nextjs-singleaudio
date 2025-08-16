@@ -1,7 +1,7 @@
 import Link from 'next/link';
-
 import { Box, Container } from '@mui/material';
 import PublicNavBar from '@/components/PublicNavBar';
+import ClientOnly from '@/components/ClientOnly';
 
 const navItems = [
   { label: 'Home', href: '/' },
@@ -17,7 +17,9 @@ const authItems = [
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <Box>
-      <PublicNavBar />
+      <ClientOnly>
+        <PublicNavBar />
+      </ClientOnly>
       <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
         {children}
       </Container>

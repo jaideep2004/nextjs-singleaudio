@@ -11,16 +11,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
     <AppContextProvider>
       <NotificationsProvider>
         <ColorModeProvider>
-          <CssBaseline />
-          <Box
-            sx={{
-              minHeight: '100vh',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {children}
-          </Box>
+          {children}
         </ColorModeProvider>
       </NotificationsProvider>
     </AppContextProvider>
