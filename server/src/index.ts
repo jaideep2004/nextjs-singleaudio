@@ -1,8 +1,8 @@
+import 'dotenv/config';
 import express, { Express, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import path from 'path';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
 import apiRoutes from './routes';
@@ -11,8 +11,7 @@ import { setupCors } from './middleware/cors.middleware';
 import { PORT, API_PREFIX, UPLOAD_DIR } from './config/constants';
 import settingsController from './controllers/settings.controller';
 
-// Load environment variables
-dotenv.config();
+// .env already loaded by the side-effect import above
 
 // Create Express app
 const app: Express = express();
@@ -21,7 +20,10 @@ const app: Express = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 setupCors(app);
-app.use(helmet());
+// Allow cross-origin loading of static media (images/audio) from Next.js (port 3000)
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(compression());
 
 // Static files

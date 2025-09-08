@@ -58,9 +58,15 @@ export async function POST(request: Request) {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('Error from Express server:', error);
-        throw new Error('Analysis failed');
+        // Try to forward the exact error back to the client
+        let errorBody: any = null;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = { error: await response.text() };
+        }
+        console.error('Error from Express server:', errorBody);
+        return NextResponse.json(errorBody, { status: response.status });
       }
 
       const data = await response.json();

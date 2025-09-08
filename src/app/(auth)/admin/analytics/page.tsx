@@ -72,6 +72,8 @@ export default function AnalyticsPage() {
     "#42a5f5", "#66bb6a", "#ffa726", "#ef5350", "#ab47bc", "#26c6da", "#d4e157", "#ff7043"
   ];
 
+  const CARD_SIZE = { xs: 320, sm: 380, md: 440 } as const;
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Typography variant="h4" fontWeight={700} mb={2}>
@@ -92,12 +94,13 @@ export default function AnalyticsPage() {
           <Typography sx={{ ml: 2 }}>Loading charts...</Typography>
         </Box>
       ) : (
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #42a5f5 0%, #478ed1 100%)" }}>
-              <Typography variant="h6" color="white" gutterBottom>
+        <Grid container spacing={4} justifyContent="center">
+          <Grid item>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #42a5f5 0%, #478ed1 100%)", width: CARD_SIZE, height: CARD_SIZE, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" color="white" gutterBottom sx={{ px: 1 }}>
                 Releases by Status
               </Typography>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
               <Pie
                 data={{
                   labels: Object.keys(releaseStatusCounts),
@@ -108,6 +111,7 @@ export default function AnalyticsPage() {
                   }]
                 }}
                 options={{
+                  maintainAspectRatio: false,
                   plugins: {
                     legend: { labels: { color: "white", font: { size: 16 } } },
                     tooltip: { enabled: true },
@@ -115,13 +119,15 @@ export default function AnalyticsPage() {
                   animation: { animateRotate: true, animateScale: true },
                 }}
               />
+              </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #66bb6a 0%, #43a047 100%)" }}>
-              <Typography variant="h6" color="white" gutterBottom>
+          <Grid item>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #66bb6a 0%, #43a047 100%)", width: CARD_SIZE, height: CARD_SIZE, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" color="white" gutterBottom sx={{ px: 1 }}>
                 User Roles Distribution
               </Typography>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
               <Bar
                 data={{
                   labels: Object.keys(userRoleCounts),
@@ -132,6 +138,7 @@ export default function AnalyticsPage() {
                   }]
                 }}
                 options={{
+                  maintainAspectRatio: false,
                   plugins: {
                     legend: { display: false },
                     tooltip: { enabled: true },
@@ -143,13 +150,15 @@ export default function AnalyticsPage() {
                   }
                 }}
               />
+              </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={8}>
-            <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #ffa726 0%, #fb8c00 100%)" }}>
-              <Typography variant="h6" color="white" gutterBottom>
+          <Grid item>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #ffa726 0%, #fb8c00 100%)", width: CARD_SIZE, height: CARD_SIZE, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" color="white" gutterBottom sx={{ px: 1 }}>
                 Releases Per Month
               </Typography>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
               <Line
                 data={{
                   labels: Object.keys(releasesPerMonth),
@@ -163,6 +172,7 @@ export default function AnalyticsPage() {
                   }]
                 }}
                 options={{
+                  maintainAspectRatio: false,
                   plugins: {
                     legend: { labels: { color: "white" } },
                     tooltip: { enabled: true },
@@ -174,13 +184,15 @@ export default function AnalyticsPage() {
                   }
                 }}
               />
+              </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ p: 3, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%)" }}>
-              <Typography variant="h6" color="white" gutterBottom>
+          <Grid item>
+            <Paper sx={{ p: 2, borderRadius: 3, boxShadow: 6, background: "linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%)", width: CARD_SIZE, height: CARD_SIZE, display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="h6" color="white" gutterBottom sx={{ px: 1 }}>
                 Tracks Per Release
               </Typography>
+              <Box sx={{ flex: 1, minHeight: 0 }}>
               <Bar
                 data={{
                   labels: releaseData.map((r, i) => r.releaseTitle || `Release ${i + 1}`),
@@ -191,6 +203,7 @@ export default function AnalyticsPage() {
                   }]
                 }}
                 options={{
+                  maintainAspectRatio: false,
                   plugins: {
                     legend: { display: false },
                     tooltip: { enabled: true },
@@ -202,6 +215,7 @@ export default function AnalyticsPage() {
                   }
                 }}
               />
+              </Box>
             </Paper>
           </Grid>
         </Grid>

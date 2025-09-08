@@ -251,8 +251,33 @@ export const releaseAPI = {
       return {
         success: false,
         data: [],
-        error: error.message || 'Unknown error',
+        error: (error as any).message || 'Unknown error',
       };
+    }
+  },
+
+  getReleaseById: async (id: string) => {
+    try {
+      const response = await api.get(`/releases/${id}`);
+      if (response.data && response.data.success) {
+        return { success: true, data: response.data.release };
+      }
+      return { success: false, error: response.data?.error || 'Failed to fetch release' };
+    } catch (error) {
+      return { success: false, error: (error as any).message || 'Unknown error' };
+    }
+  },
+
+  updateReleaseStatus: async (
+    id: string,
+    status: 'approved' | 'rejected' | 'pending',
+    reason?: string
+  ) => {
+    try {
+      const response = await api.patch(`/releases/${id}/status`, { status, reason });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
     }
   },
 };

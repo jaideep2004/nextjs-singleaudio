@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, ToggleButton, ToggleButtonGroup, Autocomplete, TextField, Chip } from '@mui/material';
-import countries from '../../utils/countries'; // We'll create this if it doesn't exist
+import { Box, Typography, ToggleButton, ToggleButtonGroup, Autocomplete, TextField, Chip, Stack, Button, Divider, Grid, Paper } from '@mui/material';
+import countries, { continents } from '../../utils/countries';
 
 export type TerritoryMode = 'allowed' | 'disallowed';
 
@@ -23,71 +23,135 @@ const TerritoryManager: React.FC<TerritoryManagerProps> = ({ value, mode, onChan
   }, [mode]);
 
   return (
-    <Box>
+    <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.paper' }}>
       <Typography variant="h6" gutterBottom>Territory Restrictions</Typography>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         Select the countries where this track/release is {currentMode === 'allowed' ? 'ALLOWED' : 'DISALLOWED'} for distribution.
       </Typography>
-      <ToggleButtonGroup
-        value={currentMode}
-        exclusive
-        onChange={(_, newMode) => {
-          if (newMode) {
-            setCurrentMode(newMode);
-            onChange(selected, newMode);
-          }
-        }}
-        sx={{ mb: 2 }}
-      >
-        <ToggleButton value="allowed">Allowed</ToggleButton>
-        <ToggleButton value="disallowed">Disallowed</ToggleButton>
-      </ToggleButtonGroup>
-      <Box sx={{ mb: 2 }}>
-        <button
-          type="button"
-          style={{
-            padding: '6px 16px',
-            marginBottom: 8,
-            background: '#1976d2',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-            fontWeight: 500
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={currentMode}
+          exclusive
+          onChange={(_, newMode) => {
+            if (newMode) {
+              setCurrentMode(newMode);
+              onChange(selected, newMode);
+            }
           }}
+        >
+          <ToggleButton value="allowed">Allowed</ToggleButton>
+          <ToggleButton value="disallowed">Disallowed</ToggleButton>
+        </ToggleButtonGroup>
+        <Typography variant="caption" color="text.secondary">
+          Mode: <strong>{currentMode.toUpperCase()}</strong> · Selected: <strong>{selected.length}</strong>
+        </Typography>
+      </Box>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, flexWrap: 'wrap' }}>
+        <Button
+          variant="outlined"
+          size="small"
           onClick={() => {
             if (selected.length < countries.length) {
-              setSelected(countries.map(c => c.code));
-              onChange(countries.map(c => c.code), currentMode);
+              const all = countries.map(c => c.code);
+              setSelected(all);
+              onChange(all, currentMode);
             } else {
               setSelected([]);
               onChange([], currentMode);
             }
           }}
         >
-          {selected.length < countries.length ? 'Select All Countries' : 'Clear All Countries'}
-        </button>
-      </Box>
+          {selected.length < countries.length ? 'Select All' : 'Clear All'}
+        </Button>
+        <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+        {continents.map(ct => (
+          <Button
+            key={ct.key}
+            variant="outlined"
+            size="small"
+            onClick={() => {
+              // Toggle continent selection: if all codes for this continent are included, remove them; else add missing
+              const set = new Set(selected);
+              const allIn = ct.countryCodes.every(code => set.has(code));
+              if (allIn) {
+                const next = selected.filter(code => !ct.countryCodes.includes(code));
+                setSelected(next);
+                onChange(next, currentMode);
+              } else {
+                ct.countryCodes.forEach(code => set.add(code));
+                const next = Array.from(set);
+                setSelected(next);
+                onChange(next, currentMode);
+              }
+            }}
+          >
+            {ct.name}
+          </Button>
+        ))}
+      </Stack>
       <Autocomplete
         multiple
         options={countries}
+        groupBy={(option) => option.continent}
         getOptionLabel={(option) => option.label}
+        isOptionEqualToValue={(o, v) => o.code === v.code}
         value={countries.filter(c => selected.includes(c.code))}
         onChange={(_, newValue) => {
           setSelected(newValue.map(c => c.code));
           onChange(newValue.map(c => c.code), currentMode);
         }}
+        size="small"
+        limitTags={6}
         renderTags={(tagValue, getTagProps) =>
           tagValue.map((option, index) => (
-            <Chip label={option.label} {...getTagProps({ index })} key={option.code} />
+            <Chip size="small" variant="outlined" label={option.label} {...getTagProps({ index })} key={option.code} />
           ))
         }
         renderInput={(params) => (
-          <TextField {...params} variant="outlined" label="Countries" placeholder="Select countries..." />
+          <TextField
+            {...params}
+            variant="outlined"
+            label="Countries"
+            placeholder="Select countries..."
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
         )}
-        sx={{ mt: 2, width: '100%' }}
+        sx={{
+          mt: 2,
+          width: '100%',
+          // Keep input tidy with many chips
+          '& .MuiInputBase-root': {
+            minHeight: 56,
+            alignItems: 'flex-start',
+            flexWrap: 'wrap',
+            maxHeight: 160,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          },
+          '& .MuiAutocomplete-input': {
+            // remove extra vertical padding so minHeight applies cleanly
+            paddingTop: 0.75,
+            paddingBottom: 0.75,
+          },
+          // Ensure outline doesn't create inner lines when label is floating
+          '& .MuiOutlinedInput-notchedOutline legend': {
+            display: 'none',
+          },
+          '& .MuiOutlinedInput-root': {
+            alignItems: 'flex-start',
+          },
+          '& .MuiAutocomplete-inputRoot': {
+            paddingTop: 6,
+            paddingBottom: 6,
+          },
+          '& .MuiOutlinedInput-notchedOutline': {
+            top: 0,
+          },
+          '& .MuiChip-root': { m: 0.25 },
+        }}
       />
-    </Box>
+    </Paper>
   );
 };
 

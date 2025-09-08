@@ -277,14 +277,9 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     getToken,
   };
 
-  // Don't render children until client-side initialization is complete
-  if (!isInitialized && typeof window !== 'undefined') {
-    return <div style={{ display: 'none' }}>{children}</div>;
-  }
-
   return (
     <AppContext.Provider value={contextValue}>
-      {children}
+      {isInitialized ? children : <div>Loading...</div>}
     </AppContext.Provider>
   );
 }

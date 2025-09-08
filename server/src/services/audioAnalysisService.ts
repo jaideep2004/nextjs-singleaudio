@@ -1,6 +1,23 @@
 // @ts-ignore - No type definitions for fluent-ffmpeg
 import ffmpeg from 'fluent-ffmpeg';
 
+// Allow configuring binary paths via environment variables (Windows-friendly)
+// Set these in your server .env if ffmpeg/ffprobe are not on PATH
+// FFMPEG_PATH=C:\\ffmpeg\\bin\\ffmpeg.exe
+// FFPROBE_PATH=C:\\ffmpeg\\bin\\ffprobe.exe
+try {
+  const ffmpegPath = process.env.FFMPEG_PATH;
+  const ffprobePath = process.env.FFPROBE_PATH;
+  if (ffmpegPath && typeof (ffmpeg as any).setFfmpegPath === 'function') {
+    (ffmpeg as any).setFfmpegPath(ffmpegPath);
+  }
+  if (ffprobePath && typeof (ffmpeg as any).setFfprobePath === 'function') {
+    (ffmpeg as any).setFfprobePath(ffprobePath);
+  }
+} catch {
+  // non-fatal; fluent-ffmpeg will try PATH
+}
+
 export interface AudioAnalysisResult {
   format: string;
   duration: number;

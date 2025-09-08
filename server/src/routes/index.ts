@@ -10,6 +10,7 @@ import audioRoutes from './audio';
 import { API_PREFIX } from '../config/constants';
 import territoryRoutes from './territory.routes';
 import rightsRoutes from './rights.routes';
+import uploadRoutes from './upload.routes';
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use(`${API_PREFIX}/users`, userRoutes);
 router.use(`${API_PREFIX}/settings`, settingsRoutes);
 router.use(`${API_PREFIX}/territory`, territoryRoutes);
 router.use(`${API_PREFIX}/rights`, rightsRoutes);
+router.use(`${API_PREFIX}/uploads`, uploadRoutes);
 
 export default router;
