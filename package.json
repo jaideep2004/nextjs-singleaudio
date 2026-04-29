@@ -7,7 +7,7 @@
     "server"
   ],
   "scripts": {
-    "dev:client": "next dev --turbopack",
+    "dev:client": "next dev",
     "dev:server": "cd server && npm run dev",
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "build:client": "next build",
