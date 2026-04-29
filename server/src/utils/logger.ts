@@ -1,19 +1,21 @@
-import { createLogger, format, transports } from 'winston';
+type LogMeta = Record<string, unknown> | unknown;
 
-const logger = createLogger({
-  level: 'info',
-  format: format.combine(
-    format.timestamp(),
-    format.errors({ stack: true }),
-    format.splat(),
-    format.json()
-  ),
-  defaultMeta: { service: 'audio-upload-app' },
-  transports: [
-    new transports.Console({ format: format.simple() }),
-    new transports.File({ filename: 'logs/error.log', level: 'error' }),
-    new transports.File({ filename: 'logs/combined.log' })
-  ]
-});
+const writeLog = (level: 'info' | 'warn' | 'error', message: string, meta?: LogMeta) => {
+  const timestamp = new Date().toISOString();
 
+  if (meta !== undefined) {
+    console[level](`[${timestamp}] ${level.toUpperCase()}: ${message}`, meta);
+    return;
+  }
+
+  console[level](`[${timestamp}] ${level.toUpperCase()}: ${message}`);
+};
+
+const logger = {
+  info: (message: string, meta?: LogMeta) => writeLog('info', message, meta),
+  warn: (message: string, meta?: LogMeta) => writeLog('warn', message, meta),
+  error: (message: string, meta?: LogMeta) => writeLog('error', message, meta),
+};
+
+export { logger };
 export default logger;

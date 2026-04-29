@@ -1,14 +1,19 @@
 import { Service } from 'typedi';
-import { Model } from 'mongoose';
-import { InjectModel } from 'typegoose';
 import { IStore, StoreType, IStoreDelivery, IStoreDeliveryReport } from '../../types/store';
-import { ITrack } from '../../types/track';
+import { ITrack } from '../../models/track.model';
 import { storeFactory } from './store.factory';
-import { logger } from '../../utils/logger';
-import { BaseService } from '../base.service.impl';
+import logger from '../../utils/logger';
 import { StoreRepository } from '../../repositories/store.repository';
 import { StoreDeliveryRepository } from '../../repositories/store-delivery.repository';
 import { StoreDeliveryReportRepository } from '../../repositories/store-delivery-report.repository';
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
 
 @Service()
 export class StoreService {
@@ -105,13 +110,13 @@ export class StoreService {
       await this.storeRepository.update(storeId, { 
         lastTestedAt: new Date(),
         lastTestStatus: 'failed',
-        lastError: error.message,
+        lastError: getErrorMessage(error),
         isActive: false
       });
       
       return { 
         connected: false, 
-        error: error.message 
+        error: getErrorMessage(error) 
       };
     }
   }
@@ -189,13 +194,13 @@ export class StoreService {
         deliveryId, 
         trackId: track._id, 
         storeId: store._id,
-        error: error.message 
+        error: getErrorMessage(error)
       });
       
       // Update delivery status to failed
       await this.storeDeliveryRepository.update(deliveryId, { 
         status: 'failed',
-        error: error.message,
+        error: getErrorMessage(error),
         lastChecked: new Date()
       });
       
@@ -289,7 +294,7 @@ export class StoreService {
       // Update sync status with error
       await this.storeRepository.update(storeId, { 
         lastSyncStatus: 'failed',
-        lastError: error.message,
+        lastError: getErrorMessage(error),
         lastSyncedAt: new Date()
       });
       
@@ -327,7 +332,8 @@ export class StoreService {
       const reports = await this.storeDeliveryReportRepository.find({
         storeId,
         reportDate: { $gte: startDate, $lte: endDate }
-      });n      
+      });
+
       // Process reports to calculate earnings
       const earningsByTrack = new Map<string, { 
         trackTitle: string; 

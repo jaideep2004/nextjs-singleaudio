@@ -49,7 +49,7 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
     const audioPath = path.join(TRACKS_DIR, audioFile);
     let analysis: { format: string; duration: number; bitrate: number; loudness: number | null } = { format: '', duration: 0, bitrate: 0, loudness: null };
     try {
-      const { analyzeAudio } = await import('../utils/audioAnalysis');
+      const { analyzeAudio } = await import('../utils/audioAnalysis.js');
       analysis = await analyzeAudio(audioPath);
     } catch (err) {
       // If analysis fails, log but do not block upload

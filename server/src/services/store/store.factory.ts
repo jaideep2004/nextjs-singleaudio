@@ -7,6 +7,14 @@ import { logger } from '../../utils/logger';
 
 type StoreConstructor = new (store: IStore) => IStoreIntegration;
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Unknown error';
+};
+
 class StoreFactory {
   private static instance: StoreFactory;
   private integrations: Map<StoreType, StoreConstructor> = new Map();
@@ -56,7 +64,7 @@ class StoreFactory {
       return new Integration(store);
     } catch (error) {
       logger.error(`Failed to initialize integration for store type: ${type}`, { error });
-      throw new Error(`Failed to initialize store integration: ${error.message}`);
+      throw new Error(`Failed to initialize store integration: ${getErrorMessage(error)}`);
     }
   }
 
