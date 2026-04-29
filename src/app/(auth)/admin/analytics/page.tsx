@@ -108,7 +108,7 @@ export default function AnalyticsPage() {
         </Box>
       ) : (
         <Grid container spacing={4} justifyContent="center">
-          <Grid item>
+          <Grid item xs={12} md={6} xl={4}>
             <Paper
               sx={{
                 p: 2,
@@ -148,7 +148,7 @@ export default function AnalyticsPage() {
               </Box>
             </Paper>
           </Grid>
-          <Grid item>
+          <Grid item xs={12} md={6} xl={4}>
             <Paper
               sx={{
                 p: 2,
@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
               </Box>
             </Paper>
           </Grid>
-          <Grid item>
+          <Grid item xs={12} md={6} xl={4}>
             <Paper
               sx={{
                 p: 2,
@@ -239,7 +239,7 @@ export default function AnalyticsPage() {
               </Box>
             </Paper>
           </Grid>
-          <Grid item>
+          <Grid item xs={12} md={6} xl={4}>
             <Paper
               sx={{
                 p: 2,
