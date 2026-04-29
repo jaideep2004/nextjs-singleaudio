@@ -32,11 +32,12 @@ import {
 import { Search, CheckCircle, Cancel, MonetizationOn } from '@mui/icons-material';
 import { payoutAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
+import { useColorMode } from '@/context/ColorModeContext';
 
 export default function AdminPayoutsPage() {
   const router = useRouter();
   const { isAdmin } = useAdminAuth();
-  
+
   const [payouts, setPayouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -48,6 +49,7 @@ export default function AdminPayoutsPage() {
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const { mode } = useColorMode();
 
   useEffect(() => {
     if (isAdmin) {
@@ -63,13 +65,13 @@ export default function AdminPayoutsPage() {
         limit: rowsPerPage,
         search: searchTerm,
       };
-      
+
       if (statusFilter !== 'all') {
         params.status = statusFilter;
       }
-      
+
       const response = await payoutAPI.getPayouts(params);
-      
+
       if (response.success && response.data) {
         setPayouts(Array.isArray(response.data.payouts) ? response.data.payouts : []);
         setTotalPayouts(response.data.total || 0);
@@ -113,7 +115,7 @@ export default function AdminPayoutsPage() {
 
   const handleApprovePayout = async () => {
     if (!selectedPayout) return;
-    
+
     try {
       const response = await payoutAPI.updatePayoutStatus(selectedPayout._id, 'approved');
       if (response.success) {
@@ -129,14 +131,14 @@ export default function AdminPayoutsPage() {
 
   const handleRejectPayout = async () => {
     if (!selectedPayout) return;
-    
+
     try {
       const response = await payoutAPI.updatePayoutStatus(
-        selectedPayout._id, 
-        'rejected', 
+        selectedPayout._id,
+        'rejected',
         rejectionReason
       );
-      
+
       if (response.success) {
         fetchPayouts();
       }
@@ -181,7 +183,11 @@ export default function AdminPayoutsPage() {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1">
+        <Typography
+          variant="h4"
+          component="h1"
+          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+        >
           Payout Management
         </Typography>
         <Typography variant="body1" color="text.secondary">
@@ -246,16 +252,13 @@ export default function AdminPayoutsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              payouts.map((payout) => (
+              payouts.map(payout => (
                 <TableRow key={payout._id} hover>
                   <TableCell>{payout.artistName}</TableCell>
                   <TableCell>{formatCurrency(payout.amount)}</TableCell>
                   <TableCell>
                     {payout.paymentMethod ? (
-                      <Chip 
-                        label={payout.paymentMethod.toUpperCase()} 
-                        size="small"
-                      />
+                      <Chip label={payout.paymentMethod.toUpperCase()} size="small" />
                     ) : (
                       '--'
                     )}
@@ -267,25 +270,17 @@ export default function AdminPayoutsPage() {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>
-                    {new Date(payout.createdAt).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{new Date(payout.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell align="right">
                     {payout.status === 'pending' && (
                       <>
                         <Tooltip title="Approve Payout">
-                          <IconButton 
-                            color="success"
-                            onClick={() => handleApproveClick(payout)}
-                          >
+                          <IconButton color="success" onClick={() => handleApproveClick(payout)}>
                             <CheckCircle />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Reject Payout">
-                          <IconButton 
-                            color="error"
-                            onClick={() => handleRejectClick(payout)}
-                          >
+                          <IconButton color="error" onClick={() => handleRejectClick(payout)}>
                             <Cancel />
                           </IconButton>
                         </Tooltip>
@@ -310,22 +305,20 @@ export default function AdminPayoutsPage() {
       />
 
       {/* Approve Dialog */}
-      <Dialog
-        open={approveDialogOpen}
-        onClose={() => setApproveDialogOpen(false)}
-      >
+      <Dialog open={approveDialogOpen} onClose={() => setApproveDialogOpen(false)}>
         <DialogTitle>Approve Payout</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to approve this payout of {formatCurrency(selectedPayout?.amount || 0)} 
+            Are you sure you want to approve this payout of{' '}
+            {formatCurrency(selectedPayout?.amount || 0)}
             to {selectedPayout?.artistName}?
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setApproveDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleApprovePayout} 
-            variant="contained" 
+          <Button
+            onClick={handleApprovePayout}
+            variant="contained"
             color="success"
             startIcon={<CheckCircle />}
           >
@@ -335,14 +328,12 @@ export default function AdminPayoutsPage() {
       </Dialog>
 
       {/* Reject Dialog */}
-      <Dialog
-        open={rejectDialogOpen}
-        onClose={() => setRejectDialogOpen(false)}
-      >
+      <Dialog open={rejectDialogOpen} onClose={() => setRejectDialogOpen(false)}>
         <DialogTitle>Reject Payout</DialogTitle>
         <DialogContent>
           <DialogContentText sx={{ mb: 2 }}>
-            Are you sure you want to reject this payout of {formatCurrency(selectedPayout?.amount || 0)} 
+            Are you sure you want to reject this payout of{' '}
+            {formatCurrency(selectedPayout?.amount || 0)}
             to {selectedPayout?.artistName}?
           </DialogContentText>
           <TextField
@@ -352,16 +343,16 @@ export default function AdminPayoutsPage() {
             fullWidth
             variant="outlined"
             value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
+            onChange={e => setRejectionReason(e.target.value)}
             multiline
             rows={3}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRejectDialogOpen(false)}>Cancel</Button>
-          <Button 
-            onClick={handleRejectPayout} 
-            variant="contained" 
+          <Button
+            onClick={handleRejectPayout}
+            variant="contained"
             color="error"
             startIcon={<Cancel />}
             disabled={!rejectionReason.trim()}

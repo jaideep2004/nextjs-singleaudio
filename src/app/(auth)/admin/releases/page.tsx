@@ -1,5 +1,5 @@
-"use client";
-import { useEffect, useState } from "react";
+'use client';
+import { useEffect, useState } from 'react';
 import {
   Container,
   Typography,
@@ -15,16 +15,108 @@ import {
   Box,
   Divider,
   Button,
-} from "@mui/material";
-import Link from "next/link";
-import { releaseAPI } from "@/services/api";
+  Tabs,
+  Tab,
+  useTheme,
+  useMediaQuery,
+  IconButton,
+  Tooltip,
+  Avatar,
+  Card,
+  CardContent,
+} from '@mui/material';
+import {
+  Link as LinkIcon,
+  CheckCircle,
+  Pending,
+  Cancel,
+  MusicNote,
+  Store,
+} from '@mui/icons-material';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faApple, 
+  faSpotify, 
+  faYoutube, 
+  faAmazon, 
+  faSoundcloud, 
+  faDeezer,
+  faTidal,
+  faTiktok,
+  faFacebook,
+  faInstagram
+} from '@fortawesome/free-brands-svg-icons';
+import Link from 'next/link';
+import { releaseAPI } from '@/services/api';
+import { useColorMode } from '@/context/ColorModeContext';
+
+// DSP mapping for better visualization with Font Awesome icons
+const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
+  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
+  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
+  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
+  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
+  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
+  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
+  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
+  'TikTok': { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
+  'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
+  'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
+  'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
+};
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`releases-tabpanel-${index}`}
+      aria-labelledby={`releases-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `releases-tab-${index}`,
+    'aria-controls': `releases-tabpanel-${index}`,
+  };
+}
 
 export default function AdminReleasesPage({ searchParams }: any) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [releases, setReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tabValue, setTabValue] = useState(0);
+  const { mode } = useColorMode();
 
   const statusFilter = searchParams?.status;
+
+  // Set initial tab based on status filter
+  useEffect(() => {
+    if (statusFilter === 'pending') {
+      setTabValue(1);
+    } else if (statusFilter === 'approved') {
+      setTabValue(2);
+    } else if (statusFilter === 'rejected') {
+      setTabValue(3);
+    } else {
+      setTabValue(0);
+    }
+  }, [statusFilter]);
 
   useEffect(() => {
     const fetchReleases = async () => {
@@ -33,107 +125,428 @@ export default function AdminReleasesPage({ searchParams }: any) {
         const response = await releaseAPI.getReleases();
         if (response && response.success) {
           let data = Array.isArray(response.data) ? response.data : [];
-          if (statusFilter) {
-            data = data.filter((r) => r.status === statusFilter);
-          }
           setReleases(data);
         } else {
-          setError("Failed to load releases");
+          setError('Failed to load releases');
           setReleases([]);
         }
       } catch (err) {
-        setError("An error occurred while fetching releases");
+        setError('An error occurred while fetching releases');
         setReleases([]);
       } finally {
         setLoading(false);
       }
     };
     fetchReleases();
-  }, [statusFilter]);
+  }, []);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
     });
+  };
+
+  // Filter releases based on tab
+  const getFilteredReleases = () => {
+    switch (tabValue) {
+      case 1: // Pending
+        return releases.filter(r => r.status === 'pending');
+      case 2: // Approved
+        return releases.filter(r => r.status === 'approved');
+      case 3: // Rejected
+        return releases.filter(r => r.status === 'rejected');
+      default: // All
+        return releases;
+    }
+  };
+
+  const filteredReleases = getFilteredReleases();
+
+  // Get status chip with proper styling
+  const getStatusChip = (status: string) => {
+    const statusConfig = {
+      pending: { label: 'Pending', color: 'warning', icon: <Pending /> },
+      approved: { label: 'Approved', color: 'success', icon: <CheckCircle /> },
+      rejected: { label: 'Rejected', color: 'error', icon: <Cancel /> },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      label: status,
+      color: 'default',
+      icon: null,
+    };
+
+    return (
+      <Chip
+        icon={config.icon}
+        label={config.label}
+        color={config.color as any}
+        size="small"
+        sx={{
+          minWidth: 90,
+          fontWeight: 500,
+          '& .MuiChip-icon': {
+            color: 'inherit',
+          },
+        }}
+      />
+    );
+  };
+
+  // Render DSP chips with icons
+  const renderDSPChips = (stores: string[]) => {
+    if (!Array.isArray(stores) || stores.length === 0) {
+      return <Typography variant="body2" color="text.secondary">N/A</Typography>;
+    }
+
+    return (
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+        {stores.slice(0, 3).map((store, index) => {
+          // Try to match store name with our mapping
+          let dspKey = store;
+          if (!DSP_MAPPING[store]) {
+            // Try to find a partial match
+            const matchedKey = Object.keys(DSP_MAPPING).find(key => 
+              store.toLowerCase().includes(key.toLowerCase()) || 
+              key.toLowerCase().includes(store.toLowerCase())
+            );
+            dspKey = matchedKey || 'default';
+          }
+          
+          const dsp = DSP_MAPPING[dspKey] || DSP_MAPPING.default;
+          
+          // Check if it's a Font Awesome icon or MUI icon
+          const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');
+          
+          return (
+            <Tooltip key={index} title={dsp.name}>
+              <Avatar
+                sx={{
+                  width: 24,
+                  height: 24,
+                  bgcolor: dsp.color,
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isFAIcon ? (
+                  <FontAwesomeIcon 
+                    icon={dsp.icon} 
+                    style={{ 
+                      fontSize: '0.75rem',
+                      color: '#fff'
+                    }} 
+                  />
+                ) : (
+                  <Store sx={{ fontSize: '0.75rem', color: '#fff' }} />
+                )}
+              </Avatar>
+            </Tooltip>
+          );
+        })}
+        {stores.length > 3 && (
+          <Chip
+            label={`+${stores.length - 3}`}
+            size="small"
+            sx={{ height: 24, fontSize: '0.7rem' }}
+          />
+        )}
+      </Box>
+    );
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" fontWeight={700} mb={2}>
-        Releases {statusFilter && `- ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
-      </Typography>
-      <Divider sx={{ mb: 3 }} />
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 4 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Typography color="error">{error}</Typography>
-      ) : releases.length === 0 ? (
-        <Typography color="text.secondary">No releases found.</Typography>
-      ) : (
-        <Paper elevation={0} sx={{ p: 2, borderRadius: 2, mb: 4 }}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Artist</TableCell>
-                  <TableCell>Label</TableCell>
-                  <TableCell>UPC</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>DSPs</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Updated</TableCell>
-                  <TableCell align="right">Action</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {releases.map((release) => (
-                  <TableRow key={release._id}>
-                    <TableCell>{release.releaseTitle || "Untitled"}</TableCell>
-                    <TableCell>{release.primaryArtist || "N/A"}</TableCell>
-                    <TableCell>{release.label || "N/A"}</TableCell>
-                    <TableCell>{release.upc || "N/A"}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={release.status.charAt(0).toUpperCase() + release.status.slice(1)}
-                        color={
-                          release.status === "approved"
-                            ? "success"
-                            : release.status === "pending"
-                            ? "warning"
-                            : "error"
-                        }
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {Array.isArray(release.stores)
-                        ? release.stores.join(", ")
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>{formatDate(release.createdAt)}</TableCell>
-                    <TableCell>{formatDate(release.updatedAt)}</TableCell>
-                    <TableCell align="right">
-                      <Button
-                        component={Link}
-                        href={`/admin/releases/${release._id}`}
-                        size="small"
-                        variant="outlined"
-                      >
-                        Review
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
+      <Box sx={{ mb: 4 }}>
+        <Typography
+          variant={isMobile ? "h5" : "h4"}
+          fontWeight={700}
+          gutterBottom
+          sx={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+        >
+          Release Management
+        </Typography>
+        <Typography
+          variant="subtitle1"
+          color="text.secondary"
+          sx={{ mb: 2 }}
+        >
+          Manage and review music releases across all DSPs
+        </Typography>
+      </Box>
+
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          borderRadius: 3,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          mb: 4
+        }}
+      >
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          aria-label="releases tabs"
+          variant={isMobile ? "scrollable" : "fullWidth"}
+          scrollButtons="auto"
+          sx={{
+            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            '& .MuiTab-root': {
+              color: mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+              '&.Mui-selected': {
+                color: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              backgroundColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+            },
+          }}
+        >
+          <Tab label={`All (${releases.length})`} {...a11yProps(0)} />
+          <Tab label={`Pending (${releases.filter(r => r.status === 'pending').length})`} {...a11yProps(1)} />
+          <Tab label={`Approved (${releases.filter(r => r.status === 'approved').length})`} {...a11yProps(2)} />
+          <Tab label={`Rejected (${releases.filter(r => r.status === 'rejected').length})`} {...a11yProps(3)} />
+        </Tabs>
+
+        <TabPanel value={tabValue} index={0}>
+          {renderReleasesTable()}
+        </TabPanel>
+        <TabPanel value={tabValue} index={1}>
+          {renderReleasesTable()}
+        </TabPanel>
+        <TabPanel value={tabValue} index={2}>
+          {renderReleasesTable()}
+        </TabPanel>
+        <TabPanel value={tabValue} index={3}>
+          {renderReleasesTable()}
+        </TabPanel>
+      </Paper>
     </Container>
   );
+
+  function renderReleasesTable() {
+    if (loading) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
+
+    if (error) {
+      return (
+        <Box sx={{ py: 4, textAlign: 'center' }}>
+          <Typography color="error">{error}</Typography>
+        </Box>
+      );
+    }
+
+    if (filteredReleases.length === 0) {
+      return (
+        <Box sx={{ py: 8, textAlign: 'center' }}>
+          <MusicNote sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            No releases found
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {tabValue === 1
+              ? 'There are no pending releases at the moment.'
+              : tabValue === 2
+              ? 'No releases have been approved yet.'
+              : tabValue === 3
+              ? 'No releases have been rejected.'
+              : 'No releases match your current filters.'}
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ px: { xs: 1, sm: 2 } }}>
+        {/* Stats Summary */}
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
+          <Box sx={{ flex: 1 }}>
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 2,
+                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+                backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                <Typography variant="h5" fontWeight={700}>
+                  {filteredReleases.length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Total Releases
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 2,
+                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+                backgroundColor: mode === 'dark' ? 'rgba(255, 183, 0, 0.1)' : 'rgba(255, 183, 0, 0.1)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                <Typography variant="h5" fontWeight={700} color="warning.main">
+                  {filteredReleases.filter(r => r.status === 'pending').length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Pending
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 2,
+                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+                backgroundColor: mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                <Typography variant="h5" fontWeight={700} color="success.main">
+                  {filteredReleases.filter(r => r.status === 'approved').length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Approved
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Card
+              elevation={0}
+              sx={{
+                borderRadius: 2,
+                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+                backgroundColor: mode === 'dark' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+              }}
+            >
+              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
+                <Typography variant="h5" fontWeight={700} color="error.main">
+                  {filteredReleases.filter(r => r.status === 'rejected').length}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Rejected
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        </Box>
+
+        {/* Releases Table */}
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>Release</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Artist</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Label</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>DSPs</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Tracks</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Updated</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>Action</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filteredReleases.map((release) => (
+                <TableRow
+                  key={release._id}
+                  sx={{
+                    '&:last-child td, &:last-child th': { border: 0 },
+                    '&:hover': {
+                      backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+                    },
+                  }}
+                >
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Avatar
+                        variant="rounded"
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          mr: 1.5,
+                          bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                        }}
+                      >
+                        <MusicNote sx={{ fontSize: 20 }} />
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body2" fontWeight={500}>
+                          {release.releaseTitle || 'Untitled Release'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {release.upc || 'No UPC'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {release.primaryArtist || 'Unknown Artist'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {release.label || 'N/A'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{getStatusChip(release.status)}</TableCell>
+                  <TableCell>{renderDSPChips(release.stores || [])}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {Array.isArray(release.tracks) ? release.tracks.length : 0}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {formatDate(release.updatedAt)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Button
+                      component={Link}
+                      href={`/admin/releases/${release._id}`}
+                      size="small"
+                      variant="outlined"
+                      startIcon={<LinkIcon />}
+                      sx={{
+                        borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+                        minWidth: 'auto',
+                        px: 1.5,
+                        py: 0.5,
+                      }}
+                    >
+                      Review
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
+    );
+  }
 }

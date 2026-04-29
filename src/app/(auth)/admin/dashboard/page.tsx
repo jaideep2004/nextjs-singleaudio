@@ -2,7 +2,37 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Container, Box, Typography, Paper, Card, CardContent, Button, Chip, CircularProgress, Alert, Divider, List, ListItem, ListItemAvatar, ListItemText, Avatar, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid } from '@mui/material';
+import { useColorMode } from '@/context/ColorModeContext';
+import useAdminAuth from '@/hooks/useAdminAuth';
+import { adminAPI, releaseAPI } from '@/services/api';
+import { 
+  Container, 
+  Box, 
+  Typography, 
+  Paper, 
+  Card, 
+  CardContent, 
+  Button, 
+  Chip, 
+  CircularProgress, 
+  Alert, 
+  Divider, 
+  List, 
+  ListItem, 
+  ListItemAvatar, 
+  ListItemText, 
+  Avatar, 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableContainer, 
+  TableHead, 
+  TableRow, 
+  Grid,
+  useTheme,
+  useMediaQuery,
+  Skeleton
+} from '@mui/material';
 import {
   MusicNote,
   Group,
@@ -14,10 +44,36 @@ import {
   CheckCircle,
   PendingActions,
   Error as ErrorIcon,
+  PlayArrow,
+  TrendingUp,
+  Storage,
+  AccountBalance
 } from '@mui/icons-material';
-import { adminAPI, trackAPI, payoutAPI, releaseAPI } from '@/services/api';
-import { ReleaseStatus, PayoutStatus } from '@/utils/constants';
-import useAdminAuth from '@/hooks/useAdminAuth';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faApple, 
+  faSpotify, 
+  faYoutube, 
+  faAmazon, 
+  faSoundcloud, 
+  faDeezer,
+  faTidal,
+  faTiktok,
+  faFacebook,
+  faInstagram
+} from '@fortawesome/free-brands-svg-icons';
+
+// DSP mapping for better visualization with Font Awesome icons
+const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
+  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
+  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
+  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
+  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
+  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
+  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
+  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
+  'default': { icon: 'store', color: '#4a6cf7', name: 'Other' }
+};
 
 interface DashboardStats {
   totalUsers: number;
@@ -31,6 +87,9 @@ interface DashboardStats {
 
 export default function AdminDashboard() {
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { mode } = useColorMode();
   const { isAdmin, isLoading: isAuthLoading, error: authError } = useAdminAuth();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -221,9 +280,32 @@ export default function AdminDashboard() {
   // Render loading state
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '70vh' }}>
-        <CircularProgress />
-      </Box>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box sx={{ mb: 4 }}>
+          <Skeleton variant="text" width={300} height={40} />
+          <Skeleton variant="text" width={200} height={20} />
+        </Box>
+        
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {[...Array(4)].map((_, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <Skeleton variant="rounded" height={120} />
+            </Grid>
+          ))}
+        </Grid>
+        
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rounded" height={300} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Skeleton variant="rounded" height={300} />
+          </Grid>
+          <Grid item xs={12}>
+            <Skeleton variant="rounded" height={400} />
+          </Grid>
+        </Grid>
+      </Container>
     );
   }
   
@@ -239,172 +321,239 @@ export default function AdminDashboard() {
   }
   
   return (
-    <Container maxWidth="lg" sx={{ px: { xs: 1, sm: 3 }, py: { xs: 2, sm: 4 } }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" fontWeight={700}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
+      {/* Header */}
+      <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+        <Typography 
+          variant={isMobile ? "h5" : "h4"} 
+          component="h1" 
+          fontWeight={700}
+          sx={{ mb: 1 }}
+          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+        >
           Admin Dashboard
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
-          Manage users, releases, and payouts
+          Welcome back! Here's what's happening today.
         </Typography>
       </Box>
 
-      {/* Stats cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={6}>
-          <Paper
+      {/* Stats Overview */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              mb: 2,
-              borderRadius: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: 'rgba(76, 175, 80, 0.1)',
-              border: '1px solid rgba(76, 175, 80, 0.2)',
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <Group color="success" />
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                    mr: 1.5
+                  }}
+                >
+                  <Group sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {stats.totalUsers}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Total Users
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {stats.totalUsers}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Users
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </CardContent>
+          </Card>
         </Grid>
         
-        <Grid item xs={12} md={6}>
-          <Paper
+        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              mb: 2,
-              borderRadius: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: 'rgba(33, 150, 243, 0.1)',
-              border: '1px solid rgba(33, 150, 243, 0.2)',
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <Album color="primary" />
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'secondary.dark' : 'secondary.light',
+                    mr: 1.5
+                  }}
+                >
+                  <Album sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {allReleases.length}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Total Releases
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {allReleases.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Releases
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </CardContent>
+          </Card>
         </Grid>
         
-        <Grid item xs={12} md={6}>
-          <Paper
+        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              mb: 2,
-              borderRadius: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: 'rgba(255, 152, 0, 0.1)',
-              border: '1px solid rgba(255, 152, 0, 0.2)',
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <PendingActions color="warning" />
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'warning.dark' : 'warning.light',
+                    mr: 1.5
+                  }}
+                >
+                  <PendingActions sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {stats.pendingReleases}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Pending Approvals
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {stats.pendingReleases}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Approvals
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </CardContent>
+          </Card>
         </Grid>
         
-        <Grid item xs={12} md={6}>
-          <Paper
+        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              mb: 2,
-              borderRadius: 2,
-              display: 'flex',
-              flexDirection: 'column',
-              backgroundColor: 'rgba(244, 67, 54, 0.1)',
-              border: '1px solid rgba(244, 67, 54, 0.2)',
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(244, 67, 54, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <MonetizationOn color="error" />
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'error.dark' : 'error.light',
+                    mr: 1.5
+                  }}
+                >
+                  <MonetizationOn sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {stats.pendingPayouts}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Pending Payouts
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {stats.pendingPayouts}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Payouts
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
       
-      {/* Quick links */}
-      <Grid container spacing={2} sx={{ mb: 5 }}>
+      {/* Quick Actions */}
+      <Grid container spacing={2} sx={{ mb: 4 }} component="div">
         {[
           { title: 'Manage Users', icon: <Group />, href: '/admin/users', color: 'primary' },
           { title: 'Pending Releases', icon: <MusicNote />, href: '/admin/releases?status=pending', color: 'warning' },
           { title: 'Payout Requests', icon: <MonetizationOn />, href: '/admin/payouts', color: 'error' },
           { title: 'View Analytics', icon: <BarChart />, href: '/admin/analytics', color: 'success' },
         ].map((item, index) => (
-          <Grid item xs={6} sm={3} key={index}>
+          <Grid item xs={6} sm={3} key={index} sx={{ flex: '1' }}>
             <Button
               component={Link}
               href={item.href}
@@ -417,9 +566,18 @@ export default function AdminDashboard() {
                 height: '100%',
                 borderWidth: 2,
                 textTransform: 'none',
-                fontSize: '0.9rem',
+                fontSize: '0.85rem',
                 fontWeight: 600,
                 justifyContent: 'flex-start',
+                borderColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.23)` 
+                  : `rgba(0, 0, 0, 0.23)`,
+                '&:hover': {
+                  borderWidth: 2,
+                  backgroundColor: mode === 'dark' 
+                    ? `rgba(255, 255, 255, 0.08)` 
+                    : `rgba(0, 0, 0, 0.04)`,
+                }
               }}
               fullWidth
             >
@@ -429,17 +587,18 @@ export default function AdminDashboard() {
         ))}
       </Grid>
       
-      {/* Dashboard content */}
-      <Grid container spacing={4}>
-        {/* New users */}
-        <Grid item xs={12} md={6}>
+      {/* Dashboard Content */}
+      <Grid container spacing={3} style={{flexWrap: 'nowrap'}}>
+        {/* Recent Users */}
+        <Grid item xs={12} md={6} component="div">
           <Paper
             elevation={0}
             sx={{
               p: 3,
-              mb: 2,
-              borderRadius: 2,
+              borderRadius: 3,
               height: '100%',
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -451,6 +610,12 @@ export default function AdminDashboard() {
                 href="/admin/users"
                 size="small"
                 color="primary"
+                variant="outlined"
+                sx={{
+                  borderColor: mode === 'dark' 
+                    ? `rgba(255, 255, 255, 0.23)` 
+                    : `rgba(0, 0, 0, 0.23)`,
+                }}
               >
                 View All
               </Button>
@@ -465,6 +630,7 @@ export default function AdminDashboard() {
                     key={user._id}
                     sx={{
                       px: 0,
+                      py: 1,
                       borderBottom: '1px solid',
                       borderColor: 'divider',
                       '&:last-child': {
@@ -473,15 +639,31 @@ export default function AdminDashboard() {
                     }}
                   >
                     <ListItemAvatar>
-                      <Avatar>{user.name.charAt(0)}</Avatar>
+                      <Avatar sx={{ width: 36, height: 36 }}>
+                        {user.name.charAt(0)}
+                      </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={user.name}
+                      primary={
+                        <Typography variant="body2" fontWeight={500}>
+                          {user.name}
+                        </Typography>
+                      }
                       secondary={
                         <>
-                          {user.email}
+                          <Typography 
+                            component="span" 
+                            variant="caption" 
+                            color="text.secondary"
+                          >
+                            {user.email}
+                          </Typography>
                           <br />
-                          <Typography component="span" variant="caption" color="text.secondary">
+                          <Typography 
+                            component="span" 
+                            variant="caption" 
+                            color="text.secondary"
+                          >
                             Joined {formatDate(user.createdAt)}
                           </Typography>
                         </>
@@ -491,11 +673,16 @@ export default function AdminDashboard() {
                       label={user.role}
                       size="small"
                       color={user.role === 'admin' ? 'secondary' : 'primary'}
+                      sx={{ 
+                        height: 20, 
+                        fontSize: '0.65rem',
+                        minWidth: 60
+                      }}
                     />
                   </ListItem>
                 ))
               ) : (
-                <Typography variant="body2" color="text.secondary" align="center">
+                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
                   No recent users
                 </Typography>
               )}
@@ -503,84 +690,33 @@ export default function AdminDashboard() {
           </Paper>
         </Grid>
 
-        {/* All releases table */}
-        <Grid item xs={12}>
-          <Paper elevation={0} sx={{ p: 3, borderRadius: 2, mb: 4 }}>
-            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
-              All Releases
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            {allReleases.length > 0 ? (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Title</TableCell>
-                      <TableCell>Artist</TableCell>
-                      <TableCell>Label</TableCell>
-                      <TableCell>UPC</TableCell>
-                      <TableCell>Status</TableCell>
-                      <TableCell>DSPs</TableCell>
-                      <TableCell>Tracks</TableCell>
-                      <TableCell>Created</TableCell>
-                      <TableCell>Updated</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {allReleases.map((release) => (
-                      <TableRow key={release._id}>
-                        <TableCell sx={{ maxWidth: 120 }}>
-                          <Typography variant="body2" noWrap>
-                            {release.releaseTitle || 'Untitled'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>{release.primaryArtist || 'N/A'}</TableCell>
-                        <TableCell>{release.label || 'N/A'}</TableCell>
-                        <TableCell>{release.upc || 'N/A'}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={release.status.charAt(0).toUpperCase() + release.status.slice(1)}
-                            color={release.status === 'approved' ? 'success' : release.status === 'pending' ? 'warning' : 'error'}
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>{Array.isArray(release.stores) ? release.stores.join(', ') : 'N/A'}</TableCell>
-                        <TableCell>{Array.isArray(release.tracks) ? release.tracks.length : 0}</TableCell>
-                        <TableCell>{formatDate(release.createdAt)}</TableCell>
-                        <TableCell>{formatDate(release.updatedAt)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Typography variant="body2" color="text.secondary" align="center">
-                No releases found
-              </Typography>
-            )}
-          </Paper>
-        </Grid>
-        
-        {/* Pending payouts */}
-        <Grid item xs={12} md={6}>
+        {/* Pending Releases */}
+        <Grid item xs={12} md={6} component="div">
           <Paper
             elevation={0}
             sx={{
               p: 3,
-              mb: 2,
-              borderRadius: 2,
+              borderRadius: 3,
               height: '100%',
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight={600}>
-                Pending Payouts
+                Pending Releases
               </Typography>
               <Button
                 component={Link}
-                href="/admin/payouts"
+                href="/admin/releases?status=pending"
                 size="small"
                 color="primary"
+                variant="outlined"
+                sx={{
+                  borderColor: mode === 'dark' 
+                    ? `rgba(255, 255, 255, 0.23)` 
+                    : `rgba(0, 0, 0, 0.23)`,
+                }}
               >
                 View All
               </Button>
@@ -588,34 +724,161 @@ export default function AdminDashboard() {
             
             <Divider sx={{ mb: 2 }} />
             
-            {pendingPayouts.length > 0 ? (
+            {pendingReleases.length > 0 ? (
+              <List sx={{ px: 0 }}>
+                {pendingReleases.slice(0, 5).map((release) => (
+                  <ListItem
+                    key={release._id}
+                    sx={{
+                      px: 0,
+                      py: 1,
+                      borderBottom: '1px solid',
+                      borderColor: 'divider',
+                      '&:last-child': {
+                        borderBottom: 'none',
+                      },
+                    }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar 
+                        sx={{ 
+                          width: 36, 
+                          height: 36,
+                          bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light'
+                        }}
+                      >
+                        <MusicNote sx={{ fontSize: 16 }} />
+                      </Avatar>
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body2" fontWeight={500} noWrap>
+                          {release.releaseTitle || 'Untitled Release'}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography 
+                          component="span" 
+                          variant="caption" 
+                          color="text.secondary"
+                        >
+                          by {release.primaryArtist || 'Unknown Artist'}
+                        </Typography>
+                      }
+                    />
+                    <Button
+                      component={Link}
+                      href={`/admin/releases/${release._id}`}
+                      size="small"
+                      variant="outlined"
+                      sx={{
+                        borderColor: mode === 'dark' 
+                          ? `rgba(255, 255, 255, 0.23)` 
+                          : `rgba(0, 0, 0, 0.23)`,
+                        minWidth: 'auto',
+                        px: 1.5,
+                        py: 0.5
+                      }}
+                    >
+                      Review
+                    </Button>
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+                No pending releases
+              </Typography>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* All Releases Table */}
+        <Grid item xs={12}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                All Releases
+              </Typography>
+              <Button
+                component={Link}
+                href="/admin/releases"
+                size="small"
+                color="primary"
+                variant="outlined"
+                sx={{
+                  borderColor: mode === 'dark' 
+                    ? `rgba(255, 255, 255, 0.23)` 
+                    : `rgba(0, 0, 0, 0.23)`,
+                }}
+              >
+                View All
+              </Button>
+            </Box>
+            
+            <Divider sx={{ mb: 2 }} />
+            
+            {allReleases.length > 0 ? (
               <TableContainer>
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>User</TableCell>
-                      <TableCell>Amount</TableCell>
-                      <TableCell>Method</TableCell>
-                      <TableCell align="right">Action</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Title</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Artist</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Status</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Tracks</TableCell>
+                      <TableCell sx={{ fontWeight: 600, fontSize: '0.85rem' }}>Updated</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {pendingPayouts.map((payout) => (
-                      <TableRow key={payout._id}>
-                        <TableCell>{payout.userName}</TableCell>
-                        <TableCell>{formatCurrency(payout.amount)}</TableCell>
-                        <TableCell sx={{ textTransform: 'capitalize' }}>
-                          {payout.paymentMethod}
+                    {allReleases.slice(0, 5).map((release) => (
+                      <TableRow 
+                        key={release._id}
+                        sx={{
+                          '&:last-child td': {
+                            borderBottom: 0,
+                          },
+                        }}
+                      >
+                        <TableCell sx={{ maxWidth: 120 }}>
+                          <Typography variant="body2" noWrap>
+                            {release.releaseTitle || 'Untitled'}
+                          </Typography>
                         </TableCell>
-                        <TableCell align="right">
-                          <Button
-                            component={Link}
-                            href={`/admin/payouts/${payout._id}`}
+                        <TableCell>
+                          <Typography variant="body2">
+                            {release.primaryArtist || 'N/A'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={release.status.charAt(0).toUpperCase() + release.status.slice(1)}
+                            color={release.status === 'approved' ? 'success' : release.status === 'pending' ? 'warning' : 'error'}
                             size="small"
-                            variant="outlined"
-                          >
-                            Review
-                          </Button>
+                            sx={{ 
+                              height: 20, 
+                              fontSize: '0.65rem',
+                              minWidth: 70
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {Array.isArray(release.tracks) ? release.tracks.length : 0}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" color="text.secondary">
+                            {formatDate(release.updatedAt)}
+                          </Typography>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -623,8 +886,8 @@ export default function AdminDashboard() {
                 </Table>
               </TableContainer>
             ) : (
-              <Typography variant="body2" color="text.secondary" align="center">
-                No pending payouts
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+                No releases found
               </Typography>
             )}
           </Paper>

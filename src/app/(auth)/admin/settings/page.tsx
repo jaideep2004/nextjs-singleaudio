@@ -19,6 +19,7 @@ import {
 import { Save, Security, Notifications, Payment, Person } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
+import { useColorMode } from '@/context/ColorModeContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -37,11 +38,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`settings-tab-${index}`}
       {...other}
     >
-      {value === index && (
-        <Box sx={{ p: 3 }}>
-          {children}
-        </Box>
-      )}
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
     </div>
   );
 }
@@ -56,7 +53,7 @@ function a11yProps(index: number) {
 export default function AdminSettingsPage() {
   const router = useRouter();
   const { isAdmin } = useAdminAuth();
-  
+
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState({
     siteName: '',
@@ -70,9 +67,9 @@ export default function AdminSettingsPage() {
     maxUploadSize: 50, // MB
     allowedFileTypes: ['mp3', 'wav', 'aac', 'flac'],
   });
-  
+
   const [signupEnabled, setSignupEnabled] = useState(true);
-  
+  const { mode } = useColorMode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -87,11 +84,11 @@ export default function AdminSettingsPage() {
   const fetchSettings = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch signup setting
       const signupResponse = await adminAPI.getSetting('signupEnabled');
       console.log('Signup setting response:', signupResponse);
-      
+
       if (signupResponse.success && signupResponse.data) {
         const signupValue = signupResponse.data.value;
         console.log('Signup value:', signupValue);
@@ -116,7 +113,7 @@ export default function AdminSettingsPage() {
     const { name, value, type, checked } = e.target;
     setSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -124,28 +121,28 @@ export default function AdminSettingsPage() {
     const { name, value } = e.target;
     setSettings(prev => ({
       ...prev,
-      [name]: value === '' ? '' : Number(value)
+      [name]: value === '' ? '' : Number(value),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setSaving(true);
       setError('');
-      
+
       // Save signup setting
       console.log('Saving signup setting:', signupEnabled);
       const signupResponse = await adminAPI.updateSetting('signupEnabled', signupEnabled);
       console.log('Signup setting save response:', signupResponse);
-      
+
       if (!signupResponse.success) {
         throw new Error(signupResponse.message || 'Failed to update signup setting');
       }
-      
+
       setSaveSuccess(true);
-      
+
       // Hide success message after 3 seconds
       setTimeout(() => {
         setSaveSuccess(false);
@@ -153,7 +150,7 @@ export default function AdminSettingsPage() {
     } catch (error: any) {
       console.error('Error saving settings:', error);
       setError(error?.message || 'Failed to save settings');
-      
+
       // Show error message for 5 seconds
       setTimeout(() => {
         setError('');
@@ -187,7 +184,12 @@ export default function AdminSettingsPage() {
   return (
     <Box>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+        <Typography
+          variant="h4"
+          component="h1"
+          gutterBottom
+          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+        >
           Settings
         </Typography>
         <Typography variant="body1" color="text.secondary">
@@ -250,7 +252,7 @@ export default function AdminSettingsPage() {
                   control={
                     <Switch
                       checked={signupEnabled}
-                      onChange={(e) => setSignupEnabled(e.target.checked)}
+                      onChange={e => setSignupEnabled(e.target.checked)}
                       name="signupEnabled"
                       color="primary"
                       disabled={saving}
@@ -261,7 +263,7 @@ export default function AdminSettingsPage() {
                 {saving && <CircularProgress size={24} sx={{ ml: 2 }} />}
               </Box>
               <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                {signupEnabled 
+                {signupEnabled
                   ? 'New users can create accounts on the signup page.'
                   : 'New user registrations are currently disabled. Only administrators can create new accounts.'}
               </Typography>
@@ -288,11 +290,11 @@ export default function AdminSettingsPage() {
                 label="Allowed File Types"
                 name="allowedFileTypes"
                 value={settings.allowedFileTypes.join(', ')}
-                onChange={(e) => {
+                onChange={e => {
                   const types = e.target.value.split(',').map(t => t.trim().toLowerCase());
                   setSettings(prev => ({
                     ...prev,
-                    allowedFileTypes: types
+                    allowedFileTypes: types,
                   }));
                 }}
                 margin="normal"
@@ -375,18 +377,14 @@ export default function AdminSettingsPage() {
           </TabPanel>
 
           <Divider />
-          
+
           <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <Button 
-              variant="outlined" 
-              onClick={() => fetchSettings()}
-              disabled={saving}
-            >
+            <Button variant="outlined" onClick={() => fetchSettings()} disabled={saving}>
               Reset
             </Button>
-            <Button 
-              type="submit" 
-              variant="contained" 
+            <Button
+              type="submit"
+              variant="contained"
               color="primary"
               startIcon={saving ? <CircularProgress size={20} /> : <Save />}
               disabled={saving}

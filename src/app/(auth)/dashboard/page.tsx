@@ -1,26 +1,25 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  CardMedia,
-  CardActions,
-  Button,
-  Chip,
-  CircularProgress,
-  Paper,
-  Avatar,
-  Divider,
+import { useColorMode } from '@/context/ColorModeContext';
+import { 
+  Container, 
+  Box, 
+  Typography, 
+  Paper, 
+  Card, 
+  CardContent, 
+  Button, 
+  Chip, 
+  CircularProgress, 
+  Alert, 
+  Divider, 
+  Grid,
   useTheme,
   useMediaQuery,
+  Avatar,
   IconButton,
-  Tooltip,
-  Container,
-  Alert,
-  Grid,
+  CardActions
 } from '@mui/material';
 
 import {
@@ -38,6 +37,12 @@ import {
   Cancel as CancelIcon,
   ShowChart as ShowChartIcon,
   Logout as LogoutIcon,
+  Group,
+  MonetizationOn,
+  TrendingUp,
+  Storage,
+  AccountBalance,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { trackAPI, releaseAPI } from '@/services/api';
@@ -45,7 +50,7 @@ import { trackAPI, releaseAPI } from '@/services/api';
 // Define types
 interface Track {
   _id: string;
-  title: string;
+  title: string;   
   genre: string;
   releaseDate: string;
   audioUrl: string;
@@ -65,9 +70,10 @@ export default function ArtistDashboard() {
   );
 }
 
-function DashboardPage(props) {
+function DashboardPage() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { mode } = useColorMode();
   const [mounted, setMounted] = useState(false);
 
   // FIX: Always call hooks at the top level (never conditionally)
@@ -228,197 +234,393 @@ function DashboardPage(props) {
   
   // Render dashboard
   return (
-    <Box sx={{ p: 4 }}>
-      <Box sx={{ mb: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" component="h1" fontWeight={700}>
-            Welcome, {user?.artistName || user?.name}
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            Manage your releases and track your music performance
-          </Typography>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
+      {/* Header */}
+      <Box sx={{ mb: { xs: 3, sm: 4 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+            <Typography 
+              variant={isMobile ? "h5" : "h4"} 
+              component="h1" 
+              fontWeight={700}
+              style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+            >
+              Welcome, {user?.artistName || user?.name}
+            </Typography>
+            <Typography variant="subtitle1" color="text.secondary">
+              Manage your releases and track your music performance
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<LogoutIcon />}
+            onClick={handleLogout}
+            sx={{
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+            }}
+          >
+            Logout
+          </Button>
         </Box>
-        <Button
-          variant="outlined"
-          color="primary"
-          startIcon={<LogoutIcon />}
-          onClick={handleLogout}
-        >
-          Logout
-        </Button>
       </Box>
-      
-      {/* Dashboard stats */}
-      <Grid container spacing={3} sx={{ mb: 5 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper
+
+      {/* Stats Overview */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={6} sm={4} md={3}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: 'rgba(76, 175, 80, 0.1)',
-              border: '1px solid rgba(76, 175, 80, 0.2)',
+            sx={{ 
               height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <LibraryMusicIcon color="success" />
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                    mr: 1.5
+                  }}
+                >
+                  <LibraryMusicIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {tracks.length}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Total Tracks
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {tracks.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Tracks
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: 'rgba(33, 150, 243, 0.1)',
-              border: '1px solid rgba(33, 150, 243, 0.2)',
-              height: '100%',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(33, 150, 243, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <AlbumIcon color="primary" />
-              </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {releases.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Releases
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: 'rgba(76, 175, 80, 0.1)',
-              border: '1px solid rgba(76, 175, 80, 0.2)',
-              height: '100%',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(76, 175, 80, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <CheckCircleIcon color="success" />
-              </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {approvedReleases}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Approved Releases
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: 'rgba(255, 152, 0, 0.1)',
-              border: '1px solid rgba(255, 152, 0, 0.2)',
-              height: '100%',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                  mr: 2,
-                }}
-              >
-                <PendingActionsIcon color="warning" />
-              </Box>
-              <Box>
-                <Typography variant="h4" component="div" fontWeight={700}>
-                  {pendingTracks}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pending Review
-                </Typography>
-              </Box>
-            </Box>
-          </Paper>
+            </CardContent>
+          </Card>
         </Grid>
         
-        <Grid item xs={12} sm={6} md={3} component="div">
-          <Paper
+        <Grid item xs={6} sm={4} md={3}>
+          <Card 
             elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 2,
-              backgroundColor: 'rgba(244, 67, 54, 0.1)',
-              border: '1px solid rgba(244, 67, 54, 0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
+            sx={{ 
               height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
             }}
           >
-            <Button
-              component={Link}
-              href="/upload"
-              variant="contained"
-              color="primary"
-              size="large"
-              startIcon={<CloudUploadIcon />}
-              sx={{ py: 1.5 }}
-            >
-              Upload New Track
-            </Button>
-          </Paper>
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'secondary.dark' : 'secondary.light',
+                    mr: 1.5
+                  }}
+                >
+                  <AlbumIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {releases.length}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Total Releases
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={6} sm={4} md={3}>
+          <Card 
+            elevation={0}
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
+            }}
+          >
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'success.dark' : 'success.light',
+                    mr: 1.5
+                  }}
+                >
+                  <CheckCircleIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {approvedReleases}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Approved Releases
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={6} sm={4} md={3}>
+          <Card 
+            elevation={0}
+            sx={{ 
+              height: '100%',
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: mode === 'dark' 
+                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
+              }
+            }}
+          >
+            <CardContent sx={{ p: 2, pb: '16px !important' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Avatar 
+                  sx={{ 
+                    width: 40, 
+                    height: 40, 
+                    bgcolor: mode === 'dark' ? 'warning.dark' : 'warning.light',
+                    mr: 1.5
+                  }}
+                >
+                  <PendingActionsIcon sx={{ fontSize: 20 }} />
+                </Avatar>
+                <Box>
+                  <Typography 
+                    variant="h6" 
+                    component="div" 
+                    fontWeight={700}
+                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
+                  >
+                    {pendingTracks}
+                  </Typography>
+                  <Typography 
+                    variant="caption" 
+                    color="text.secondary"
+                    sx={{ fontSize: '0.7rem' }}
+                  >
+                    Pending Review
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+      
+      {/* Quick Actions */}
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Button
+            component={Link}
+            href="/dashboard/upload"
+            variant="outlined"
+            color="primary"
+            startIcon={<CloudUploadIcon />}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              height: '100%',
+              borderWidth: 2,
+              textTransform: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              justifyContent: 'flex-start',
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+              '&:hover': {
+                borderWidth: 2,
+                backgroundColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.08)` 
+                  : `rgba(0, 0, 0, 0.04)`,
+              }
+            }}
+            fullWidth
+          >
+            Upload New Track
+          </Button>
+        </Grid>
+        
+        <Grid item xs={12} sm={6} md={3}>
+          <Button
+            component={Link}
+            href="/dashboard/royalties"
+            variant="outlined"
+            color="success"
+            startIcon={<MonetizationOn />}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              height: '100%',
+              borderWidth: 2,
+              textTransform: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              justifyContent: 'flex-start',
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+              '&:hover': {
+                borderWidth: 2,
+                backgroundColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.08)` 
+                  : `rgba(0, 0, 0, 0.04)`,
+              }
+            }}
+            fullWidth
+          >
+            View Royalties
+          </Button>
+        </Grid>
+        
+        <Grid item xs={12} sm={6} md={3}>
+          <Button
+            component={Link}
+            href="/dashboard/releases"
+            variant="outlined"
+            color="secondary"
+            startIcon={<AlbumIcon />}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              height: '100%',
+              borderWidth: 2,
+              textTransform: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              justifyContent: 'flex-start',
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+              '&:hover': {
+                borderWidth: 2,
+                backgroundColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.08)` 
+                  : `rgba(0, 0, 0, 0.04)`,
+              }
+            }}
+            fullWidth
+          >
+            Manage Releases
+          </Button>
+        </Grid>
+        
+        <Grid item xs={12} sm={6} md={3}>
+          <Button
+            component={Link}
+            href="/dashboard/settings"
+            variant="outlined"
+            color="warning"
+            startIcon={<SettingsIcon />}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              height: '100%',
+              borderWidth: 2,
+              textTransform: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              justifyContent: 'flex-start',
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+              '&:hover': {
+                borderWidth: 2,
+                backgroundColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.08)` 
+                  : `rgba(0, 0, 0, 0.04)`,
+              }
+            }}
+            fullWidth
+          >
+            Account Settings
+          </Button>
         </Grid>
       </Grid>
       
       {/* Track status summary */}
-      <Paper elevation={0} sx={{ p: 3, borderRadius: 2, mb: 4 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          mb: 4,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+        }}
+      >
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
           Release Status
         </Typography>
-        <Grid container spacing={2} component="div">
-          <Grid item xs={4} component="div">
+        <Grid container spacing={2}>
+          <Grid item xs={4}>
             <Box sx={{ textAlign: 'center' }}>
               <Chip
                 icon={<CheckCircleIcon />}
@@ -429,7 +631,7 @@ function DashboardPage(props) {
               />
             </Box>
           </Grid>
-          <Grid item xs={4} component="div">
+          <Grid item xs={4}>
             <Box sx={{ textAlign: 'center' }}>
               <Chip
                 icon={<PendingActionsIcon />}
@@ -440,7 +642,7 @@ function DashboardPage(props) {
               />
             </Box>
           </Grid>
-          <Grid item xs={4} component="div">
+          <Grid item xs={4}>
             <Box sx={{ textAlign: 'center' }}>
               <Chip
                 icon={<ErrorIcon />}
@@ -454,9 +656,9 @@ function DashboardPage(props) {
         </Grid>
       </Paper>
       
-      {/* Recent releases */}
+      {/* Recent tracks */}
       <Typography variant="h5" component="h2" fontWeight={600} sx={{ mb: 3 }}>
-        Your Releases
+        Your Tracks
       </Typography>
       
       {isLoading ? (
@@ -487,7 +689,7 @@ function DashboardPage(props) {
           </Typography>
           <Button
             component={Link}
-            href="/upload"
+            href="/dashboard/upload"
             variant="contained"
             color="primary"
             startIcon={<CloudUploadIcon />}
@@ -498,7 +700,7 @@ function DashboardPage(props) {
       ) : (
         <Grid container spacing={3} sx={{ mt: 4 }}>
           {tracks.map((track) => (
-            <Grid item xs={12} sm={6} md={4} key={track._id} component="div">
+            <Grid item xs={12} sm={6} md={4} key={track._id}>
               <Card
                 sx={{
                   height: '100%',
@@ -506,17 +708,20 @@ function DashboardPage(props) {
                   flexDirection: 'column',
                   border: '1px solid',
                   borderColor: 'divider',
+                  borderRadius: 3,
+                  overflow: 'hidden',
                   '&:hover': {
                     boxShadow: 3,
                   },
                 }}
               >
                 <Box sx={{ position: 'relative' }}>
-                  <CardMedia
+                  <Box
                     component="img"
                     height="200"
-                    image={track.artworkUrl || '/placeholder-artwork.jpg'}
+                    src={track.artworkUrl || '/placeholder-artwork.jpg'}
                     alt={track.title}
+                    sx={{ width: '100%', objectFit: 'cover' }}
                   />
                   <Box
                     sx={{
@@ -582,6 +787,11 @@ function DashboardPage(props) {
                     size="small"
                     variant="outlined"
                     fullWidth
+                    sx={{
+                      borderColor: mode === 'dark' 
+                        ? `rgba(255, 255, 255, 0.23)` 
+                        : `rgba(0, 0, 0, 0.23)`,
+                    }}
                   >
                     View Details
                   </Button>
@@ -600,11 +810,16 @@ function DashboardPage(props) {
             href="/dashboard/tracks"
             variant="outlined"
             color="primary"
+            sx={{
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+            }}
           >
             View All Releases
           </Button>
         </Box>
       )}
-    </Box>
+    </Container>
   );
 }

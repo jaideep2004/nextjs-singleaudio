@@ -277,9 +277,13 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     getToken,
   };
 
+  // Always render children to prevent hydration mismatch
+  // Use CSS to hide content during loading instead of conditional rendering
   return (
     <AppContext.Provider value={contextValue}>
-      {isInitialized ? children : <div>Loading...</div>}
+      <div style={{ visibility: isInitialized ? 'visible' : 'hidden' }}>
+        {children}
+      </div>
     </AppContext.Provider>
   );
 }
@@ -313,4 +317,4 @@ export const useAuth = () => {
     };
   }
   return context;
-}; 
+};

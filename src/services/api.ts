@@ -413,7 +413,7 @@ export const publicAPI = {
       const response = await api.get<ApiResponse<any>>('/api/settings/signup-enabled');
       return {
         success: true,
-        enabled: response.data.enabled === true
+        enabled: response.data?.data?.enabled === true
       };
     } catch (error) {
       console.error('Error checking if signups are enabled:', error);
@@ -454,7 +454,7 @@ export const adminAPI = {
             ...response.data,
             data: {
               users: Array.isArray(response.data.data) ? response.data.data : [],
-              total: response.data.pagination?.total || 0
+              total: response.data?.data?.pagination?.total || 0
             }
           };
         }
@@ -491,6 +491,15 @@ export const adminAPI = {
   updateUser: async (id: string, userData: any) => {
     try {
       const response = await api.put<ApiResponse<any>>(`/admin/users/${id}`, userData);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  deleteUser: async (id: string) => {
+    try {
+      const response = await api.delete<ApiResponse<any>>(`/admin/users/${id}`);
       return response.data;
     } catch (error) {
       return handleApiError(error);

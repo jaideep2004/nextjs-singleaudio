@@ -101,18 +101,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     markAllAsRead,
   };
 
-  // Don't render anything meaningful during SSR
-  if (!isClient) {
-    return (
-      <NotificationsContext.Provider value={contextValue}>
-        {children}
-      </NotificationsContext.Provider>
-    );
-  }
-
+  // Always render children to prevent hydration mismatch
+  // Use a wrapper div with visibility control during initial load
   return (
     <NotificationsContext.Provider value={contextValue}>
-      {children}
+      <div style={{ visibility: !isClient || loading ? 'hidden' : 'visible' }}>
+        {children}
+      </div>
     </NotificationsContext.Provider>
   );
 }

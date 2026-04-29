@@ -27,9 +27,12 @@ import {
   ExpandMore,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
+  Album,
+  TrendingUp,
+  AccountBalance
 } from '@mui/icons-material';
 
-const drawerWidth = 240;
+const drawerWidth = 260;
 
 const menuItems = [
   {
@@ -43,20 +46,30 @@ const menuItems = [
     path: '/admin/users',
   },
   {
+    text: 'Releases',
+    icon: <Album />,
+    path: '/admin/releases',
+    subItems: [
+      { text: 'All Releases', path: '/admin/releases' },
+      { text: 'Pending', path: '/admin/releases?status=pending' },
+      { text: 'Approved', path: '/admin/releases?status=approved' },
+      { text: 'Rejected', path: '/admin/releases?status=rejected' },
+    ],
+  },
+  {
     text: 'Tracks',
     icon: <MusicNoteIcon />,
     path: '/admin/tracks',
-    subItems: [
-      { text: 'All Tracks', path: '/admin/tracks' },
-      { text: 'Pending', path: '/admin/tracks?status=pending' },
-      { text: 'Approved', path: '/admin/tracks?status=approved' },
-      { text: 'Rejected', path: '/admin/tracks?status=rejected' },
-    ],
   },
   {
     text: 'Payouts',
     icon: <PaymentIcon />,
     path: '/admin/payouts',
+  },
+  {
+    text: 'Analytics',
+    icon: <TrendingUp />,
+    path: '/admin/analytics',
   },
   {
     text: 'Settings',
@@ -89,20 +102,43 @@ export default function AdminSidebar() {
   };
 
   const drawer = (
-    <Box sx={{ overflow: 'auto' }}>
-      <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-          SingleAudio
+    <Box 
+      sx={{ 
+        overflow: 'auto',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.8)' : 'rgba(245, 245, 245, 0.8)',
+      }}
+    >
+      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Typography 
+          variant="h6" 
+          component="div" 
+          sx={{ 
+            fontWeight: 700,
+            background: 'linear-gradient(45deg, #4a6cf7 30%, #6b8af8 90%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          Admin Panel
         </Typography>
-        <IconButton onClick={handleDrawerToggle} sx={{ display: { sm: 'none' } }}>
+        <IconButton 
+          onClick={handleDrawerToggle} 
+          sx={{ 
+            display: { sm: 'none' },
+            color: theme.palette.mode === 'dark' ? 'white' : 'black'
+          }}
+        >
           <ChevronLeftIcon />
         </IconButton>
       </Box>
-      <Divider />
-      <List>
+      <Divider sx={{ borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)' }} />
+      <List sx={{ px: 1, py: 2, flex: 1 }}>
         {menuItems.map((item) => (
           <div key={item.path}>
-            <ListItem disablePadding>
+            <ListItem disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={isActive(item.path)}
                 onClick={() =>
@@ -111,20 +147,45 @@ export default function AdminSidebar() {
                     : router.push(item.path)
                 }
                 sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  py: 1.2,
                   '&.Mui-selected': {
-                    backgroundColor: 'primary.light',
-                    color: 'primary.main',
+                    backgroundColor: theme.palette.mode === 'dark' 
+                      ? 'rgba(74, 108, 247, 0.15)' 
+                      : 'rgba(74, 108, 247, 0.1)',
+                    color: theme.palette.mode === 'dark' ? '#9bafff' : '#4a6cf7',
                     '&:hover': {
-                      backgroundColor: 'primary.light',
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(74, 108, 247, 0.2)' 
+                        : 'rgba(74, 108, 247, 0.15)',
                     },
                     '& .MuiListItemIcon-root': {
-                      color: 'primary.main',
+                      color: theme.palette.mode === 'dark' ? '#9bafff' : '#4a6cf7',
                     },
+                  },
+                  '&:hover': {
+                    backgroundColor: theme.palette.mode === 'dark' 
+                      ? 'rgba(255, 255, 255, 0.08)' 
+                      : 'rgba(0, 0, 0, 0.04)',
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
+                <ListItemIcon 
+                  sx={{ 
+                    minWidth: 40,
+                    color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.54)'
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text} 
+                  primaryTypographyProps={{
+                    fontWeight: 500,
+                    fontSize: '0.95rem'
+                  }}
+                />
                 {item.subItems && (
                   <>{openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}</>
                 )}
@@ -132,23 +193,41 @@ export default function AdminSidebar() {
             </ListItem>
             {item.subItems && (
               <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
+                <List component="div" disablePadding sx={{ py: 0.5 }}>
                   {item.subItems.map((subItem) => (
                     <ListItemButton
                       key={subItem.path}
                       selected={pathname === subItem.path}
                       onClick={() => router.push(subItem.path)}
                       sx={{
-                        pl: 8,
+                        borderRadius: 2,
+                        mx: 2,
+                        py: 1,
+                        pl: 3,
                         '&.Mui-selected': {
-                          backgroundColor: 'action.selected',
+                          backgroundColor: theme.palette.mode === 'dark' 
+                            ? 'rgba(74, 108, 247, 0.1)' 
+                            : 'rgba(74, 108, 247, 0.05)',
                           '&:hover': {
-                            backgroundColor: 'action.hover',
+                            backgroundColor: theme.palette.mode === 'dark' 
+                              ? 'rgba(74, 108, 247, 0.15)' 
+                              : 'rgba(74, 108, 247, 0.1)',
                           },
+                        },
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark' 
+                            ? 'rgba(255, 255, 255, 0.04)' 
+                            : 'rgba(0, 0, 0, 0.02)',
                         },
                       }}
                     >
-                      <ListItemText primary={subItem.text} />
+                      <ListItemText 
+                        primary={subItem.text} 
+                        primaryTypographyProps={{
+                          fontSize: '0.9rem',
+                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'
+                        }}
+                      />
                     </ListItemButton>
                   ))}
                 </List>
@@ -157,6 +236,19 @@ export default function AdminSidebar() {
           </div>
         ))}
       </List>
+      
+      {/* Sidebar Footer */}
+      <Box sx={{ p: 2, textAlign: 'center' }}>
+        <Typography 
+          variant="caption" 
+          sx={{ 
+            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+            fontSize: '0.7rem'
+          }}
+        >
+          Karhari Media Admin v1.0
+        </Typography>
+      </Box>
     </Box>
   );
 
@@ -180,6 +272,9 @@ export default function AdminSidebar() {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
+              border: 'none',
+              backgroundColor: 'transparent',
+              backdropFilter: 'blur(10px)',
             },
           }}
         >
@@ -194,8 +289,8 @@ export default function AdminSidebar() {
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
-              borderRight: 'none',
-              boxShadow: '1px 0px 4px rgba(0, 0, 0, 0.1)',
+              border: 'none',
+              backgroundColor: 'transparent',
             },
           }}
           open
@@ -221,10 +316,11 @@ export default function AdminSidebar() {
             edge="start"
             onClick={handleDrawerToggle}
             sx={{ 
-              backgroundColor: 'background.paper',
-              boxShadow: 1,
+              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+              boxShadow: 2,
+              backdropFilter: 'blur(10px)',
               '&:hover': {
-                backgroundColor: 'action.hover',
+                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.9)' : 'rgba(255, 255, 255, 0.9)',
               },
             }}
           >

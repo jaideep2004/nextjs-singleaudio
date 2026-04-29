@@ -8,15 +8,25 @@ import theme from '@/theme';
 
 export default function ThemeRegistry({ children }: { children: React.ReactNode }) {
   const [cache] = React.useState(() => createEmotionCache());
+  const [isClient, setIsClient] = React.useState(false);
 
-  useServerInsertedHTML(() => (
-    <style
-      data-emotion={`${cache.key} ${Object.keys(cache.inserted).join(' ')}`}
-      dangerouslySetInnerHTML={{
-        __html: Object.values(cache.inserted).join(' '),
-      }}
-    />
-  ));
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useServerInsertedHTML(() => {
+    if (!isClient) {
+      return (
+        <style
+          data-emotion={`${cache.key} ${Object.keys(cache.inserted).join(' ')}`}
+          dangerouslySetInnerHTML={{
+            __html: Object.values(cache.inserted).join(' '),
+          }}
+        />
+      );
+    }
+    return null;
+  });
 
   return (
     <CacheProvider value={cache}>

@@ -1033,9 +1033,11 @@ export default function UploadPage() {
                           </Box>
                         )}
                         {analysisResults[idx] && (
-                          <Box sx={{ mt: 1 }}>
-                            <Typography variant="caption" color="success.main">Format: {analysisResults[idx].format || analysisResults[idx].container || '—'}</Typography><br />
-                            <Typography variant="caption" color="success.main">Duration: {formatDuration(analysisResults[idx].duration)}</Typography><br />
+                          <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            <Typography variant="caption" color="success.main">Format: {analysisResults[idx].format || analysisResults[idx].container || '—'}</Typography>
+                            <Typography variant="caption" color="success.main" aria-hidden>•</Typography>
+                            <Typography variant="caption" color="success.main">Duration: {formatDuration(analysisResults[idx].duration)}</Typography>
+                            <Typography variant="caption" color="success.main" aria-hidden>•</Typography>
                             <Typography variant="caption" color="success.main">Bitrate: {formatBitrate(analysisResults[idx].bitrate || analysisResults[idx].bit_rate)}</Typography>
                           </Box>
                         )}

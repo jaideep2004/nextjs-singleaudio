@@ -1,6 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { ThemeProvider, createTheme, PaletteMode, Theme } from '@mui/material/styles';
+import { CssBaseline } from '@mui/material';
 
 // Define the context type
 type ColorModeContextType = {
@@ -10,7 +11,7 @@ type ColorModeContextType = {
 
 // Create the context
 export const ColorModeContext = createContext<ColorModeContextType>({
-  mode: 'light',
+  mode: 'dark',
   toggleColorMode: () => {},
 });
 
@@ -19,8 +20,8 @@ export const useColorMode = () => useContext(ColorModeContext);
 
 // Provider component
 export function ColorModeProvider({ children }: { children: React.ReactNode }) {
-  // Use state to track the current mode - default to light for SSR
-  const [mode, setMode] = useState<PaletteMode>('light');
+  // Use state to track the current mode - default to dark
+  const [mode, setMode] = useState<PaletteMode>('dark');
   const [mounted, setMounted] = useState(false);
 
   // Initialize mode from localStorage or system preference
@@ -42,8 +43,8 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error initializing color mode:', error);
-      // Fallback to light mode
-      setMode('light');
+      // Fallback to dark mode
+      setMode('dark');
     }
   }, []);
 
@@ -63,12 +64,9 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
   // Create a theme with the current mode
   const theme = useMemo(
     () => {
-      // Always use light theme during SSR to prevent hydration mismatch
-      const themeMode = mounted ? mode : 'light';
-      
       return createTheme({
         palette: {
-          mode: themeMode as PaletteMode,
+          mode,
           primary: {
             main: '#4a6cf7',
             light: '#6b8af8',
@@ -82,8 +80,8 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
             contrastText: '#ffffff',
           },
           background: {
-            default: themeMode === 'light' ? '#f8f9fa' : '#121212',
-            paper: themeMode === 'light' ? '#ffffff' : '#1e1e1e',
+            default: mode === 'dark' ? '#0f0f1a' : '#f5f5f5',
+            paper: mode === 'dark' ? '#1a1a2e' : '#ffffff',
           },
         },
         typography: {
@@ -111,7 +109,7 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
           MuiAppBar: {
             styleOverrides: {
               colorDefault: {
-                backgroundColor: mode === 'light' ? '#ffffff' : '#1e1e1e',
+                backgroundColor: mode === 'dark' ? '#1a1a2e' : '#ffffff',
               },
             },
           },
@@ -134,16 +132,24 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
             styleOverrides: {
               root: {
                 borderRadius: 12,
-                boxShadow: mode === 'light' 
-                  ? '0px 2px 8px rgba(0, 0, 0, 0.05)'
-                  : '0px 2px 8px rgba(0, 0, 0, 0.2)',
+                backgroundImage: 'none',
+              },
+            },
+          },
+          MuiPaper: {
+            styleOverrides: {
+              root: {
+                backgroundImage: 'none',
+              },
+              outlined: {
+                borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
               },
             },
           },
         },
       });
     },
-    [mode, mounted]
+    [mode]
   );
 
   // Context value
@@ -152,27 +158,18 @@ export function ColorModeProvider({ children }: { children: React.ReactNode }) {
       mode,
       toggleColorMode,
     }),
-    [mode, mounted]
+    [mode]
   );
-
-  // Prevent flash of wrong theme during SSR
-  if (!mounted) {
-    // Return a minimal theme provider during SSR
-    return (
-      <ColorModeContext.Provider value={{ mode: 'light', toggleColorMode: () => {} }}>
-        <ThemeProvider theme={createTheme({ palette: { mode: 'light' } })}>
-          {children}
-        </ThemeProvider>
-      </ColorModeContext.Provider>
-    );
-  }
 
   // Always render children to prevent hydration mismatch
   return (
     <ColorModeContext.Provider value={colorModeContextValue}>
       <ThemeProvider theme={theme}>
-        {children}
+        <CssBaseline />
+        <div style={{ visibility: mounted ? 'visible' : 'hidden' }}>
+          {children}
+        </div>
       </ThemeProvider>
     </ColorModeContext.Provider>
   );
-} 
+}

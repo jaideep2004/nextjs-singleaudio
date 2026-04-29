@@ -10,20 +10,71 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
+  DialogContentText,
   DialogTitle,
   Divider,
   Paper,
   Stack,
   TextField,
   Typography,
+  useTheme,
+  Card,
+  CardContent,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import {
+  Album,
+  CheckCircle,
+  Pending,
+  Cancel,
+  ArrowBack,
+  ThumbUp,
+  ThumbDown,
+  Info,
+  MusicNote,
+  Store,
+  Link as LinkIcon,
+  PlayArrow,
+  Pause,
+} from "@mui/icons-material";
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faApple, 
+  faSpotify, 
+  faYoutube, 
+  faAmazon, 
+  faSoundcloud, 
+  faDeezer,
+  faTidal,
+  faTiktok,
+  faFacebook,
+  faInstagram
+} from '@fortawesome/free-brands-svg-icons';
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { releaseAPI } from "@/services/api";
-import { Album } from "@mui/icons-material";
-import countries from "@/utils/countries";
+import { useColorMode } from '@/context/ColorModeContext';
+
+// DSP mapping for better visualization with Font Awesome icons
+const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
+  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
+  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
+  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
+  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
+  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
+  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
+  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
+  'TikTok': { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
+  'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
+  'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
+  'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
+};
 
 export default function AdminReleaseDetailPage() {
+  const router = useRouter();   
+  const theme = useTheme();
+  const { mode } = useColorMode();
   const params = useParams<{ id: string }>();
   const releaseId = params?.id as string;
 
@@ -31,6 +82,8 @@ export default function AdminReleaseDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [release, setRelease] = useState<any | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -71,6 +124,11 @@ export default function AdminReleaseDetailPage() {
     if (releaseId) load();
     return () => {
       mounted = false;
+      // Clean up audio element
+      if (audioElement) {
+        audioElement.pause();
+        setAudioElement(null);
+      }
     };
   }, [releaseId]);
 
@@ -108,281 +166,562 @@ export default function AdminReleaseDetailPage() {
     }
   };
 
+  const handlePlayTrack = (audioUrl: string, trackId: string) => {
+    if (!audioUrl) return;
+    
+    if (currentlyPlaying === trackId) {
+      // Pause if same track
+      if (audioElement) {
+        audioElement.pause();
+        setCurrentlyPlaying(null);
+      }
+    } else {
+      // Stop current audio if playing
+      if (audioElement) {
+        audioElement.pause();
+      }
+      
+      // Create new audio element
+      const audio = new Audio(audioUrl);
+      audio.play();
+      setAudioElement(audio);
+      setCurrentlyPlaying(trackId);
+      
+      // Handle audio end
+      audio.onended = () => {
+        setCurrentlyPlaying(null);
+      };
+    }
+  };
+
   const InfoRow = ({ label, value }: { label: string; value: any }) => (
     <Stack direction="row" spacing={1} sx={{ my: 0.5 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160 }}>
-        {label}
+      <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160, fontWeight: 500 }}>
+        {label}:
       </Typography>
-      <Typography variant="body2" fontWeight={600} sx={{ wordBreak: "break-word" }}>
+      <Typography variant="body2" sx={{ wordBreak: "break-word", fontWeight: 500 }}>
         {value ?? "—"}
       </Typography>
     </Stack>
   );
 
-  // DSP metadata to render pretty chips with logos
-  const DSP_LIST = [
-    { key: "spotify", name: "Spotify", logo: "/dsp/spotify.png" },
-    { key: "apple", name: "Apple Music", logo: "/dsp/applemusic.png" },
-    { key: "amazon", name: "Amazon Music", logo: "/dsp/amazonmusic.png" },
-    { key: "youtube", name: "YouTube Music", logo: "/dsp/youtubemusic.png" },
-    { key: "deezer", name: "Deezer", logo: "/dsp/deezer.png" },
-    { key: "tidal", name: "Tidal", logo: "/dsp/tidal.png" },
-    { key: "pandora", name: "Pandora", logo: "/dsp/pandora.png" },
-    { key: "soundcloud", name: "SoundCloud", logo: "/dsp/soundcloud.png" },
-  ];
+  // Render DSP chips with icons
+  const renderDSPChips = (stores: string[]) => {
+    if (!Array.isArray(stores) || stores.length === 0) {
+      return <Typography variant="body2" color="text.secondary">None specified</Typography>;
+    }
 
-  const renderStores = (stores: any) => {
-    const list = Array.isArray(stores)
-      ? stores
-      : typeof stores === "string"
-        ? stores.split(/\s*,\s*/).filter(Boolean)
-        : [];
-    if (!list.length) return <Typography variant="body2" color="text.secondary">—</Typography>;
     return (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-        {list.map((k: string) => {
-          const key = k.trim().toLowerCase();
-          const meta = DSP_LIST.find(d => d.key === key) || DSP_LIST.find(d => d.name.toLowerCase() === key);
-          const label = meta?.name || k;
-          const logo = meta?.logo;
-          return <Chip key={k} label={label} avatar={logo ? <Avatar src={logo} alt={label} /> : undefined} variant="outlined" />;
+        {stores.map((store, index) => {
+          // Try to match store name with our mapping
+          let dspKey = store;
+          if (!DSP_MAPPING[store]) {
+            // Try to find a partial match
+            const matchedKey = Object.keys(DSP_MAPPING).find(key => 
+              store.toLowerCase().includes(key.toLowerCase()) || 
+              key.toLowerCase().includes(store.toLowerCase())
+            );
+            dspKey = matchedKey || 'default';
+          }
+          
+          const dsp = DSP_MAPPING[dspKey] || DSP_MAPPING.default;
+          
+          // Check if it's a Font Awesome icon or MUI icon
+          const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');
+          
+          return (
+            <Tooltip key={index} title={dsp.name}>
+              <Chip
+                icon={
+                  isFAIcon ? (
+                    <FontAwesomeIcon 
+                      icon={dsp.icon} 
+                      style={{ 
+                        color: dsp.color,
+                        fontSize: '1rem'
+                      }} 
+                    />
+                  ) : (
+                    <Store sx={{ color: dsp.color }} />
+                  )
+                }
+                label={dsp.name}
+                size="small"
+                sx={{
+                  bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                }}
+              />
+            </Tooltip>
+          );
         })}
       </Box>
     );
   };
 
-  const renderTerritories = (codes: any) => {
-    const list = Array.isArray(codes)
-      ? codes
-      : typeof codes === "string"
-        ? codes.split(/\s*,\s*/).filter(Boolean)
-        : [];
-    if (!list.length) return <Typography variant="body2" color="text.secondary">—</Typography>;
-    const labels = list.map((code: string) => countries.find(c => c.code === code)?.label || code).sort();
+  // Render tracks table
+  const renderTracks = () => {
+    // Check different possible track structures
+    let tracks = [];
+    if (Array.isArray(release?.tracks)) {
+      tracks = release.tracks;
+    } else if (release?.tracks?.data && Array.isArray(release.tracks.data)) {
+      tracks = release.tracks.data;
+    }
+    
+    if (tracks.length === 0) {
+      return (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+          No tracks found for this release
+        </Typography>
+      );
+    }
+
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 0.5,
-          maxHeight: 160,
-          overflowY: 'auto',
-          p: 1,
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 1,
-          bgcolor: 'background.default',
-        }}
-      >
-        {labels.map((l) => (<Chip key={l} size="small" variant="outlined" label={l} />))}
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+          Tracks ({tracks.length})
+        </Typography>
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            borderRadius: 2,
+            border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+          }}
+        >
+          <Stack spacing={1} sx={{ p: 2 }}>
+            {tracks.map((track: any, index: number) => {
+              // Try different possible field names for audio URL
+              const audioUrl = track.audioUrl || track.audioFile || track.audio || null;
+              const trackId = track._id || track.id || index.toString();
+              const title = track.title || track.name || `Track ${index + 1}`;
+              const isrc = track.isrc || track.ISRC || 'No ISRC';
+              const duration = track.duration || track.length || 0;
+              
+              return (
+                <Box 
+                  key={trackId} 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    py: 1,
+                    borderBottom: index < tracks.length - 1 ? 
+                      `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}` : 
+                      'none'
+                  }}
+                >
+                  <Avatar
+                    sx={{
+                      width: 40,
+                      height: 40,
+                      mr: 2,
+                      bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                    }}
+                  >
+                    <MusicNote />
+                  </Avatar>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight={500}>
+                      {title}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {isrc}
+                    </Typography>
+                  </Box>
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
+                    {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}
+                  </Typography>
+                  {audioUrl && (
+                    <IconButton 
+                      size="small"
+                      onClick={() => handlePlayTrack(audioUrl, trackId)}
+                      sx={{
+                        bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                      }}
+                    >
+                      {currentlyPlaying === trackId ? <Pause /> : <PlayArrow />}
+                    </IconButton>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Paper>
       </Box>
     );
   };
 
-  // Build media base from NEXT_PUBLIC_API_URL (strip trailing /api) or default localhost:5000
-  const MEDIA_BASE = useMemo(() => {
-    const env = process.env.NEXT_PUBLIC_API_URL || '';
-    if (env && env.startsWith('http')) {
-      return env.replace(/\/?api\/?$/, '');
-    }
-    return 'http://localhost:5000';
-  }, []);
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress />
+      </Container>
+    );
+  }
 
-  const getArtworkUrl = (r: any): string | null => {
-    const direct = r?.artworkUrl || r?.artworkURL || r?.artwork || r?.artworkPath || null;
-    if (direct) return String(direct);
-    const file = r?.artworkFile;
-    if (file) return `${MEDIA_BASE}/uploads/artwork/${file}`;
-    return null;
-  };
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="error" variant="h6" sx={{ mb: 2 }}>
+            Error Loading Release
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 3 }}>
+            {error}
+          </Typography>
+          <Button 
+            variant="outlined" 
+            onClick={() => router.back()}
+            startIcon={<ArrowBack />}
+          >
+            Go Back
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
+
+  if (!release) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Paper elevation={0} sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Release Not Found
+          </Typography>
+          <Typography color="text.secondary" sx={{ mb: 3 }}>
+            The requested release could not be found.
+          </Typography>
+          <Button 
+            variant="outlined" 
+            component={Link} 
+            href="/admin/releases"
+            startIcon={<ArrowBack />}
+          >
+            Back to Releases
+          </Button>
+        </Paper>
+      </Container>
+    );
+  }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" mb={2}>
-        <Typography variant="h4" fontWeight={700}>
-          Release Review
-        </Typography>
-        <Stack direction="row" spacing={1}>
-          <Button component={Link} href="/admin/releases" variant="outlined" size="small">
-            Back
-          </Button>
-          {release && (
-            <Chip label={release.status} color={statusColor} size="small" sx={{ textTransform: "capitalize" }} />
-          )}
-        </Stack>
-      </Stack>
-      <Divider sx={{ mb: 3 }} />
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => router.back()}
+          variant="outlined"
+          sx={{
+            borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+          }}
+        >
+          Back to Releases
+        </Button>
+        
+        <Chip
+          icon={
+            release.status === "approved" ? <CheckCircle /> :
+            release.status === "pending" ? <Pending /> :
+            <Cancel />
+          }
+          label={release.status?.charAt(0).toUpperCase() + release.status?.slice(1)}
+          color={statusColor}
+          size="medium"
+          sx={{ fontWeight: 600 }}
+        />
+      </Box>
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 6 }}>
-          <CircularProgress />
-        </Box>
-      ) : error ? (
-        <Typography color="error">{error}</Typography>
-      ) : !release ? (
-        <Typography color="text.secondary">Release not found.</Typography>
-      ) : (
-        <>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 360px' }, gap: 2 }}>
-            <Box>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom>
-                  Overview
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 1 }}>
-                  <Box sx={{ width: 160, height: 160, borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: 'divider', bgcolor: 'grey.200', flexShrink: 0 }}>
-                    {getArtworkUrl(release) ? (
-                      <img src={getArtworkUrl(release) as string} alt="Artwork" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
-                        <Album />
-                      </Box>
-                    )}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <InfoRow label="Title" value={release.releaseTitle || "Untitled"} />
-                    <InfoRow label="Primary Artist" value={release.primaryArtist} />
-                    <InfoRow label="Featuring Artists" value={Array.isArray(release.featuredArtists) ? release.featuredArtists.join(", ") : release.featuredArtists} />
-                    <InfoRow label="Label" value={release.label} />
-                    <InfoRow label="UPC" value={release.upc} />
-                    <InfoRow label="Primary Genre" value={release.primaryGenre} />
-                    <InfoRow label="Secondary Genre" value={release.secondaryGenre} />
-                    <InfoRow label="Language" value={release.language} />
-                    <InfoRow label="P Line" value={release.pLine} />
-                    <InfoRow label="C Line" value={release.cLine} />
-                    <InfoRow label="Release Date" value={release.releaseDate ? new Date(release.releaseDate).toLocaleDateString() : undefined} />
-                  </Box>
-                </Box>
-                <Typography variant="subtitle2" sx={{ mt: 1 }}>Stores (DSPs)</Typography>
-                {renderStores(release.stores)}
-                {(() => {
-                  const tList = Array.isArray(release.territories)
-                    ? release.territories
-                    : typeof release.territories === 'string'
-                      ? release.territories.split(/\s*,\s*/).filter(Boolean)
-                      : [];
-                  return (
-                    <>
-                      <Typography variant="subtitle2" sx={{ mt: 2 }}>
-                        Territories <Typography component="span" variant="caption" color="text.secondary">({tList.length})</Typography>
-                      </Typography>
-                      {renderTerritories(release.territories)}
-                    </>
-                  );
-                })()}
-                <Divider sx={{ my: 2 }} />
-                <InfoRow label="Created" value={release.createdAt ? new Date(release.createdAt).toLocaleString() : undefined} />
-                <InfoRow label="Updated" value={release.updatedAt ? new Date(release.updatedAt).toLocaleString() : undefined} />
-              </Paper>
-
-              {Array.isArray(release.tracks) && release.tracks.length > 0 && (
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mt: 2 }}>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
-                    Tracks
-                  </Typography>
-                  <Divider sx={{ mb: 2 }} />
-                  <Stack spacing={2}>
-                    {release.tracks.map((t: any, idx: number) => (
-                      <Box key={t._id || idx}>
-                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                          <Chip size="small" label={`#${idx + 1}`} sx={{ minWidth: 48 }} />
-                          <Typography variant="body2" fontWeight={700}>{t.title || `Track ${idx + 1}`}</Typography>
-                          <Typography variant="body2" color="text.secondary">{t.version ? `(${t.version})` : ''}</Typography>
-                          <Typography variant="body2" color="text.secondary">— {t.artist || release.primaryArtist}</Typography>
-                          {t.featuring && <Typography variant="body2" color="text.secondary">feat. {t.featuring}</Typography>}
-                          {t.remixer && <Typography variant="body2" color="text.secondary">[Remix: {t.remixer}]</Typography>}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                          {t.duration ? `Duration: ${t.duration} · ` : ''}
-                          {t.genre ? `Genre: ${t.genre}${t.subgenre ? `/${t.subgenre}` : ''} · ` : ''}
-                          {t.language ? `Language: ${t.language} · ` : ''}
-                          {t.isrc ? `ISRC: ${t.isrc} · ` : ''}
-                          {t.parentalAdvisory && t.parentalAdvisory !== 'none' ? `Advisory: ${t.parentalAdvisory} · ` : ''}
-                          {t.instrumental ? `Instrumental · ` : ''}
-                          {t.recordingYear ? `Recording Year: ${t.recordingYear}` : ''}
-                        </Typography>
-                        {(t.composers || t.publishers || t.producers) && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {t.composers ? `Composers: ${t.composers} · ` : ''}
-                            {t.publishers ? `Publishers: ${t.publishers} · ` : ''}
-                            {t.producers ? `Producers: ${t.producers}` : ''}
-                          </Typography>
-                        )}
-                        {(t.copyrightC || t.copyrightP || t.upc) && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                            {t.copyrightC ? `© ${t.copyrightC} · ` : ''}
-                            {t.copyrightP ? `℗ ${t.copyrightP} · ` : ''}
-                            {t.upc ? `UPC: ${t.upc}` : ''}
-                          </Typography>
-                        )}
-                        {(t.audioUrl || t.previewUrl || t.audio) && (
-                          <Box sx={{ mt: 1 }}>
-                            <audio controls src={(t.audioUrl || t.previewUrl || t.audio) as string} style={{ width: '100%' }} />
-                          </Box>
-                        )}
-                      </Box>
-                    ))}
-                  </Stack>
-                </Paper>
-              )}
-            </Box>
-
-            <Box>
-              <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, position: "sticky", top: 24 }}>
-                <Typography variant="h6" fontWeight={700} gutterBottom>
-                  Actions
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                <Stack spacing={1}>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    color="success"
-                    disabled={saving || release.status === "approved"}
-                    onClick={handleApprove}
-                  >
-                    {saving ? "Saving..." : "Approve"}
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    color="error"
-                    disabled={saving || release.status === "rejected"}
-                    onClick={() => setRejectOpen(true)}
-                  >
-                    Reject
-                  </Button>
-                </Stack>
-              </Paper>
-            </Box>
-          </Box>
-
-          <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} fullWidth maxWidth="sm">
-            <DialogTitle>Reject Release</DialogTitle>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Please provide a reason to help the artist understand what to fix.
-              </Typography>
-              <TextField
-                autoFocus
-                label="Reason"
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                fullWidth
-                multiline
-                minRows={3}
+      {/* Release Header */}
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 3, 
+          mb: 3,
+          borderRadius: 3,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+          {/* Cover Image */}
+          <Box
+            component="img"
+            src={release.artworkUrl || release.artwork || '/placeholder-artwork.jpg'}
+            alt={`${release.releaseTitle || 'Release'} Cover`}
+            sx={{
+              width: { xs: '100%', md: 200 },
+              height: { xs: 200, md: 200 },
+              borderRadius: 2,
+              objectFit: 'cover',
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+            }}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = '/placeholder-artwork.jpg';
+            }}
+          />
+          
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h4" fontWeight={700} sx={{ mb: 1 }}>
+              {release.releaseTitle || 'Untitled Release'}
+            </Typography>
+            
+            <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+              by {release.primaryArtist || 'Unknown Artist'}
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              <Chip 
+                label={`Label: ${release.label || 'N/A'}`} 
+                size="small" 
+                variant="outlined" 
               />
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setRejectOpen(false)}>Cancel</Button>
-              <Button color="error" variant="contained" onClick={handleReject} disabled={saving}>
-                {saving ? "Saving..." : "Reject"}
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </>
-      )}
+              <Chip 
+                label={`UPC: ${release.upc || 'N/A'}`} 
+                size="small" 
+                variant="outlined" 
+              />
+              <Chip 
+                label={`${Array.isArray(release.tracks) ? release.tracks.length : 0} Tracks`} 
+                size="small" 
+                variant="outlined" 
+              />
+            </Box>
+            
+            {release.status === "rejected" && release.rejectReason && (
+              <Card 
+                elevation={0} 
+                sx={{ 
+                  mb: 2,
+                  border: `1px solid ${mode === 'dark' ? 'rgba(244, 67, 54, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`,
+                  backgroundColor: mode === 'dark' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+                }}
+              >
+                <CardContent>
+                  <Typography variant="subtitle2" color="error" sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <Info sx={{ mr: 1 }} /> Rejection Reason
+                  </Typography>
+                  <Typography variant="body2">
+                    {release.rejectReason}
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
+            
+            {release.status === "pending" && (
+              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<ThumbUp />}
+                  onClick={handleApprove}
+                  disabled={saving}
+                  sx={{ minWidth: 120 }}
+                >
+                  {saving ? <CircularProgress size={20} /> : 'Approve'}
+                </Button>
+                <Button
+                  variant="contained"
+                  color="error"
+                  startIcon={<ThumbDown />}
+                  onClick={() => setRejectOpen(true)}
+                  disabled={saving}
+                  sx={{ minWidth: 120 }}
+                >
+                  Reject
+                </Button>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Paper>
+
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3 }}>
+        {/* Release Information */}
+        <Box sx={{ flex: { xs: 1, md: 2 } }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              mb: 3,
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+              Release Information
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+              <Box sx={{ flex: 1 }}>
+                <InfoRow label="Release Title" value={release.releaseTitle} />
+                <InfoRow label="Primary Artist" value={release.primaryArtist} />
+                <InfoRow label="Featuring" value={release.featuring} />
+                <InfoRow label="Label" value={release.label} />
+                <InfoRow label="UPC" value={release.upc} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <InfoRow label="Release Date" value={release.releaseDate} />
+                <InfoRow label="Pre-order Date" value={release.preorderDate} />
+                <InfoRow label="Genre" value={release.genre} />
+                <InfoRow label="Sub-genre" value={release.subGenre} />
+                <InfoRow label="Copyright" value={release.copyright} />
+              </Box>
+            </Box>
+            
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                Description
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {release.description || 'No description provided'}
+              </Typography>
+            </Box>
+          </Paper>
+          
+          {/* Tracks */}
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            {renderTracks()}
+          </Paper>
+        </Box>
+        
+        {/* Distribution Info */}
+        <Box sx={{ flex: { xs: 1, md: 1 } }}>
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3, 
+              mb: 3,
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+              Distribution
+            </Typography>
+            
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                DSPs
+              </Typography>
+              {renderDSPChips(release.stores || [])}
+            </Box>
+            
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                Territories
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {Array.isArray(release.territories) && release.territories.length > 0
+                  ? release.territories.join(', ')
+                  : 'Worldwide'}
+              </Typography>
+            </Box>
+            
+            <Box>
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                Links
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton 
+                  size="small" 
+                  sx={{ 
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <LinkIcon />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  sx={{ 
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <LinkIcon />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  sx={{ 
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <LinkIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          </Paper>
+          
+          {/* Metadata */}
+          <Paper 
+            elevation={0} 
+            sx={{ 
+              p: 3,
+              borderRadius: 3,
+              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
+              Metadata
+            </Typography>
+            
+            <InfoRow label="Created" value={new Date(release.createdAt).toLocaleString()} />
+            <InfoRow label="Updated" value={new Date(release.updatedAt).toLocaleString()} />
+            {release.approvedAt && (
+              <InfoRow label="Approved" value={new Date(release.approvedAt).toLocaleString()} />
+            )}
+            {release.rejectedAt && (
+              <InfoRow label="Rejected" value={new Date(release.rejectedAt).toLocaleString()} />
+            )}
+          </Paper>
+        </Box>
+      </Box>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)}>
+        <DialogTitle>Reject Release</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Please provide a reason for rejecting this release. This will be sent to the artist.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Rejection Reason"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectOpen(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleReject} 
+            color="error" 
+            variant="contained"
+            disabled={saving || !rejectReason.trim()}
+          >
+            {saving ? <CircularProgress size={20} /> : 'Reject Release'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 }
