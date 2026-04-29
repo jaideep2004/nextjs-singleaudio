@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Container, Typography, Box, Paper, CircularProgress, Grid } from '@mui/material';
+import { Container, Typography, Box, Paper, CircularProgress } from '@mui/material';
 import { releaseAPI, trackAPI, adminAPI } from '@/services/api';
 import dynamic from 'next/dynamic';
 import { registerChartElements } from './registerChartElements';
@@ -107,8 +107,19 @@ export default function AnalyticsPage() {
           <Typography sx={{ ml: 2 }}>Loading charts...</Typography>
         </Box>
       ) : (
-        <Grid container spacing={4} justifyContent="center">
-          <Grid item xs={12} md={6} xl={4}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'repeat(2, minmax(0, 1fr))',
+              xl: 'repeat(3, minmax(0, 1fr))',
+            },
+            gap: 4,
+            justifyItems: 'center',
+          }}
+        >
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <Paper
               sx={{
                 p: 2,
@@ -147,8 +158,8 @@ export default function AnalyticsPage() {
                 />
               </Box>
             </Paper>
-          </Grid>
-          <Grid item xs={12} md={6} xl={4}>
+          </Box>
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <Paper
               sx={{
                 p: 2,
@@ -191,8 +202,8 @@ export default function AnalyticsPage() {
                 />
               </Box>
             </Paper>
-          </Grid>
-          <Grid item xs={12} md={6} xl={4}>
+          </Box>
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <Paper
               sx={{
                 p: 2,
@@ -238,8 +249,8 @@ export default function AnalyticsPage() {
                 />
               </Box>
             </Paper>
-          </Grid>
-          <Grid item xs={12} md={6} xl={4}>
+          </Box>
+          <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <Paper
               sx={{
                 p: 2,
@@ -282,8 +293,8 @@ export default function AnalyticsPage() {
                 />
               </Box>
             </Paper>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       )}
     </Container>
   );
