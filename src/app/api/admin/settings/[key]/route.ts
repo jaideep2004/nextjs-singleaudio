@@ -4,9 +4,9 @@ import { cookies } from 'next/headers';
 // GET handler for fetching a specific setting by key
 export async function GET(
   request: Request,
-  { params }: { params: { key: string } }
+  { params }: { params: Promise<{ key: string }> }
 ) {
-  const key = params.key;
+  const { key } = await params;
   
   try {
     // Get authentication token from cookies
@@ -49,9 +49,9 @@ export async function GET(
 // PUT handler for updating a specific setting by key
 export async function PUT(
   request: Request,
-  { params }: { params: { key: string } }
+  { params }: { params: Promise<{ key: string }> }
 ) {
-  const key = params.key;
+  const { key } = await params;
   
   try {
     // Get authentication token from cookies

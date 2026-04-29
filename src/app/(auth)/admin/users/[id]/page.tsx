@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
   Typography,
@@ -59,14 +59,14 @@ function a11yProps(index: number) {
   };
 }
 
-export default function EditUserPage({ params }: { params: { id: string } }) {
+export default function EditUserPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
   const theme = useTheme();
   const { mode } = useColorMode();
   const { isAdmin } = useAdminAuth();
   
-  // For Next.js App Router, params is already resolved
-  const userId = params.id;
+  const userId = params?.id ?? '';
   
   const [tabValue, setTabValue] = useState(0);
   const [user, setUser] = useState<any>(null);
