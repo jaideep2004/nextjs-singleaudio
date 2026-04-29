@@ -14,8 +14,13 @@ import { ApiError } from '../middleware/errorHandler.middleware';
 
 // Ensure upload directories exist
 [TRACKS_DIR, ARTWORK_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown upload directory error';
+    throw new Error(`Failed to initialize upload directory "${dir}": ${message}`);
   }
 });
 

@@ -1,4 +1,5 @@
 import path from 'path';
+import os from 'os';
 
 // Environment
 export const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -19,7 +20,10 @@ export enum UserRole {
 }
 
 // File Upload
-export const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const isServerlessRuntime = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+export const UPLOAD_DIR = isServerlessRuntime
+  ? path.join(os.tmpdir(), 'nextjs-singleaudio', 'uploads')
+  : path.join(process.cwd(), 'uploads');
 export const TRACKS_DIR = path.join(UPLOAD_DIR, 'tracks');
 export const ARTWORK_DIR = path.join(UPLOAD_DIR, 'artwork');
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for audio files
