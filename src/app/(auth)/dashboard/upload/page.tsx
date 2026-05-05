@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -31,8 +31,9 @@ import {
   Slide,
   Avatar,
   Snackbar,
+  Collapse,
 } from '@mui/material';
-import {Grid} from '@mui/material';
+import Grid from '@mui/material/GridLegacy';
 import {
   MusicNote,
   Album,
@@ -52,8 +53,9 @@ import {
   PlaylistAddCheck,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
-import { useRouter } from 'next/navigation';
+import Cookies from 'js-cookie';
 import countries from '@/utils/countries';
+import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
 const API_BASE = typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
@@ -63,7 +65,12 @@ const API_BASE = typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_U
 async function uploadArtworkToServer(file: File): Promise<{ url: string; filename: string }> {
   const fd = new FormData();
   fd.append('artwork', file);
-  const res = await fetch(`${API_BASE}/uploads/artwork`, { method: 'POST', body: fd });
+  const token = Cookies.get('token');
+  const res = await fetch(`${API_BASE}/uploads/artwork`, {
+    method: 'POST',
+    body: fd,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error || 'Failed to upload artwork');
@@ -72,16 +79,45 @@ async function uploadArtworkToServer(file: File): Promise<{ url: string; filenam
   return { url: data.url, filename: data.filename };
 }
 
-async function uploadAudioToServer(file: File): Promise<{ url: string; filename: string }> {
+async function uploadAudioToServer(
+  file: File,
+  onProgress?: (percent: number) => void
+): Promise<{ url: string; filename: string }> {
   const fd = new FormData();
   fd.append('audio', file);
-  const res = await fetch(`${API_BASE}/uploads/audio`, { method: 'POST', body: fd });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'Failed to upload audio');
-  }
-  const data = await res.json();
-  return { url: data.url, filename: data.filename };
+  const token = Cookies.get('token');
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/uploads/audio`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && onProgress) {
+        onProgress(Math.min(100, Math.round((100 * ev.loaded) / ev.total)));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve({ url: data.url, filename: data.filename });
+        } catch {
+          reject(new Error('Invalid upload response'));
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err?.error || xhr.statusText || 'Failed to upload audio'));
+        } catch {
+          reject(new Error('Failed to upload audio'));
+        }
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error during upload'));
+    xhr.send(fd);
+  });
 }
 
 // Define release types
@@ -195,7 +231,6 @@ const steps = [
   'Select Release Type',
   'Artwork',
   'Tracks & Info',
-  'Pricing & Scheduling',
   'Distribution Providers',
   'Territories & Rights',
   'Review & Submit',
@@ -219,7 +254,14 @@ const formatBitrate = (bpsOrKbps?: number) => {
 import TerritoryManager, { TerritoryMode } from '@/components/territory/TerritoryManager';
 import RightsManager, { RightsType } from '@/components/rights/RightsManager';
 // --- TrackInfo type (inline, since not using TrackInfoForm) ---
-interface TrackInfo {
+type ContributorRole = 'artist' | 'performer' | 'composer' | 'lyricist' | 'producer' | 'publisher' | 'remixer' | 'other';
+
+interface TrackContributor {
+  role: ContributorRole;
+  name: string;
+}  
+ 
+interface TrackInfo { 
   title: string;
   version: string;
   artist: string;
@@ -228,6 +270,8 @@ interface TrackInfo {
   isrc: string;
   upc: string;
   language: string;
+  metadataLanguage: string;
+  audioLanguage: string;
   explicit: boolean;
   genre: string;
   subgenre: string;
@@ -240,11 +284,35 @@ interface TrackInfo {
   lyrics: string;
   copyrightC: string;
   copyrightP: string;
+  copyrightCYear: string;
+  copyrightPYear: string;
   recordingYear: string;
   originalReleaseDate: string;
   parentalAdvisory: string;
   instrumental: boolean;
+  contributors: TrackContributor[];
 }
+
+const contributorRoles: { value: ContributorRole; label: string }[] = [
+  { value: 'artist', label: 'Artist' },
+  { value: 'performer', label: 'Performer' },
+  { value: 'composer', label: 'Composer' },
+  { value: 'lyricist', label: 'Lyricist' },
+  { value: 'producer', label: 'Producer' },
+  { value: 'publisher', label: 'Publisher' },
+  { value: 'remixer', label: 'Remixer' },
+  { value: 'other', label: 'Other' },
+];
+
+const currentYear = new Date().getFullYear();
+const copyrightYears = Array.from({ length: 80 }, (_, index) => String(currentYear - index));
+
+const cloneTrackInfo = (info: TrackInfo): TrackInfo => ({
+  ...info,
+  contributors: info.contributors.map(contributor => ({ ...contributor })),
+});
+
+const createDefaultTrackInfo = (): TrackInfo => cloneTrackInfo(defaultTrackInfo);
 
 const defaultTrackInfo: TrackInfo = {
   title: '',
@@ -255,6 +323,8 @@ const defaultTrackInfo: TrackInfo = {
   isrc: '',
   upc: '',
   language: '',
+  metadataLanguage: '',
+  audioLanguage: '',
   explicit: false,
   genre: '',
   subgenre: '',
@@ -267,10 +337,13 @@ const defaultTrackInfo: TrackInfo = {
   producers: '',
   copyrightC: '',
   copyrightP: '',
+  copyrightCYear: String(currentYear),
+  copyrightPYear: String(currentYear),
   recordingYear: '',
   originalReleaseDate: '',
   parentalAdvisory: 'none',
   instrumental: false,
+  contributors: [{ role: 'artist', name: '' }],
 };
 
 export default function UploadPage() {
@@ -279,39 +352,37 @@ export default function UploadPage() {
   const [releaseTitle, setReleaseTitle] = useState('');
   const [label, setLabel] = useState('');
   const [upc, setUpc] = useState('');
+  const [autoGenerateCodes, setAutoGenerateCodes] = useState(true);
+  const [allowedDspKeys, setAllowedDspKeys] = useState<DspKey[] | null>(null);
   // ...existing state
 
   // All hooks must be at the top and called unconditionally
   const auth = useAuth();
-  const router = useRouter();
-
   // All useState hooks declared at the top in consistent order
   const [mounted, setMounted] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [releaseType, setReleaseType] = useState<ReleaseType>('single');
-  const [tracks, setTracks] = useState<(File | null)[]>(() => {
-    // Default to minTracks for initial releaseType
-    const initialType = releaseTypes.find(t => t.value === 'single');
-    return Array(initialType?.minTracks ?? 1).fill(null);
-  });
+  const [tracks, setTracks] = useState<File[]>([]);
   // Which track is being edited in the right-side form
   const [selectedTrackIdx, setSelectedTrackIdx] = useState<number>(0);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   // Step 1 track analysis state (must always be declared after tracks)
-  const [analysisResults, setAnalysisResults] = useState<(any | null)[]>(() => Array(tracks.length).fill(null));
-  const [analysisLoading, setAnalysisLoading] = useState<boolean[]>(() => Array(tracks.length).fill(false));
-  const [analysisErrors, setAnalysisErrors] = useState<(string | null)[]>(() => Array(tracks.length).fill(null));
+  const [analysisResults, setAnalysisResults] = useState<(any | null)[]>([]);
+  const [analysisLoading, setAnalysisLoading] = useState<boolean[]>([]);
+  const [analysisErrors, setAnalysisErrors] = useState<(string | null)[]>([]);
   const [artworkFile, setArtworkFile] = useState<File | null>(null);
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
   const [artworkError, setArtworkError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   // Track upload progress indicator (indeterminate for now)
-  const [trackUploading, setTrackUploading] = useState<boolean[]>(() => Array(tracks.length).fill(false));
+  const [trackUploading, setTrackUploading] = useState<boolean[]>([]);
+  const [audioUploadPct, setAudioUploadPct] = useState<number[]>([]);
+  const appendTracksInputRef = useRef<HTMLInputElement | null>(null);
   // Uploaded media (server) state
   const [artworkUploadedUrl, setArtworkUploadedUrl] = useState<string | null>(null);
   const [artworkUploadedFilename, setArtworkUploadedFilename] = useState<string | null>(null);
-  const [audioUploadedUrls, setAudioUploadedUrls] = useState<(string | null)[]>(() => Array(tracks.length).fill(null));
-  const [audioUploadedFilenames, setAudioUploadedFilenames] = useState<(string | null)[]>(() => Array(tracks.length).fill(null));
+  const [audioUploadedUrls, setAudioUploadedUrls] = useState<(string | null)[]>([]);
+  const [audioUploadedFilenames, setAudioUploadedFilenames] = useState<(string | null)[]>([]);
   const [territoryCountries, setTerritoryCountries] = useState<string[]>([]);
   const [territoryMode, setTerritoryMode] = useState<TerritoryMode>('allowed');
   const [rightsType, setRightsType] = useState<RightsType>('exclusive');
@@ -319,34 +390,35 @@ export default function UploadPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null); 
   const [analysisError, setAnalysisError] = useState('');
   // Multi-track info state for Track Information step
-  const [trackInfos, setTrackInfos] = useState<TrackInfo[]>(() => Array(tracks.length).fill({ ...defaultTrackInfo }));
+  const [trackInfos, setTrackInfos] = useState<TrackInfo[]>([]);
   // Distribution Step State
-  const DSP_LIST = [
-    { key: 'spotify', name: 'Spotify', logo: '/dsp/spotify.png', info: 'World\'s largest streaming service.' },
-    { key: 'apple', name: 'Apple Music', logo: '/dsp/applemusic.png', info: 'Apple\'s music streaming.' },
-    { key: 'amazon', name: 'Amazon Music', logo: '/dsp/amazonmusic.png', info: 'Amazon\'s music streaming.' },
-    { key: 'youtube', name: 'YouTube Music', logo: '/dsp/youtubemusic.png', info: 'Google\'s streaming platform.' },
-    { key: 'deezer', name: 'Deezer', logo: '/dsp/deezer.png', info: 'Popular in Europe.' },
-    { key: 'tidal', name: 'Tidal', logo: '/dsp/tidal.png', info: 'High-fidelity audio.' },
-    { key: 'pandora', name: 'Pandora', logo: '/dsp/pandora.png', info: 'US-based streaming.' },
-    { key: 'soundcloud', name: 'SoundCloud', logo: '/dsp/soundcloud.png', info: 'Indie & creators.' },
-  ];
-  const [selectedDSPs, setSelectedDSPs] = useState<string[]>(DSP_LIST.map(dsp => dsp.key));
+  const DSP_LIST = DSP_META;
+  type DspItem = DspMeta;
+  const visibleDSPs = useMemo(() => {
+    const allow = new Set(((allowedDspKeys ?? ALL_DSP_KEYS) as string[]));
+    return DSP_LIST.filter((dsp: DspItem) => allow.has(dsp.key));
+  }, [allowedDspKeys]);
+
+  const [selectedDSPs, setSelectedDSPs] = useState<string[]>([]);
   const [releaseWorldwide, setReleaseWorldwide] = useState(true);
   const [releaseDate, setReleaseDate] = useState<string>("");
+  const [originalReleaseDate, setOriginalReleaseDate] = useState<string>("");
   // Artwork loading indicator
   const [artworkUploading, setArtworkUploading] = useState<boolean>(false);
   // Local audio preview URLs for each selected track
-  const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>(() => Array(tracks.length).fill(null));
-  // Pricing & scheduling state
-  const [currency, setCurrency] = useState<string>('USD');
-  const [albumPrice, setAlbumPrice] = useState<number | ''>('');
-  const [trackPrice, setTrackPrice] = useState<number | ''>('');
+  const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
   // Snackbar for "Apply to all"
   const [snackOpen, setSnackOpen] = useState(false);
+  const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
 
   // Computed values (not state)
-  const allSelected = selectedDSPs.length === DSP_LIST.length;
+  const allSelected = selectedDSPs.length === visibleDSPs.length;
+
+  const getContributorNames = (track: TrackInfo, role: ContributorRole) =>
+    track.contributors
+      .filter(contributor => contributor.role === role && contributor.name.trim())
+      .map(contributor => contributor.name.trim())
+      .join(', ');
 
   
 
@@ -357,26 +429,33 @@ export default function UploadPage() {
     const releasePayload = {
       releaseType,
       releaseTitle,
-      primaryArtist: trackInfos[0]?.artist || '',
+      primaryArtist: trackInfos[0] ? getContributorNames(trackInfos[0], 'artist') : '',
       label,
       upc,
+      autoGenerateCodes,
       releaseDate,
+      originalReleaseDate,
       artworkUrl: artworkUploadedUrl,
       artworkFile: artworkUploadedFilename,
       territories: territoryCountries,
       stores: selectedDSPs,
       tracks: trackInfos.map((t, idx) => ({
+        contributors: t.contributors.filter(contributor => contributor.name.trim()),
         title: t.title,
-        artist: t.artist,
+        artist: getContributorNames(t, 'artist') || t.artist,
         genre: t.genre,
-        language: t.language,
+        language: t.audioLanguage || t.language,
+        metadataLanguage: t.metadataLanguage,
+        audioLanguage: t.audioLanguage || t.language,
         explicit: t.explicit,
-        composers: t.composers,
-        publishers: t.publishers,
-        producers: t.producers,
+        composers: getContributorNames(t, 'composer') || t.composers,
+        publishers: getContributorNames(t, 'publisher') || t.publishers,
+        producers: getContributorNames(t, 'producer') || t.producers,
         lyrics: t.lyrics,
         copyrightC: t.copyrightC,
         copyrightP: t.copyrightP,
+        copyrightCYear: t.copyrightCYear,
+        copyrightPYear: t.copyrightPYear,
         recordingYear: t.recordingYear,
         duration: t.duration,
         isrc: t.isrc,
@@ -387,9 +466,9 @@ export default function UploadPage() {
         instrumental: t.instrumental,
         subgenre: t.subgenre,
         version: t.version,
-        featuring: t.featuring,
-        remixer: t.remixer,
-        originalReleaseDate: t.originalReleaseDate,
+        featuring: getContributorNames(t, 'performer') || t.featuring,
+        remixer: getContributorNames(t, 'remixer') || t.remixer,
+        originalReleaseDate: t.originalReleaseDate || originalReleaseDate,
         audioUrl: audioUploadedUrls[idx] || null,
         audioFile: audioUploadedFilenames[idx] || null,
       }))
@@ -421,23 +500,17 @@ export default function UploadPage() {
     setSelectedDSPs(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
   const handleSelectAll = () => {
-    setSelectedDSPs(allSelected ? [] : DSP_LIST.map(dsp => dsp.key));
+    setSelectedDSPs(allSelected ? [] : visibleDSPs.map((dsp: DspItem) => dsp.key));
   };
   const handleContinue = () => {
     if (isDistributionValid) handleNext();
   };
 
-  const isPricingValid = (() => {
-    const validNumber = (v: number | '') => typeof v === 'number' && v >= 0;
-    if (releaseType === 'single') return validNumber(trackPrice);
-    return validNumber(albumPrice) && validNumber(trackPrice);
-  })();
-
   // Keep trackInfos in sync with tracks length
   useEffect(() => {
     setTrackInfos(prev => {
       if (prev.length < tracks.length) {
-        return [...prev, ...Array(tracks.length - prev.length).fill({ ...defaultTrackInfo })];
+        return [...prev, ...Array.from({ length: tracks.length - prev.length }, createDefaultTrackInfo)];
       } else if (prev.length > tracks.length) {
         return prev.slice(0, tracks.length);
       }
@@ -450,27 +523,78 @@ export default function UploadPage() {
     setTrackInfos(prev => prev.map((info, i) => i === idx ? { ...info, [field]: value } : info));
   };
 
-  // Handler to apply a field value from one track to all tracks, only if the value is not empty/null
-  const handleApplyToAll = (idx: number, field: keyof TrackInfo) => {
-    const value = trackInfos[idx]?.[field];
-    // Only apply if value is not empty (for strings) or not null/undefined
-    if (
-      (typeof value === 'string' && value.trim() === '') ||
-      value === undefined ||
-      value === null
-    ) {
-      return;
-    }
-    setTrackInfos(prev => prev.map(info => ({ ...info, [field]: value })));
+  const updateContributor = (trackIdx: number, contributorIdx: number, field: keyof TrackContributor, value: string) => {
+    setTrackInfos(prev => prev.map((info, i) => {
+      if (i !== trackIdx) return info;
+      return {
+        ...info,
+        contributors: info.contributors.map((contributor, cIdx) =>
+          cIdx === contributorIdx
+            ? { ...contributor, [field]: field === 'role' ? value as ContributorRole : value }
+            : contributor
+        ),
+      };
+    }));
+  };
+
+  const addContributor = (trackIdx: number) => {
+    setTrackInfos(prev => prev.map((info, i) =>
+      i === trackIdx
+        ? { ...info, contributors: [...info.contributors, { role: 'performer', name: '' }] }
+        : info
+    ));
+  };
+
+  const removeContributor = (trackIdx: number, contributorIdx: number) => {
+    setTrackInfos(prev => prev.map((info, i) => {
+      if (i !== trackIdx) return info;
+      const contributors = info.contributors.filter((_, cIdx) => cIdx !== contributorIdx);
+      return { ...info, contributors: contributors.length ? contributors : [{ role: 'artist', name: '' }] };
+    }));
+  };
+
+  const handleApplyTrackInfoToAll = (idx: number) => {
+    const source = trackInfos[idx];
+    if (!source) return;
+    const shareable = cloneTrackInfo(source);
+    delete (shareable as Partial<TrackInfo>).title;
+    delete (shareable as Partial<TrackInfo>).originalReleaseDate;
+    delete (shareable as Partial<TrackInfo>).artist;
+    delete (shareable as Partial<TrackInfo>).featuring;
+    delete (shareable as Partial<TrackInfo>).isrc;
+    delete (shareable as Partial<TrackInfo>).upc;
+    delete (shareable as Partial<TrackInfo>).copyrightC;
+    delete (shareable as Partial<TrackInfo>).copyrightP;
+    delete (shareable as Partial<TrackInfo>).copyrightCYear;
+    delete (shareable as Partial<TrackInfo>).copyrightPYear;
+    delete (shareable as Partial<TrackInfo>).explicit;
+
+    setTrackInfos(prev => prev.map((info, i) => (
+      i === idx ? info : { ...info, ...shareable }
+    )));
+    setSnackOpen(true);
   };
 
   // Validation: all required fields for all tracks
-  const isTrackInfoListValid = trackInfos.every(info =>
-    info.title.trim() &&
-    info.artist.trim() &&
-    info.language &&
-    info.genre
-  );
+  const selectedReleaseTypeConfig = releaseTypes.find((t) => t.value === releaseType);
+  const minTracksRequired = selectedReleaseTypeConfig?.minTracks ?? 1;
+
+  const trackHasListedArtist = (info: TrackInfo) =>
+    info.contributors.some((c) => c.role === 'artist' && c.name.trim());
+
+  const isTrackInfoListValid =
+    tracks.length >= minTracksRequired &&
+    tracks.every((_, idx) => {
+      const info = trackInfos[idx];
+      if (!info) return false;
+      return (
+        info.title.trim() &&
+        trackHasListedArtist(info) &&
+        info.metadataLanguage &&
+        (info.audioLanguage || info.language) &&
+        info.genre
+      );
+    });
 
   // All useEffect hooks
   // Set mounted state to true after component mounts
@@ -478,29 +602,46 @@ export default function UploadPage() {
     setMounted(true);
   }, []);
 
-  // Keep analysis state arrays in sync with tracks array length
   useEffect(() => {
-    setAnalysisResults(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(null));
-    setAnalysisLoading(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(false));
-    setAnalysisErrors(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(null));
-    setTrackUploading(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(false));
+    const loadAllowed = async () => {
+      try {
+        const res = await fetch('/api/platforms', { cache: 'no-store' });
+        const json = await res.json().catch(() => null);
+        const keys = Array.isArray(json?.data?.dspKeys) ? (json.data.dspKeys as DspKey[]) : ALL_DSP_KEYS;
+        setAllowedDspKeys(keys);
+      } catch {
+        setAllowedDspKeys(ALL_DSP_KEYS);
+      }
+    };
+    void loadAllowed();
+  }, []);
+
+  useEffect(() => {
+    const allow = new Set(visibleDSPs.map((d: DspItem) => d.key));
+    setSelectedDSPs((prev) => {
+      const filtered = prev.filter((k) => allow.has(k));
+      return filtered.length ? filtered : visibleDSPs.map((d: DspItem) => d.key);
+    });
+  }, [visibleDSPs]);
+
+  // Keep analysis / upload state arrays in sync with tracks array length
+  useEffect(() => {
+    const len = tracks.length;
+    setAnalysisResults((arr) => (arr.length === len ? arr : Array(len).fill(null)));
+    setAnalysisLoading((arr) => (arr.length === len ? arr : Array(len).fill(false)));
+    setAnalysisErrors((arr) => (arr.length === len ? arr : Array(len).fill(null)));
+    setTrackUploading((arr) => (arr.length === len ? arr : Array(len).fill(false)));
+    setAudioUploadPct((arr) => {
+      if (arr.length === len) return arr;
+      return Array.from({ length: len }, (_, i) => (i < arr.length ? arr[i] : 0));
+    });
   }, [tracks.length]);
 
-  // Update tracks state when releaseType changes
+  // When release type changes, only enforce max track count (no empty placeholder slots)
   useEffect(() => {
-    const selectedType = releaseTypes.find(t => t.value === releaseType);
+    const selectedType = releaseTypes.find((t) => t.value === releaseType);
     if (!selectedType) return;
-    setTracks(prev => {
-      if (prev.length < selectedType.minTracks) {
-        return [...prev, ...Array(selectedType.minTracks - prev.length).fill(null)];
-      } else if (prev.length > selectedType.maxTracks) {
-        return prev.slice(0, selectedType.maxTracks);
-      } else if (prev.length < selectedType.maxTracks) {
-        // If user switched from album to single/ep, trim tracks
-        return prev.slice(0, selectedType.maxTracks);
-      }
-      return prev;
-    });
+    setTracks((prev) => (prev.length > selectedType.maxTracks ? prev.slice(0, selectedType.maxTracks) : prev));
   }, [releaseType]);
 
   // Create preview for artwork
@@ -591,57 +732,53 @@ export default function UploadPage() {
     return '';
   };
 
-  // Add or remove tracks (for EP/Album)
-  const handleAddTrack = () => {
-    const selectedType = releaseTypes.find(t => t.value === releaseType);
-    if (selectedType && tracks.length < selectedType.maxTracks) {
-      setTracks([...tracks, null]);
-    }
+  const handleAppendTracksClick = () => {
+    appendTracksInputRef.current?.click();
   };
-  
+
   const handleRemoveTrack = (index: number) => {
-    const selectedType = releaseTypes.find(t => t.value === releaseType);
-    if (selectedType && tracks.length > selectedType.minTracks) {
-      setTracks(tracks.filter((_, i) => i !== index));
-    }
+    setTracks((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      setSelectedTrackIdx((si) => (next.length === 0 ? 0 : Math.min(si, next.length - 1)));
+      return next;
+    });
   };
-  
-  // Handle file drop or selection
+
+  /** Replace audio for an existing row, or remove row when `file` is null. */
   const handleTrackFileChange = async (index: number, file: File | null) => {
-    const newTracks = [...tracks];
-    newTracks[index] = file;
-    setTracks(newTracks);
-
-    // Reset previous analysis state for this index
-    setAnalysisResults(prev => prev.map((r, i) => (i === index ? null : r)));
-    setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
-    setTrackUploading(prev => prev.map((u, i) => (i === index ? !!file : u)));
-
-    // If the file is cleared, also clear autofilled fields so re-uploads can repopulate
     if (!file) {
-      // Clear title and duration to enable fresh autofill on next upload
-      setTrackInfos(prev => prev.map((info, i) => (
-        i === index ? { ...info, title: '', duration: '' } : info
-      )));
-      // Make sure loading is not stuck for this slot
-      setAnalysisLoading(prev => prev.map((l, i) => (i === index ? false : l)));
-      // Clear uploaded refs too
-      setAudioUploadedUrls(prev => prev.map((u, i) => (i === index ? null : u)));
-      setAudioUploadedFilenames(prev => prev.map((u, i) => (i === index ? null : u)));
+      handleRemoveTrack(index);
       return;
     }
 
-    // Auto-analyze on valid selection
-    // Autofill title from file name if empty
+    const err = validateTrackFile(file);
+    if (err) {
+      alert(err);
+      return;
+    }
+
+    setTracks((prev) => {
+      const next = [...prev];
+      if (index < next.length) next[index] = file;
+      return next;
+    });
+
+    setAnalysisResults((prev) => prev.map((r, i) => (i === index ? null : r)));
+    setAnalysisErrors((prev) => prev.map((e, i) => (i === index ? null : e)));
+    setTrackUploading((prev) => prev.map((u, i) => (i === index ? true : u)));
+    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 0 : p)));
+
     const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-    setTrackInfos(prev => prev.map((info, i) => i === index ? { ...info, title: info.title ? info.title : baseName } : info));
-    setAnalysisLoading(prev => prev.map((l, i) => (i === index ? true : l)));
+    setTrackInfos((prev) =>
+      prev.map((info, i) => (i === index ? { ...info, title: info.title ? info.title : baseName } : info))
+    );
+    setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? true : l)));
+
     try {
       const formData = new FormData();
       formData.append('file', file);
       const res = await fetch('/api/audio/analyze', { method: 'POST', body: formData });
       if (!res.ok) {
-        // Surface backend error
         let errMsg = 'Analysis failed';
         try {
           const errBody = await res.json();
@@ -650,27 +787,53 @@ export default function UploadPage() {
         throw new Error(errMsg);
       }
       const data = await res.json();
-      setAnalysisResults(prev => prev.map((r, i) => (i === index ? data : r)));
-      // Autofill duration from analysis if available
+      setAnalysisResults((prev) => prev.map((r, i) => (i === index ? data : r)));
       const dur = data?.duration;
       if (typeof dur === 'number' || typeof dur === 'string') {
         const durStr = formatDuration(dur);
-        setTrackInfos(prev => prev.map((info, i) => i === index ? { ...info, duration: durStr } : info));
+        setTrackInfos((prev) =>
+          prev.map((info, i) => (i === index ? { ...info, duration: durStr } : info))
+        );
       }
-    } catch (err: any) {
-      setAnalysisErrors(prev => prev.map((e, i) => (i === index ? (err?.message || 'Error analyzing audio') : e)));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error analyzing audio';
+      setAnalysisErrors((prev) => prev.map((e, i) => (i === index ? msg : e)));
     } finally {
-      setAnalysisLoading(prev => prev.map((l, i) => (i === index ? false : l)));
-      setTrackUploading(prev => prev.map((u, i) => (i === index ? false : u)));
+      setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? false : l)));
     }
 
-    // Upload audio to server (after analysis kicks off)
     try {
-      const { url, filename } = await uploadAudioToServer(file);
-      setAudioUploadedUrls(prev => prev.map((u, i) => (i === index ? url : u)));
-      setAudioUploadedFilenames(prev => prev.map((u, i) => (i === index ? filename : u)));
-    } catch (e: any) {
+      const { url, filename } = await uploadAudioToServer(file, (pct) =>
+        setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
+      );
+      setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
+      setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+    } catch (e) {
       console.error('Audio upload failed:', e);
+    }
+    setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
+  };
+
+  const handleAppendTracksSelected = async (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const selectedType = releaseTypes.find((t) => t.value === releaseType);
+    const max = selectedType?.maxTracks ?? 50;
+    const room = max - tracks.length;
+    if (room <= 0) return;
+
+    const incoming = Array.from(fileList)
+      .filter((f) => validateTrackFile(f) === '')
+      .slice(0, room);
+
+    if (!incoming.length) return;
+
+    const startIdx = tracks.length;
+    setTracks((prev) => [...prev, ...incoming]);
+    if (appendTracksInputRef.current) appendTracksInputRef.current.value = '';
+
+    for (let i = 0; i < incoming.length; i++) {
+      await analyzeAndUploadForIndex(startIdx + i, incoming[i]);
     }
   };
 
@@ -756,30 +919,36 @@ export default function UploadPage() {
     } catch (err: any) {
       setAnalysisErrors(prev => prev.map((e, i) => (i === index ? (err?.message || 'Error analyzing audio') : e)));
     } finally {
-      setAnalysisLoading(prev => prev.map((l, i) => (i === index ? false : l)));
-      setTrackUploading(prev => prev.map((u, i) => (i === index ? false : u)));
+      setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? false : l)));
     }
 
-    // Upload audio to server
     try {
-      const { url, filename } = await uploadAudioToServer(file);
-      setAudioUploadedUrls(prev => prev.map((u, i) => (i === index ? url : u)));
-      setAudioUploadedFilenames(prev => prev.map((u, i) => (i === index ? filename : u)));
-    } catch (e: any) {
+      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 0 : p)));
+      const { url, filename } = await uploadAudioToServer(file, (pct) =>
+        setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
+      );
+      setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
+      setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+    } catch (e) {
       console.error('Audio upload failed:', e);
+    } finally {
+      setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
     }
   };
 
-  // Multi-file selection handler
   const handleMultiTrackFiles = async (fileList: FileList) => {
-    const selectedType = releaseTypes.find(t => t.value === releaseType);
+    const selectedType = releaseTypes.find((t) => t.value === releaseType);
     const max = selectedType?.maxTracks ?? 50;
-    const files = Array.from(fileList).slice(0, max);
-    // Initialize tracks array to the selected files length
-    setTracks(files.map(f => f));
-    // Ensure dependent arrays resize
+    const files = Array.from(fileList)
+      .filter((f) => validateTrackFile(f) === '')
+      .slice(0, max);
+
+    if (!files.length) return;
+
+    setTracks(files);
     setSelectedTrackIdx(0);
-    // Kick off analyze+upload for each file
+
     for (let i = 0; i < files.length; i++) {
       await analyzeAndUploadForIndex(i, files[i]);
     }
@@ -798,44 +967,88 @@ export default function UploadPage() {
             </Typography>
 
             <FormControl component="fieldset" sx={{ width: '100%' }}>
-              <Grid container spacing={3} sx={{ mt: 2 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  flexWrap: 'wrap',
+                  gap: { xs: 2.5, md: 4 },
+                  mt: 1,
+                  width: '100%',
+                }}
+              >
                 {releaseTypes.map((type) => (
-                  <Grid xs={12} md={4} key={type.value}>
-                    <Card 
-                      sx={{ 
+                  <Box
+                    key={type.value}
+                    sx={{
+                      flex: { md: '1 1 0' },
+                      minWidth: { xs: '100%', md: 0 },
+                      width: { xs: '100%' },
+                    }}
+                  >
+                    <Card
+                      sx={{
                         height: '100%',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        position: 'relative',
+                        borderRadius: 2,
+                        transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: releaseType === type.value ? 2 : 1,
                         borderColor: releaseType === type.value ? 'primary.main' : 'divider',
+                        boxShadow:
+                          releaseType === type.value
+                            ? (theme) =>
+                                theme.palette.mode === 'dark'
+                                  ? '0 8px 32px rgba(25,118,210,0.2)'
+                                  : '0 8px 28px rgba(25,118,210,0.12)'
+                            : 'none',
                         '&:hover': {
-                          boxShadow: 3,
+                          boxShadow: (theme) =>
+                            theme.palette.mode === 'dark'
+                              ? '0 12px 40px rgba(0,0,0,0.35)'
+                              : '0 12px 36px rgba(15, 23, 42, 0.1)',
                         },
                       }}
                       onClick={() => setReleaseType(type.value)}
                     >
-                      <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 3 }}>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          zIndex: 1,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Radio
                           checked={releaseType === type.value}
                           onChange={handleReleaseTypeChange}
                           value={type.value}
                           name="release-type"
-                          sx={{ alignSelf: 'flex-end', mt: -2, mr: -2 }}
+                          sx={{ p: 0.5 }}
                         />
-                        <Box sx={{ color: 'primary.main', mb: 2 }}>
-                          {type.icon}
-                        </Box>
+                      </Box>
+                      <CardContent
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          p: 3,
+                          pt: 4,
+                        }}
+                      >
+                        <Box sx={{ color: 'primary.main', mb: 2 }}>{type.icon}</Box>
                         <Typography variant="h6" component="h3" fontWeight="bold" gutterBottom>
                           {type.label}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" align="center">
                           {type.description}
                         </Typography>
                       </CardContent>
                     </Card>
-                  </Grid>
+                  </Box>
                 ))}
-              </Grid>
+              </Box>
             </FormControl>
 
             <Box sx={{ mt: 4, mb: 2 }}>
@@ -886,6 +1099,17 @@ export default function UploadPage() {
                     value={upc}
                     onChange={e => setUpc(e.target.value)}
                     inputProps={{ 'aria-label': 'UPC' }}
+                  />
+                </Grid>
+                <Grid xs={12}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={autoGenerateCodes}
+                        onChange={(e) => setAutoGenerateCodes(e.target.checked)}
+                      />
+                    }
+                    label="Auto-generate UPC & ISRC by system (recommended)"
                   />
                 </Grid>
               </Grid>
@@ -978,469 +1202,438 @@ export default function UploadPage() {
           </Box>
         );
       
-      case 2:
+      case 2: {
+        const selectedTypeLb = releaseTypes.find((t) => t.value === releaseType);
+        const uploadPctAvg =
+          tracks.length > 0
+            ? Math.round(
+                tracks.reduce((acc, _, i) => acc + (audioUploadPct[i] ?? 0), 0) / tracks.length
+              )
+            : 0;
+        const anyAnalyzing = analysisLoading.some(Boolean);
+        const anyUploadingPct = tracks.some((_, i) => {
+          const p = audioUploadPct[i] ?? 0;
+          return p > 0 && p < 100;
+        });
+        const showAggBar = tracks.length > 0 && (anyAnalyzing || anyUploadingPct || trackUploading.some(Boolean));
+
         // Tracks & Info
         return (
           <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Upload Your Track{tracks.length > 1 ? 's' : ''}</Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              {releaseTypes.find(t => t.value === releaseType)?.label === 'Single' && 'Select and upload your track.'}
-              {releaseTypes.find(t => t.value === releaseType)?.label === 'EP' && 'Upload 3-7 tracks for your EP.'}
-              {releaseTypes.find(t => t.value === releaseType)?.label === 'Album' && 'Upload up to 50 tracks for your album.'}
+            <Typography variant="h5" gutterBottom fontWeight={700}>
+              Upload Your Track{tracks.length !== 1 ? 's' : ''}
             </Typography>
-            <Grid container spacing={3} sx={{ mt: 1, alignItems: 'flex-start',flexWrap: 'nowrap' }}>
-              <Grid xs={12} md={5} minWidth={350}>
-                {/* Single multi-file selector */}
-                <Box sx={{ mb: 2 }}>
+            <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: 720 }}>
+              {selectedTypeLb?.label === 'Single' && `Need at least ${minTracksRequired} track. Audio cards appear below after you select files.`}
+              {selectedTypeLb?.label === 'EP' && `Need ${selectedTypeLb.minTracks}–${selectedTypeLb.maxTracks} tracks. Upload multiple files or add more.`}
+              {selectedTypeLb?.label === 'Album' && `Up to ${selectedTypeLb.maxTracks} tracks.`}
+            </Typography>
+
+            {showAggBar && (
+              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
+                  <Typography variant="subtitle2" fontWeight={600}>
+                    Overall upload progress
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {anyAnalyzing ? 'Analyzing + uploading…' : `${uploadPctAvg}%`}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant={anyAnalyzing || anyUploadingPct ? (anyAnalyzing ? 'indeterminate' : 'determinate') : 'determinate'}
+                  value={uploadPctAvg}
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    bgcolor: theme => theme.palette.action.hover,
+                    '& .MuiLinearProgress-bar': { borderRadius: 5 },
+                  }}
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                  {tracks.length} file{tracks.length === 1 ? '' : 's'} queued
+                </Typography>
+              </Paper>
+            )}
+
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                alignItems: 'flex-start',
+                gap: { xs: 2.5, md: 3.5 },
+                mt: 0.5,
+                width: '100%',
+              }}
+            >
+              <Box
+                sx={{
+                  flex: { md: '0 1 42%' },
+                  minWidth: { md: 0 },
+                  width: { xs: '100%', md: 'auto' },
+                  maxWidth: { md: 520 },
+                }}
+              >
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, alignItems: 'center' }}>
                   <input
                     id="multi-track-upload"
                     type="file"
-                    accept="audio/*"
+                    accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
                     multiple
                     style={{ display: 'none' }}
-                    onChange={e => { if (e.target.files && e.target.files.length) handleMultiTrackFiles(e.target.files); }}
+                    onChange={(e) => {
+                      if (e.target.files?.length) void handleMultiTrackFiles(e.target.files);
+                      e.target.value = '';
+                    }}
                   />
                   <label htmlFor="multi-track-upload">
-                    <Button variant="outlined" component="span" startIcon={<CloudUpload />}>Select Tracks</Button>
+                    <Button variant="contained" component="span" startIcon={<CloudUpload />} sx={{ borderRadius: 2 }}>
+                      {tracks.length === 0 ? 'Select audio files' : 'Replace all audio'}
+                    </Button>
                   </label>
+                  <input
+                    ref={appendTracksInputRef}
+                    type="file"
+                    accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={(e) => {
+                      void handleAppendTracksSelected(e.target.files);
+                    }}
+                  />
+                  {selectedTypeLb && tracks.length > 0 && tracks.length < selectedTypeLb.maxTracks && (
+                    <Button variant="outlined" startIcon={<Add />} onClick={handleAppendTracksClick} sx={{ borderRadius: 2 }}>
+                      Add more tracks
+                    </Button>
+                  )}
                 </Box>
-                <Grid container spacing={2}>
-                  {tracks.map((file, idx) => (
-                    <Grid xs={12} key={idx}>
+
+                {tracks.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 4, borderRadius: 2, borderStyle: 'dashed', bgcolor: theme => theme.palette.action.hover }}>
+                    <Typography color="text.secondary" align="center">
+                      No audio yet. Use <strong>Select audio files</strong> — track cards appear here automatically.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', minWidth: 0 }}>
+                    {tracks.map((file, idx) => (
                       <Card
+                        key={idx}
                         onClick={() => setSelectedTrackIdx(idx)}
-                        sx={{ p: 2, cursor: 'pointer', border: 2, borderColor: idx === selectedTrackIdx ? 'primary.main' : 'divider' }}
+                        elevation={0}
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          borderRadius: 2,
+                          border: 2,
+                          borderColor: idx === selectedTrackIdx ? 'primary.main' : 'divider',
+                          transition: 'border-color .2s ease, box-shadow .2s ease',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                        }}
                       >
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Typography fontWeight="bold">Track {idx + 1}</Typography>
-                          {(() => {
-                            const selectedType = releaseTypes.find(t => t.value === releaseType);
-                            return selectedType && tracks.length > selectedType.minTracks ? (
-                              <IconButton onClick={(e) => { e.stopPropagation(); handleRemoveTrack(idx); }} color="error"><Delete /></IconButton>
-                            ) : null;
-                          })()}
-                        </Box>
-                        {file && <Chip icon={<AudioFile />} label={file.name} sx={{ mt: 1, mb: 1 }} />}
-                        {trackPreviewUrls[idx] && (
-                          <Box sx={{ width: '100%', mt: 1 }}>
-                            <audio controls src={trackPreviewUrls[idx] || undefined} style={{ width: '100%' }} />
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: 1,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Typography fontWeight={700} sx={{ flexShrink: 0 }}>
+                              Track {idx + 1}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
+                              <input
+                                id={`track-replace-${idx}`}
+                                type="file"
+                                accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  const next = e.target.files?.[0];
+                                  void handleTrackFileChange(idx, next ?? null);
+                                  e.target.value = '';
+                                }}
+                              />
+                              <label htmlFor={`track-replace-${idx}`}>
+                                <Button component="span" size="small" variant="text" onClick={(e) => e.stopPropagation()}>
+                                  Replace
+                                </Button>
+                              </label>
+                              {tracks.length > 1 ? (
+                                <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleRemoveTrack(idx); }}>
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              ) : null}
+                            </Box>
                           </Box>
-                        )}
-                        {analysisLoading[idx] && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                            <CircularProgress size={16} />
-                            <Typography variant="caption" color="text.secondary">Analyzing…</Typography>
-                          </Box>
-                        )}
-                        {analysisResults[idx] && (
-                          <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                            <Typography variant="caption" color="success.main">Format: {analysisResults[idx].format || analysisResults[idx].container || '—'}</Typography>
-                            <Typography variant="caption" color="success.main" aria-hidden>•</Typography>
-                            <Typography variant="caption" color="success.main">Duration: {formatDuration(analysisResults[idx].duration)}</Typography>
-                            <Typography variant="caption" color="success.main" aria-hidden>•</Typography>
-                            <Typography variant="caption" color="success.main">Bitrate: {formatBitrate(analysisResults[idx].bitrate || analysisResults[idx].bit_rate)}</Typography>
-                          </Box>
-                        )}
-                        {analysisErrors[idx] && (<Typography variant="caption" color="error.main">{analysisErrors[idx]}</Typography>)}
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Button variant="outlined" color="primary" startIcon={<ArrowBack />} onClick={handleBack}>Back</Button>
-                  <Box>
-                    {(() => {
-                      const selectedType = releaseTypes.find(t => t.value === releaseType);
-                      return selectedType && tracks.length < selectedType.maxTracks ? (
-                        <Button variant="contained" color="secondary" startIcon={<Add />} onClick={handleAddTrack} sx={{ mr: 2 }}>Add Track</Button>
-                      ) : null;
-                    })()}
+                          <Chip
+                            icon={<AudioFile />}
+                            label={file.name}
+                            title={file.name}
+                            sx={{ mt: 1, mb: 1, maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
+                            variant="outlined"
+                          />
+                          {(audioUploadPct[idx] ?? 0) < 100 && (analysisLoading[idx] || (audioUploadPct[idx] ?? 0) > 0) && (
+                            <LinearProgress
+                              variant={analysisLoading[idx] ? 'indeterminate' : 'determinate'}
+                              value={audioUploadPct[idx] ?? 0}
+                              sx={{
+                                mb: 1,
+                                mt: 0.5,
+                                height: 6,
+                                borderRadius: 3,
+                                '& .MuiLinearProgress-bar': { borderRadius: 3 },
+                              }}
+                            />
+                          )}
+                          {trackPreviewUrls[idx] && (
+                            <Box sx={{ width: '100%', mt: 1 }}>
+                              <audio controls src={trackPreviewUrls[idx] || undefined} style={{ width: '100%', borderRadius: 8 }} />
+                            </Box>
+                          )}
+                          {!analysisLoading[idx] && (audioUploadPct[idx] ?? 0) >= 100 && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                              <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <CheckCircle sx={{ fontSize: 14 }} /> Upload complete
+                              </Typography>
+                            </Box>
+                          )}
+                          {analysisLoading[idx] && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <CircularProgress size={14} />
+                              <Typography variant="caption" color="text.secondary">
+                                Analyzing…
+                              </Typography>
+                            </Box>
+                          )}
+                          {analysisResults[idx] && (
+                            <Box sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                              <Typography variant="caption" color="success.main">
+                                Format: {analysisResults[idx].format || analysisResults[idx].container || '—'}
+                              </Typography>
+                              <Typography variant="caption" color="success.main">
+                                Duration: {formatDuration(analysisResults[idx].duration)}
+                              </Typography>
+                              <Typography variant="caption" color="success.main">
+                                Bitrate: {formatBitrate(analysisResults[idx].bitrate || analysisResults[idx].bit_rate)}
+                              </Typography>
+                            </Box>
+                          )}
+                          {analysisErrors[idx] && (
+                            <Typography variant="caption" color="error.main">
+                              {analysisErrors[idx]}
+                            </Typography>
+                          )}
+                        </Card>
+                    ))}
                   </Box>
+                )}
+                <Box sx={{ mt: 2.5, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 2 }}>
+                  <Button variant="outlined" color="primary" startIcon={<ArrowBack />} onClick={handleBack} sx={{ borderRadius: 2 }}>
+                    Back
+                  </Button>
                 </Box>
-              </Grid>
-              <Grid xs={12} md={7}>
-                <Typography variant="h6" fontWeight="bold">Track Information</Typography>
+              </Box>
+              <Box sx={{ flex: { md: '1 1 0' }, minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
+                <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
+                  <Typography variant="h6" fontWeight="bold">Track Information</Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<PlaylistAddCheck />}
+                    onClick={() => handleApplyTrackInfoToAll(selectedTrackIdx)}
+                    disabled={tracks.length < 2}
+                  >
+                    Apply to all
+                  </Button>
+                </Box>
+                {tracks.length === 0 ? (
+                  <Paper variant="outlined" sx={{ mt: 2.5, p: 3, borderRadius: 2, borderStyle: 'dashed', bgcolor: theme => theme.palette.action.hover }}>
+                    <Typography color="text.secondary" align="center">
+                      Upload audio on the left. Each file becomes a track and unlocks metadata here.
+                    </Typography>
+                  </Paper>
+                ) : null}
                 {tracks.length > 0 && selectedTrackIdx >= 0 && selectedTrackIdx < tracks.length && (
-                  <Box sx={{ mt: 3, mb: 3, p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                  <Box sx={{ mt: 2.5, mb: 3, p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
                     <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Track {selectedTrackIdx + 1}</Typography>
-                    <Grid container spacing={2}>
-                      <Box sx={{ width: '100%', mb: 1 }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Basic Info</Typography>
-                        <Divider />
+                    <Box sx={{ display: 'grid', gap: 2.5 }}>
+                      <Box>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Track details</Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                          <TextField
+                            label="Track Title *"
+                            fullWidth
+                            required
+                            value={trackInfos[selectedTrackIdx]?.title || ''}
+                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'title', e.target.value)}
+                            InputProps={{ endAdornment: <InputAdornment position="end"><Tooltip title="Use a clear, searchable name. Avoid extra version text here."><Info fontSize="small" /></Tooltip></InputAdornment> }}
+                          />
+                          <TextField
+                            label="Version"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.version || ''}
+                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'version', e.target.value)}
+                            InputProps={{ endAdornment: <InputAdornment position="end"><Tooltip title="e.g., Radio Edit, Acoustic, Remix"><Info fontSize="small" /></Tooltip></InputAdornment> }}
+                          />
+                        </Box>
                       </Box>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Track Title *"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 260 }}
-                          required
-                          value={trackInfos[selectedTrackIdx]?.title || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'title', e.target.value)}
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <Tooltip title="Use a clear, searchable name. Avoid extra version text here.">
-                                  <Info fontSize="small" />
-                                </Tooltip>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'title'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Version"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.version || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'version', e.target.value)}
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <Tooltip title="e.g., Radio Edit, Acoustic, Remix">
-                                  <Info fontSize="small" />
-                                </Tooltip>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'version'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Primary Artist *"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 260 }}
-                          required
-                          value={trackInfos[selectedTrackIdx]?.artist || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'artist', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'artist'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Featuring Artist"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.featuring || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'featuring', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'featuring'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Remixer"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.remixer || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'remixer', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'remixer'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          select
-                          label="Language *"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 260 }}
-                          required
-                          value={trackInfos[selectedTrackIdx]?.language || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value)}
-                        >
-                          {languages.map(lang => (
-                            <MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>
+
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.75 }}>
+                          <Typography variant="overline" sx={{ color: 'text.secondary' }}>Contributors</Typography>
+                          <Tooltip title="Add contributor">
+                            <IconButton size="small" color="primary" onClick={() => addContributor(selectedTrackIdx)}>
+                              <Add fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Add credits here. Include at least one row with role <strong>Artist</strong> (required).
+                          Use <strong>Performer</strong> for featuring guests.
+                        </Typography>
+                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' }, gap: 1, px: 1.5, py: 1, bgcolor: 'action.hover' }}>
+                            <Typography variant="caption" fontWeight={700}>Role</Typography>
+                            <Typography variant="caption" fontWeight={700}>Name</Typography>
+                          </Box>
+                          {trackInfos[selectedTrackIdx]?.contributors.map((contributor, contributorIdx) => (
+                            <Box key={`${contributorIdx}-${contributor.role}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' }, gap: 1.5, p: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'center' }}>
+                              <TextField
+                                select
+                                size="small"
+                                value={contributor.role}
+                                onChange={e => updateContributor(selectedTrackIdx, contributorIdx, 'role', e.target.value)}
+                              >
+                                {contributorRoles.map(role => (
+                                  <MenuItem key={role.value} value={role.value}>{role.label}</MenuItem>
+                                ))}
+                              </TextField>
+                              <TextField
+                                size="small"
+                                label="Contributor name"
+                                value={contributor.name}
+                                onChange={e => updateContributor(selectedTrackIdx, contributorIdx, 'name', e.target.value)}
+                              />
+                              <Tooltip title="Remove contributor">
+                                <IconButton size="small" color="error" onClick={() => removeContributor(selectedTrackIdx, contributorIdx)}>
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
                           ))}
-                        </TextField>
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'language'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          select
-                          label="Genre *"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 260 }}
-                          required
-                          value={trackInfos[selectedTrackIdx]?.genre || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)}
-                        >
-                          {genres.map(g => (
-                            <MenuItem key={g} value={g}>{g}</MenuItem>
-                          ))}
-                        </TextField>
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'genre'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Subgenre"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.subgenre || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'subgenre'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Box sx={{ width: '100%', mt: 2, mb: 1 }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Identifiers & Dates</Typography>
-                        <Divider />
+                        </Box>
                       </Box>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          label="ISRC"
-                          fullWidth
-                          sx={{ minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.isrc || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)}
-                          helperText="Leave blank for auto assign by system"
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <Tooltip title="International Standard Recording Code">
-                                  <Info fontSize="small" />
-                                </Tooltip>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                      </Grid>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          label="UPC"
-                          fullWidth
-                          sx={{ minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.upc || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'upc', e.target.value)}
-                          helperText="Leave blank for auto assign by system"
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <Tooltip title="Universal Product Code for releases">
-                                  <Info fontSize="small" />
-                                </Tooltip>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                      </Grid>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          label="Original Release Date"
-                          type="date"
-                          fullWidth
-                          sx={{ minWidth: 220 }}
-                          InputLabelProps={{ shrink: true }}
-                          value={trackInfos[selectedTrackIdx]?.originalReleaseDate || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'originalReleaseDate', e.target.value)}
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <Tooltip title="Date the track was first released">
-                                  <Info fontSize="small" />
-                                </Tooltip>
-                              </InputAdornment>
-                            )
-                          }}
-                        />
-                      </Grid>
-                      <Grid xs={12} md={3}>
-                        <TextField
-                          label="Track #"
-                          type="number"
-                          fullWidth
-                          sx={{ minWidth: 160 }}
-                          inputProps={{ min: 1 }}
-                          value={trackInfos[selectedTrackIdx]?.trackNumber || 1}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'trackNumber', Number(e.target.value))}
-                        />
-                      </Grid>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          label="Duration"
-                          fullWidth
-                          InputProps={{ readOnly: true }}
-                          value={trackInfos[selectedTrackIdx]?.duration || ''}
-                        />
-                      </Grid>
-                      <Box sx={{ width: '100%', mt: 2, mb: 1 }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Credits</Typography>
-                        <Divider />
+
+                      <Box>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Metadata</Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                          <TextField select label="Metadata Language *" fullWidth required value={trackInfos[selectedTrackIdx]?.metadataLanguage || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'metadataLanguage', e.target.value)}>
+                            {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
+                          </TextField>
+                          <TextField select label="Audio Language *" fullWidth required value={trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language || ''} onChange={e => {
+                            handleTrackInfoChange(selectedTrackIdx, 'audioLanguage', e.target.value);
+                            handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value);
+                          }}>
+                            {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
+                          </TextField>
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                          <TextField select label="Genre *" fullWidth required value={trackInfos[selectedTrackIdx]?.genre || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)}>
+                            {genres.map(g => (<MenuItem key={g} value={g}>{g}</MenuItem>))}
+                          </TextField>
+                          <TextField label="Subgenre" fullWidth value={trackInfos[selectedTrackIdx]?.subgenre || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)} />
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                          <TextField
+                            label="Original release date"
+                            type="date"
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={originalReleaseDate}
+                            onChange={(e) => setOriginalReleaseDate(e.target.value)}
+                            helperText="If this catalog was issued before."
+                          />
+                          <TextField
+                            label="Digital release date *"
+                            type="date"
+                            fullWidth
+                            required
+                            InputLabelProps={{ shrink: true }}
+                            value={releaseDate}
+                            onChange={(e) => setReleaseDate(e.target.value)}
+                            helperText="Date stores should go live."
+                          />
+                        </Box>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                          <TextField select label="Recording Year" fullWidth value={trackInfos[selectedTrackIdx]?.recordingYear || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'recordingYear', e.target.value)}>
+                            <MenuItem value="">Not set</MenuItem>
+                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                          </TextField>
+                        </Box>
                       </Box>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Composers"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.composers || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'composers', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'composers'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Publishers"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.publishers || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'publishers', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'publishers'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Producers"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.producers || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'producers', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'producers'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Recording Year"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.recordingYear || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'recordingYear', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'recordingYear'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Box sx={{ width: '100%', mt: 2, mb: 1 }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Lyrics</Typography>
-                        <Divider />
+
+                      <Box>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Identifiers</Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                          <TextField label="ISRC" fullWidth value={trackInfos[selectedTrackIdx]?.isrc || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)} helperText="Leave blank for auto assign by system" />
+                          <TextField label="UPC" fullWidth value={trackInfos[selectedTrackIdx]?.upc || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'upc', e.target.value)} helperText="Leave blank for auto assign by system" />
+                        </Box>
                       </Box>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          label="Lyrics"
-                          fullWidth
-                          sx={{ minWidth: 260 }}
-                          multiline
-                          minRows={3}
-                          value={trackInfos[selectedTrackIdx]?.lyrics || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'lyrics', e.target.value)}
-                        />
-                      </Grid>
-                      <Box sx={{ width: '100%', mt: 2, mb: 1 }}>
+
+                      <Box>
                         <Typography variant="overline" sx={{ color: 'text.secondary' }}>Rights</Typography>
-                        <Divider />
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 120px ' }, gap: 2, mt: 1 }}>
+                          <TextField label="C-line name" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightC || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)} />
+                          <TextField select label="Year" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightCYear || String(currentYear)} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightCYear', e.target.value)}>
+                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                          </TextField>
+                          <TextField label="P-line name" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightP || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightP', e.target.value)} />
+                          <TextField select label="Year" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightPYear || String(currentYear)} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightPYear', e.target.value)}>
+                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                          </TextField>
+                        </Box>
                       </Box>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Copyright (C) (C-line)"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.copyrightC || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'copyrightC'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <TextField
-                          label="Sound Recording (P) (P-line)"
-                          fullWidth
-                          sx={{ flex: 1, minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.copyrightP || ''}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightP', e.target.value)}
-                        />
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'copyrightP'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6}>
-                        <TextField
-                          select
-                          label="Parental Advisory"
-                          fullWidth
-                          sx={{ minWidth: 220 }}
-                          value={trackInfos[selectedTrackIdx]?.parentalAdvisory || 'none'}
-                          onChange={e => handleTrackInfoChange(selectedTrackIdx, 'parentalAdvisory', e.target.value)}
-                        >
-                          <MenuItem value="none">None</MenuItem>
-                          <MenuItem value="explicit">Explicit</MenuItem>
-                          <MenuItem value="clean">Clean</MenuItem>
-                        </TextField>
-                        <Tooltip title="Apply to all tracks">
-                          <IconButton sx={{ ml: 1 }} onClick={() => { handleApplyToAll(selectedTrackIdx, 'parentalAdvisory'); setSnackOpen(true); }}>
-                            <PlaylistAddCheck fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Grid>
-                      <Grid xs={12} md={6} sx={{ display: 'flex', alignItems: 'center' }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={!!trackInfos[selectedTrackIdx]?.explicit}
-                              onChange={e => handleTrackInfoChange(selectedTrackIdx, 'explicit', e.target.checked)}
-                            />
-                          }
-                          label="Explicit Lyrics"
-                        />
-                        <FormControlLabel
-                          sx={{ ml: 2 }}
-                          control={
-                            <Checkbox
-                              checked={!!trackInfos[selectedTrackIdx]?.instrumental}
-                              onChange={e => handleTrackInfoChange(selectedTrackIdx, 'instrumental', e.target.checked)}
-                            />
-                          }
-                          label="Instrumental"
-                        />
-                      </Grid>
-                    </Grid>
+
+                      <Box>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Content</Typography>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                          <Box>
+                            <TextField label="Lyrics" fullWidth multiline minRows={3} value={trackInfos[selectedTrackIdx]?.lyrics || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'lyrics', e.target.value)} />
+                          </Box>
+                          <Box>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                              <TextField select label="Parental Advisory" fullWidth value={trackInfos[selectedTrackIdx]?.parentalAdvisory || 'none'} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'parentalAdvisory', e.target.value)}>
+                                <MenuItem value="none">None</MenuItem>
+                                <MenuItem value="explicit">Explicit</MenuItem>
+                                <MenuItem value="clean">Clean</MenuItem>
+                              </TextField>
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                                <FormControlLabel
+                                  control={
+                                    <Checkbox
+                                      checked={!!trackInfos[selectedTrackIdx]?.explicit}
+                                      onChange={e => handleTrackInfoChange(selectedTrackIdx, 'explicit', e.target.checked)}
+                                    />
+                                  }
+                                  label="Explicit Lyrics"
+                                />
+                                <FormControlLabel
+                                  control={
+                                    <Checkbox
+                                      checked={!!trackInfos[selectedTrackIdx]?.instrumental}
+                                      onChange={e => handleTrackInfoChange(selectedTrackIdx, 'instrumental', e.target.checked)}
+                                    />
+                                  }
+                                  label="Instrumental"
+                                />
+                              </Box>
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
                   </Box>
                 )}
                 <Snackbar
@@ -1450,19 +1643,20 @@ export default function UploadPage() {
                   message="Applied to all tracks"
                   anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
                 />
-              </Grid>
-            </Grid>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-              <Button onClick={handleBack}>Back</Button>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, gap: 2 }}>
               <Button
                 variant="contained"
                 color="primary"
+                sx={{ borderRadius: 2, px: 3 }}
                 onClick={handleNext}
                 disabled={
                   !isTrackInfoListValid ||
                   analysisLoading.some(Boolean) ||
                   trackUploading.some(Boolean) ||
-                  tracks.some(f => !f)
+                  tracks.length < minTracksRequired ||
+                  !releaseDate.trim()
                 }
               >
                 Continue
@@ -1470,28 +1664,9 @@ export default function UploadPage() {
             </Box>
           </Box>
         );
-      
+      }
+
       case 3:
-        // Pricing & Scheduling
-        return (
-          <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Pricing & Scheduling</Typography>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid xs={12} md={4}><TextField select label="Currency" fullWidth value={currency} onChange={e => setCurrency(e.target.value)}><MenuItem value="USD">USD</MenuItem><MenuItem value="EUR">EUR</MenuItem><MenuItem value="INR">INR</MenuItem></TextField></Grid>
-              {releaseType !== 'single' && (
-                <Grid xs={12} md={4}><TextField label="Album Price" type="number" inputProps={{ step: '0.01', min: 0 }} fullWidth value={albumPrice} onChange={e => setAlbumPrice(e.target.value === '' ? '' : Number(e.target.value))} InputProps={{ startAdornment: <InputAdornment position="start">{currency}</InputAdornment> }} /></Grid>
-              )}
-              <Grid xs={12} md={4}><TextField label="Track Price" type="number" inputProps={{ step: '0.01', min: 0 }} fullWidth value={trackPrice} onChange={e => setTrackPrice(e.target.value === '' ? '' : Number(e.target.value))} InputProps={{ startAdornment: <InputAdornment position="start">{currency}</InputAdornment> }} /></Grid>
-              <Grid xs={12} md={4}><TextField label="Release Date" type="date" fullWidth InputLabelProps={{ shrink: true }} value={releaseDate} onChange={e => setReleaseDate(e.target.value)} /></Grid>
-            </Grid>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-              <Button onClick={handleBack}>Back</Button>
-              <Button variant="contained" color="primary" onClick={handleNext} disabled={!isPricingValid || !releaseDate}>Continue</Button>
-            </Box>
-          </Box>
-        );
-      
-      case 4:
         // Distribution Providers
         return (
           <Box>
@@ -1504,7 +1679,7 @@ export default function UploadPage() {
               <Button size="small" onClick={handleSelectAll}>{allSelected ? 'Deselect All' : 'Select All'}</Button>
             </Box>
             <Grid container spacing={2}>
-              {DSP_LIST.map(dsp => {
+              {visibleDSPs.map((dsp: DspItem) => {
                 const selected = selectedDSPs.includes(dsp.key);
                 return (
                   <Grid xs={12} sm={6} md={4} key={dsp.key}>
@@ -1519,12 +1694,28 @@ export default function UploadPage() {
                       }}
                     >
                       <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar src={dsp.logo} alt={dsp.name} sx={{ width: 36, height: 36 }} />
+                        <Avatar
+                          src={dsp.logo}
+                          alt={dsp.name}
+                          variant="rounded"
+                          sx={{
+                            width: 64,
+                            height: 64,
+                            borderRadius: 2,
+                            bgcolor: 'background.default',
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            p: 0.75,
+                          }}
+                        />
                         <Box sx={{ flex: 1 }}>
                           <Typography fontWeight={600}>{dsp.name}</Typography>
-                          <Typography variant="caption" color="text.secondary">{dsp.info}</Typography>
                         </Box>
-                        <Checkbox checked={selected} onChange={() => handleDSPToggle(dsp.key)} />
+                        <Checkbox
+                          checked={selected}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => handleDSPToggle(dsp.key)}
+                        />
                       </CardContent>
                     </Card>
                   </Grid>
@@ -1538,7 +1729,7 @@ export default function UploadPage() {
           </Box>
         );
 
-      case 5:
+      case 4:
         // Territories & Rights
         return (
           <Box>
@@ -1565,7 +1756,7 @@ export default function UploadPage() {
             </Box>
           </Box>
         );
-      case 6:
+      case 5:
         // Review & Submit
         return (
           <Box>
@@ -1573,7 +1764,7 @@ export default function UploadPage() {
             <Typography variant="body1" color="text.secondary" paragraph>
               Review all details before submitting your release.
             </Typography>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: 'background.paper', color: 'text.primary' }}>
+            <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 }, mb: 3, borderRadius: 2, bgcolor: 'background.paper', color: 'text.primary', boxShadow: theme => theme.palette.mode === 'dark' ? 'none' : '0 14px 40px rgba(15,23,42,0.06)' }}>
               <Typography variant="subtitle1" fontWeight="bold">Release Overview</Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid xs={12} md={3}>
@@ -1599,10 +1790,12 @@ export default function UploadPage() {
                   <Box>
                     <strong>Release Title:</strong> {releaseTitle || 'N/A'}<br />
                     <strong>Type:</strong> {releaseType}<br />
-                    <strong>Primary Artist:</strong> {trackInfos[0]?.artist || 'N/A'}<br />
+                    <strong>Primary artist:</strong>{' '}
+                    {trackInfos[0] ? getContributorNames(trackInfos[0], 'artist') || '—' : '—'}
+                    <br />
                     <strong>Label:</strong> {label || 'N/A'}<br />
+                    <strong>Original Release Date:</strong> {originalReleaseDate || 'N/A'}<br />
                     <strong>Release Date:</strong> {releaseDate || 'N/A'}<br />
-                    <strong>Pricing:</strong> {releaseType !== 'single' ? `Album ${currency} ${albumPrice || '—'}, ` : ''}Track {currency} {trackPrice || '—'}<br />
                     <strong>Tracks:</strong> {tracks.length}<br />
                   </Box>
                 </Grid>
@@ -1610,19 +1803,26 @@ export default function UploadPage() {
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" fontWeight="bold">Tracklist</Typography>
               <ol style={{ paddingLeft: 18 }}>
-                {trackInfos.map((track, idx) => (
+                {tracks.map((_file, idx) => {
+                  const track = trackInfos[idx];
+                  if (!track) return null;
+                  const mainArtist = getContributorNames(track, 'artist') || 'Artist TBD';
+                  const featPerf = getContributorNames(track, 'performer');
+                  const remixCredits = getContributorNames(track, 'remixer');
+                  return (
                   <li key={idx}>
                     <div>
                       <strong>{track.title || `Track ${idx + 1}`}</strong>
                       {track.version ? ` (${track.version})` : ''}
-                      {` — ${track.artist || 'Unknown Artist'}`}
-                      {track.featuring ? ` feat. ${track.featuring}` : ''}
-                      {track.remixer ? ` [Remix: ${track.remixer}]` : ''}
+                      {` — ${mainArtist}`}
+                      {featPerf ? ` feat. ${featPerf}` : ''}
+                      {remixCredits ? ` [Remix: ${remixCredits}]` : ''}
                     </div>
                     <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
                       {track.duration ? `Duration: ${track.duration} · ` : ''}
                       {track.genre ? `Genre: ${track.genre}${track.subgenre ? `/${track.subgenre}` : ''} · ` : ''}
-                      {track.language ? `Language: ${track.language} · ` : ''}
+                      {track.metadataLanguage ? `Metadata Language: ${track.metadataLanguage} · ` : ''}
+                      {track.audioLanguage || track.language ? `Audio Language: ${track.audioLanguage || track.language} · ` : ''}
                       {track.isrc ? `ISRC: ${track.isrc} · ` : ''}
                       {track.parentalAdvisory && track.parentalAdvisory !== 'none' ? `Advisory: ${track.parentalAdvisory} · ` : ''}
                       {track.instrumental ? `Instrumental · ` : ''}
@@ -1637,6 +1837,14 @@ export default function UploadPage() {
                         {track.producers ? `Producers: ${track.producers}` : ''}
                       </div>
                     )}
+                    {track.contributors.some(contributor => contributor.name.trim()) && (
+                      <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
+                        Contributors: {track.contributors
+                          .filter(contributor => contributor.name.trim())
+                          .map(contributor => `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`)
+                          .join(' · ')}
+                      </div>
+                    )}
                     {(track.copyrightC || track.copyrightP) && (
                       <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
                         {track.upc ? `UPC: ${track.upc}` : ''}
@@ -1648,13 +1856,16 @@ export default function UploadPage() {
                       </div>
                     )}
                   </li>
-                ))}
+                  );
+                })}
               </ol>
               <Divider sx={{ my: 2 }} />
               <Typography variant="subtitle2" fontWeight="bold">Distribution Providers</Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, mt: 1 }}>
                 {selectedDSPs.map((key) => {
-                  const dsp = DSP_LIST.find(d => d.key === key);
+                  const dsp =
+                    visibleDSPs.find((d: DspItem) => d.key === key) ||
+                    DSP_LIST.find((d: DspItem) => d.key === key);
                   if (!dsp) return null;
                   return (
                     <Chip key={key} label={dsp.name} avatar={<Avatar src={dsp.logo} alt={dsp.name} />} variant="outlined" />
@@ -1670,21 +1881,45 @@ export default function UploadPage() {
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   Mode: <strong>{territoryMode === 'allowed' ? 'Allowed' : 'Disallowed'}</strong>
                 </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                  {territoryCountries.length > 0 ? (
-                    territoryCountries
-                      .map(code => {
-                        const c = countries.find(ct => ct.code === code);
-                        return c ? c.label : code;
-                      })
-                      .sort()
-                      .map(label => (
-                        <Chip key={label} label={label} size="small" />
-                      ))
-                  ) : (
-                    <Typography variant="body2" color="text.secondary">No territories selected</Typography>
-                  )}
-                </Box>
+                {territoryCountries.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">No territories selected</Typography>
+                ) : (() => {
+                  const REVIEW_TR_MAX = 14;
+                  const sortedTerritory = [...territoryCountries]
+                    .map((code) => ({
+                      code,
+                      label: countries.find((ct) => ct.code === code)?.label || code,
+                    }))
+                    .sort((a, b) => a.label.localeCompare(b.label));
+                  const showExpandToggle = sortedTerritory.length > REVIEW_TR_MAX;
+                  const visible = reviewTerritoriesExpanded
+                    ? sortedTerritory
+                    : sortedTerritory.slice(0, REVIEW_TR_MAX);
+                  return (
+                    <Box>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                        {visible.map(({ code, label }) => (
+                          <Chip key={code} label={label} size="small" variant="outlined" sx={{ borderRadius: 2 }} />
+                        ))}
+                      </Box>
+                      {showExpandToggle ? (
+                        <Button
+                          size="small"
+                          onClick={() => setReviewTerritoriesExpanded((prev) => !prev)}
+                          endIcon={<ExpandMore sx={{
+                            transition: 'transform 0.2s',
+                            transform: reviewTerritoriesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          }} />}
+                          sx={{ mt: 1 }}
+                        >
+                          {reviewTerritoriesExpanded
+                            ? 'Show fewer territories'
+                            : `Show all ${sortedTerritory.length} territories`}
+                        </Button>
+                      ) : null}
+                    </Box>
+                  );
+                })()}
                 <Box sx={{ mt: 1.5 }}>
                   <Typography variant="body2">
                     Rights: <strong>{rightsType}</strong>{rightsDescription ? ` — ${rightsDescription}` : ''}
@@ -1694,8 +1929,8 @@ export default function UploadPage() {
             </Paper>
             {submitState === 'idle' ? (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button onClick={handleBack}>Back</Button>
-                <Button variant="contained" color="primary" onClick={handleSubmitRelease} disabled={!isTrackInfoListValid}>
+                <Button onClick={handleBack} sx={{ borderRadius: 2 }}>Back</Button>
+                <Button variant="contained" color="primary" sx={{ borderRadius: 2, px: 3 }} onClick={handleSubmitRelease} disabled={!isTrackInfoListValid}>
                   Submit Release
                 </Button>
               </Box>
@@ -1731,19 +1966,57 @@ export default function UploadPage() {
 
 
   return (
-    <Box>
-      <Typography variant="h4" component="h1" gutterBottom fontWeight="bold">
-        Upload Your Track
-      </Typography>
-      <Typography variant="body1" color="text.secondary" paragraph>
-        Share your music with the world through our distribution platform
-      </Typography>
+    <Box sx={{ width: '100%' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 3.5 },
+          mb: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Typography variant="h4" component="h1" gutterBottom fontWeight="bold" color="text.primary">
+          Upload Your Release/Track
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Share your music with the world through our distribution platform.
+        </Typography>
+      </Paper>
 
-      <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 4 }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 1, sm: 2 },
+          mb: 3,
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          overflowX: 'auto',
+        }}
+      >
+      <Stepper
+        activeStep={activeStep}
+        alternativeLabel
+        sx={{
+          '& .MuiStepConnector-line': {
+            borderTopWidth: 2,
+            borderColor: theme => theme.palette.divider,
+          },
+          '& .Mui-active .MuiStepConnector-line, & .Mui-completed .MuiStepConnector-line': {
+            borderColor: 'primary.main',
+          },
+          '& .MuiStepLabel-labelContainer': {
+            typography: 'caption',
+            mt: { xs: 1, md: 0 },
+          },
+        }}
+      >
         {steps.map((label, index) => (
           <Step key={label}>
             <StepLabel
-              sx={{ cursor: 'pointer' }}
+              sx={{ cursor: 'pointer', '& .Mui-active': { fontWeight: 700 }, '& .Mui-completed': { fontWeight: 600 } }}
               onClick={() => setActiveStep(index)} 
               componentsProps={{
                 label: {
@@ -1764,8 +2037,18 @@ export default function UploadPage() {
           </Step>
         ))}
       </Stepper>
+      </Paper>
 
-      <Paper sx={{ p: 4, borderRadius: 2 }}>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 2, sm: 3, md: 4 },
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          borderColor: 'divider',
+          boxShadow: theme => theme.palette.mode === 'dark' ? '0 18px 50px rgba(0, 0, 0, 0.24)' : '0 18px 45px rgba(15, 23, 42, 0.08)',
+        }}
+      >
         {renderStepContent()}
       </Paper>
     </Box>

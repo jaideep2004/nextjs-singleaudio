@@ -123,6 +123,17 @@ export const authAPI = {
       return handleApiError(error);
     }
   },
+
+  checkArtistNameAvailability: async (name: string): Promise<{ available: boolean }> => {
+    try {
+      const response = await api.get<ApiResponse<{ available: boolean }>>(
+        `/auth/check-artist-name?name=${encodeURIComponent(name)}`
+      );
+      return response.data.data ?? { available: false };
+    } catch (error) {
+      throw new Error('Unable to verify artist name availability. Please try again.');
+    }
+  },
 };
 
 // Types for Track API
@@ -399,7 +410,7 @@ export const publicAPI = {
   // Get a public setting
   getSetting: async (key: string) => {
     try {
-      const response = await api.get<ApiResponse<any>>(`/api/settings/${key}`);
+      const response = await api.get<ApiResponse<any>>(`/settings/${key}`);
       return response.data;
     } catch (error) {
       console.error(`Error fetching public setting ${key}:`, error);
@@ -410,10 +421,10 @@ export const publicAPI = {
   // Check if signups are enabled
   checkSignupEnabled: async () => {
     try {
-      const response = await api.get<ApiResponse<any>>('/api/settings/signup-enabled');
+      const response = await api.get<{ success: boolean; enabled: boolean; message?: string }>('/settings/signup-enabled');
       return {
-        success: true,
-        enabled: response.data?.data?.enabled === true
+        success: response.data?.success === true,
+        enabled: response.data?.enabled === true
       };
     } catch (error) {
       console.error('Error checking if signups are enabled:', error);

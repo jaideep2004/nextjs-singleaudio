@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -43,55 +43,54 @@ import useAdminAuth from '@/hooks/useAdminAuth';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 
+interface AdminUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'artist' | string;
+  artistName?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface AdminUsersResponseData {
+  users?: AdminUser[];
+  total?: number;
+  pagination?: {
+    total?: number;
+  };
+}
+
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: 'success' | 'error' | 'warning' | 'info';
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { isAdmin } = useAdminAuth();
   const { mode } = useColorMode();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
 
-  // Safe access to auth context
-  let auth;
-  let contextError = false;
-
-  try {
-    auth = useAuth();
-  } catch (error) {
-    console.error('Auth context not available in AdminUsersPage:', error);
-    contextError = true;
-  }
-
-  const { user } = auth || { user: null };
-
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [totalUsers, setTotalUsers] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<any>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
+  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'success' });
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   // Set mounted state to true after component mounts
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Handle redirect if context is not available
-  useEffect(() => {
-    if (mounted && contextError) {
-      router.push('/login');
-    }
-  }, [mounted, contextError, router]);
-
-  useEffect(() => {
-    if (isAdmin) {
-      fetchUsers();
-    }
-  }, [isAdmin, page, rowsPerPage, searchTerm]);
 
   // Redirect if not authenticated or not admin
   useEffect(() => {
@@ -102,39 +101,27 @@ export default function AdminUsersPage() {
     }
   }, [user, router, mounted]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('Fetching users with params:', {
-        page: page + 1,
-        limit: rowsPerPage,
-        search: searchTerm,
-      });
-
       const response = await adminAPI.getUsers({
         page: page + 1,
         limit: rowsPerPage,
         search: searchTerm,
       });
 
-      console.log('Users API response:', response);
-
       if (response.success && response.data) {
-        // Ensure we're getting an array of users
-        const userData = response.data.users || [];
-        console.log('User data array:', userData);
+        const data = response.data as AdminUsersResponseData;
+        const userData = data.users || [];
 
         if (Array.isArray(userData)) {
           setUsers(userData);
-          setTotalUsers(response.data.total || response.data.pagination?.total || 0);
-          console.log('Updated users state with', userData.length, 'users');
+          setTotalUsers(data.total || data.pagination?.total || 0);
         } else {
-          console.error('Users data is not an array:', userData);
           setUsers([]);
           setTotalUsers(0);
         }
       } else {
-        console.warn('Invalid response format or unsuccessful response:', response);
         setUsers([]);
         setTotalUsers(0);
       }
@@ -146,9 +133,15 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, rowsPerPage, searchTerm]);
 
-  const handleChangePage = (event: unknown, newPage: number) => {
+  useEffect(() => {
+    if (isAdmin) {
+      void fetchUsers();
+    }
+  }, [fetchUsers, isAdmin]);
+
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -174,8 +167,8 @@ export default function AdminUsersPage() {
     router.push('/admin/users/new');
   };
 
-  const handleDeleteClick = (user: any) => {
-    setUserToDelete(user);
+  const handleDeleteClick = (selectedUser: AdminUser) => {
+    setUserToDelete(selectedUser);
     setDeleteDialogOpen(true);
   };
 
@@ -186,42 +179,41 @@ export default function AdminUsersPage() {
       const response = await adminAPI.deleteUser(userToDelete._id);
       if (response.success) {
         showSnackbar('User deleted successfully', 'success');
-        fetchUsers(); // Refresh the user list
+        void fetchUsers();
       } else {
         showSnackbar(response.message || 'Failed to delete user', 'error');
       }
-    } catch (error: any) {
-      console.error('Error deleting user:', error);
-      showSnackbar(error.message || 'Failed to delete user', 'error');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete user';
+      showSnackbar(message, 'error');
     } finally {
       setDeleteDialogOpen(false);
       setUserToDelete(null);
     }
   };
 
-  const handleStatusToggle = async (user: any) => {
+  const handleStatusToggle = async (selectedUser: AdminUser) => {
     try {
-      setUpdatingStatus(user._id);
-      const newStatus = !user.isActive;
+      setUpdatingStatus(selectedUser._id);
+      const newStatus = !selectedUser.isActive;
       
-      const response = await adminAPI.updateUser(user._id, {
+      const response = await adminAPI.updateUser(selectedUser._id, {
         isActive: newStatus
       });
       
       if (response.success) {
         showSnackbar(`User ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success');
-        // Update the user in the local state
         setUsers(prevUsers => 
           prevUsers.map(u => 
-            u._id === user._id ? { ...u, isActive: newStatus } : u
+            u._id === selectedUser._id ? { ...u, isActive: newStatus } : u
           )
         );
       } else {
         showSnackbar(response.message || `Failed to ${newStatus ? 'activate' : 'deactivate'} user`, 'error');
       }
-    } catch (error: any) {
-      console.error('Error updating user status:', error);
-      showSnackbar(error.message || 'Failed to update user status', 'error');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update user status';
+      showSnackbar(message, 'error');
     } finally {
       setUpdatingStatus(null);
     }
@@ -254,11 +246,6 @@ export default function AdminUsersPage() {
         <CircularProgress />
       </Box>
     );
-  }
-
-  // If context error, show nothing (will redirect)
-  if (contextError) {
-    return null;
   }
 
   if (isAdmin === null) {
@@ -591,7 +578,7 @@ export default function AdminUsersPage() {
       >
         <Alert 
           onClose={handleCloseSnackbar} 
-          severity={snackbar.severity as any}
+          severity={snackbar.severity}
           sx={{ width: '100%' }}
         >
           {snackbar.message}

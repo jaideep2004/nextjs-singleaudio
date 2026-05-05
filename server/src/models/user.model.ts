@@ -2,6 +2,41 @@ import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { UserRole } from '../config/constants';
 
+export interface IArtistOnboarding {
+  legalName: string;
+  idType: 'pan' | 'aadhaar';
+  idNumber: string;
+  legalAddress: string;
+  phoneNumber: string;
+  numberOfTracks: number;
+  numberOfReleases: number;
+  governmentIdFile: string; // stored path / URL
+}
+
+export interface ILabelOnboarding {
+  labelName: string;
+  registrationType: 'individual' | 'registered_company';
+  // individual
+  legalName?: string;
+  labelGovIdFile?: string;
+  // registered company
+  legalEntityName?: string;
+  companyType?: 'private' | 'public';
+  certificateFile?: string; // incorporation cert or GST cert path
+  // shared
+  totalArtists: number;
+  totalRevenue: number;
+  catalogSize: number;
+  rightsType: 'exclusive' | 'non_exclusive';
+  companyWebsite?: string;
+  socialLinks?: {
+    instagram?: string;
+    twitter?: string;
+    facebook?: string;
+    youtube?: string;
+  };
+}
+
 export interface IUser extends Document {
   name: string;
   email: string;
@@ -10,6 +45,8 @@ export interface IUser extends Document {
   profilePicture?: string;
   artistName?: string;
   bio?: string;
+  accountType?: 'artist' | 'label';
+  onboarding?: IArtistOnboarding | ILabelOnboarding;
   socialLinks?: {
     website?: string;
     instagram?: string;
@@ -27,7 +64,7 @@ const UserSchema: Schema = new Schema(
       type: String,
       required: [true, 'Name is required'],
       trim: true,
-      maxlength: [50, 'Name cannot be more than 50 characters']
+      maxlength: [50, 'Name cannot be more than 50 characters'],
     },
     email: {
       type: String,
@@ -37,46 +74,54 @@ const UserSchema: Schema = new Schema(
       lowercase: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        'Please provide a valid email'
-      ]
+        'Please provide a valid email',
+      ],
     },
     password: {
       type: String,
       required: [true, 'Password is required'],
       minlength: [6, 'Password must be at least 6 characters'],
-      select: false
+      select: false,
     },
     role: {
       type: String,
       enum: Object.values(UserRole),
-      default: UserRole.ARTIST
+      default: UserRole.ARTIST,
     },
     profilePicture: {
-      type: String
+      type: String,
     },
     artistName: {
       type: String,
-      trim: true
+      trim: true,
+      sparse: true,
+      unique: true,
     },
     bio: {
       type: String,
-      maxlength: [500, 'Bio cannot be more than 500 characters']
+      maxlength: [500, 'Bio cannot be more than 500 characters'],
+    },
+    accountType: {
+      type: String,
+      enum: ['artist', 'label'],
+    },
+    onboarding: {
+      type: Schema.Types.Mixed,
     },
     socialLinks: {
       website: String,
       instagram: String,
       twitter: String,
-      facebook: String
-    }
+      facebook: String,
+    },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
 // Hash password before saving
 UserSchema.pre<IUser>('save', async function (next) {
-  // Only hash the password if it has been modified (or is new)
   if (!this.isModified('password')) return next();
 
   try {
@@ -89,8 +134,10 @@ UserSchema.pre<IUser>('save', async function (next) {
 });
 
 // Compare password method
-UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
+UserSchema.methods.comparePassword = async function (
+  candidatePassword: string
+): Promise<boolean> {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-export default mongoose.model<IUser>('User', UserSchema); 
+export default mongoose.model<IUser>('User', UserSchema);

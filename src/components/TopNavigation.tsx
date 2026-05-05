@@ -26,8 +26,8 @@ import {
   NotificationsOutlined,
   Menu as MenuIcon,
   KeyboardArrowDown,
-  Brightness4,
-  Brightness7,
+  DarkMode,
+  LightMode,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
@@ -193,8 +193,19 @@ export default function TopNavigation({ title = 'Karhari Media' }: TopNavigation
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           {/* Theme toggle */}
           <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
-            <IconButton onClick={toggleColorMode} color="inherit">
-              {isDarkMode ? <Brightness7 /> : <Brightness4 />}
+            <IconButton
+              onClick={toggleColorMode}
+              color="inherit"
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                bgcolor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+                '&:hover': {
+                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.06)',
+                },
+              }}
+            >
+              {isDarkMode ? <LightMode /> : <DarkMode />}
             </IconButton>
           </Tooltip>
 

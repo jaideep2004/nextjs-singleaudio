@@ -1,11 +1,10 @@
 'use client';
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import Cookies from 'js-cookie';
-import { useRouter, usePathname } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
-import axios from 'axios';
 
-// Define types
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import axios from 'axios';
+import Cookies from 'js-cookie';
+import { jwtDecode } from 'jwt-decode';
+
 interface User {
   id: string;
   name: string;
@@ -14,307 +13,309 @@ interface User {
   artistName?: string;
 }
 
+interface SignupPayload {
+  name: string;
+  email: string;
+  password: string;
+  accountType: 'artist' | 'label';
+  role?: User['role'];
+  // artist fields
+  artistName?: string;
+  legalName?: string;
+  idType?: 'pan' | 'aadhaar';
+  idNumber?: string;
+  legalAddress?: string;
+  phoneNumber?: string;
+  numberOfTracks?: number;
+  numberOfReleases?: number;
+  governmentIdFile?: File;
+  // label fields
+  labelName?: string;
+  registrationType?: 'individual' | 'registered_company';
+  labelLegalName?: string;
+  legalEntityName?: string;
+  companyType?: 'private' | 'public';
+  incorporationCertFile?: File;
+  gstCertFile?: File;
+  labelGovIdFile?: File;
+  totalArtists?: number;
+  totalRevenue?: number;
+  catalogSize?: number;
+  rightsType?: 'exclusive' | 'non_exclusive';
+  companyWebsite?: string;
+  socialLinks?: Record<string, string>;
+  bio?: string;
+}
+
+interface AuthResponse {
+  data: {
+    token: string;
+    _id?: string;
+    id?: string;
+    name: string;
+    email: string;
+    role: User['role'];
+    artistName?: string;
+  };
+}
+
+interface DecodedToken {
+  exp: number;
+  id: string;
+  name: string;
+  email: string;
+  role: User['role'];
+  artistName?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (userData: any) => Promise<void>;
+  signup: (userData: SignupPayload) => Promise<void>;
   logout: () => void;
   getToken: () => string | null;
 }
 
-// Create context
 const AppContext = createContext<AuthContextType | undefined>(undefined);
 
-// API URL from environment or default
-const API_URL = typeof window !== 'undefined' 
-  ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
-  : 'http://localhost:5000/api'; // Default for SSR
+const API_URL =
+  typeof window !== 'undefined'
+    ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+    : 'http://localhost:5000/api';
 
-// Provider component
+const fallbackAuthContext: AuthContextType = {
+  user: null,
+  isLoading: true,
+  isAuthenticated: false,
+  login: async () => {
+    throw new Error('Auth provider is not initialized');
+  },
+  signup: async () => {
+    throw new Error('Auth provider is not initialized');
+  },
+  logout: () => undefined,
+  getToken: () => null,
+};
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (axios.isAxiosError(error)) {
+    return (error.response?.data as { message?: string } | undefined)?.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+const toUser = (payload: AuthResponse['data'] | DecodedToken): User => ({
+  id: '_id' in payload && payload._id ? payload._id : payload.id,
+  name: payload.name,
+  email: payload.email,
+  role: payload.role,
+  artistName: payload.artistName,
+});
+
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
 
-  // Configure axios defaults
-  useEffect(() => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-
-    console.log('Setting up axios with base URL:', API_URL);
-    axios.defaults.baseURL = API_URL;
-    
-    // Add request interceptor for debugging
-    const requestInterceptorId = axios.interceptors.request.use((config) => {
-      console.log(`Making ${config.method?.toUpperCase()} request to ${config.url}`, config.data || '');
-      
-      // Add authorization header to every request if token exists
-      const token = getToken();
-      if (token) {
-        // Ensure headers object exists
-        config.headers = config.headers || {};
-        
-        // Set Authorization header with Bearer token
-        config.headers['Authorization'] = `Bearer ${token}`;
-        console.log('Setting Authorization header:', `Bearer ${token}`);
-      }
-      return config;
-    }, (error) => {
-      console.error('Request error interceptor:', error);
-      return Promise.reject(error);
-    });
-    
-    // Add response interceptor for debugging
-    const responseInterceptorId = axios.interceptors.response.use((response) => {
-      console.log(`Response from ${response.config.url}:`, response.data);
-      return response;
-    }, (error) => {
-      console.error('Response error interceptor:', error.response?.data || error.message);
-      return Promise.reject(error);
-    });
-
-    // Initial auth check
-    checkAuth();
-    
-    // Clean up interceptors on unmount
-    return () => {
-      axios.interceptors.request.eject(requestInterceptorId);
-      axios.interceptors.response.eject(responseInterceptorId);
-    };
+  const getToken = useCallback((): string | null => {
+    if (typeof window === 'undefined') return null;
+    return Cookies.get('token') || null;
   }, []);
 
-  // Check if user is authenticated
-  const checkAuth = async () => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-    
+  const logout = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    Cookies.remove('token');
+    setUser(null);
+    setIsLoading(false);
+    window.location.assign('/login');
+  }, []);
+
+  const checkAuth = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+
     const token = getToken();
-    
     if (!token) {
       setIsLoading(false);
       setIsInitialized(true);
       return;
     }
-    
+
     try {
-      // Verify token by decoding and checking expiration
-      const decoded: any = jwtDecode(token);
-      console.log('Decoded token:', decoded);
-      
-      // Check if token is expired
+      const decoded = jwtDecode<DecodedToken>(token);
+
       if (decoded.exp * 1000 < Date.now()) {
-        console.log('Token expired, logging out');
         logout();
         return;
       }
-      
-      // Set user from token data
-      setUser({
-        id: decoded.id,
-        name: decoded.name,
-        email: decoded.email,
-        role: decoded.role,
-        artistName: decoded.artistName
-      });
-      
-      // Try to get fresh user data
+
+      setUser(toUser(decoded));
+
       try {
-        const response = await axios.get('/auth/me');
+        const response = await axios.get<{ data?: AuthResponse['data'] }>('/auth/me');
         if (response.data?.data) {
-          setUser(response.data.data);
+          setUser(toUser(response.data.data));
         }
-      } catch (error) {
-        console.error('Failed to get fresh user data:', error);
-        // Continue with token data
+      } catch {
+        // Fall back to token data if the profile refresh request fails.
       }
-    } catch (error) {
-      console.error('Auth check error:', error);
+    } catch {
       logout();
     } finally {
       setIsLoading(false);
       setIsInitialized(true);
     }
-  };
+  }, [getToken, logout]);
 
-  // Login function
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    axios.defaults.baseURL = API_URL;
+
+    const requestInterceptorId = axios.interceptors.request.use((config) => {
+      const token = getToken();
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+
+      return config;
+    });
+
+    void checkAuth();
+
+    return () => {
+      axios.interceptors.request.eject(requestInterceptorId);
+    };
+  }, [checkAuth, getToken]);
+
   const login = async (email: string, password: string) => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-    
+    if (typeof window === 'undefined') return;
+
     setIsLoading(true);
     try {
-      console.log('Attempting login with:', { email });
-      
-      const response = await axios.post('/auth/login', { email, password });
-      console.log('Login response:', response.data);
-      
+      const response = await axios.post<AuthResponse>('/auth/login', { email, password });
       const { token, ...userData } = response.data.data;
-      
+
       if (!token) {
         throw new Error('No token received from server');
       }
-      
-      // Save token in cookie with secure flags
-      Cookies.set('token', token, { 
-        expires: 30, 
+
+      Cookies.set('token', token, {
+        expires: 30,
         sameSite: 'Lax',
         secure: process.env.NODE_ENV === 'production',
-        path: '/'
+        path: '/',
       });
-      
-      // Update user state with the complete user data from the response
-      setUser({
-        id: userData._id || userData.id,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role,
-        artistName: userData.artistName || userData.name
-      });
-      
-      console.log('User data after login:', userData);
-      console.log('User role after login:', userData.role);
-      
-      // Use window.location for more reliable redirects
+
+      setUser(toUser({ ...userData, artistName: userData.artistName || userData.name }));
+
       const redirectUrl = userData.role === 'admin' ? '/admin/dashboard' : '/dashboard';
-      console.log('Redirecting to:', redirectUrl);
-      
-      // Small delay to ensure state is updated
-      setTimeout(() => {
-        window.location.href = redirectUrl;
-      }, 100);
-    } catch (error: any) {
-      console.error('Login error:', error);
-      throw new Error(error.response?.data?.message || 'Login failed');
+      window.location.assign(redirectUrl);
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Login failed'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Signup function
-  const signup = async (userData: any) => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-    
+  const signup = async (userData: SignupPayload) => {
+    if (typeof window === 'undefined') return;
+
     setIsLoading(true);
     try {
-      // Check if signups are enabled first
       const signupCheckResponse = await fetch('/api/settings/signup-enabled');
       const signupCheckData = await signupCheckResponse.json();
-      
+
       if (!signupCheckData.enabled) {
         throw new Error('New user registration is currently disabled');
       }
-      
-      console.log('Registering with data:', userData);
-      
-      const response = await axios.post('/auth/register', userData);
-      console.log('Register response:', response.data);
-      
+
+      // Build FormData when file fields are present
+      const hasFiles =
+        userData.governmentIdFile ||
+        userData.labelGovIdFile ||
+        userData.incorporationCertFile ||
+        userData.gstCertFile;
+
+      let response;
+
+      if (hasFiles) {
+        const formData = new FormData();
+        // Append all scalar fields
+        const scalarFields: (keyof SignupPayload)[] = [
+          'name', 'email', 'password', 'accountType', 'role',
+          'artistName', 'legalName', 'idType', 'idNumber', 'legalAddress',
+          'phoneNumber', 'numberOfTracks', 'numberOfReleases',
+          'labelName', 'registrationType', 'labelLegalName', 'legalEntityName',
+          'companyType', 'totalArtists', 'totalRevenue', 'catalogSize',
+          'rightsType', 'companyWebsite', 'bio',
+        ];
+        scalarFields.forEach((key) => {
+          const val = userData[key];
+          if (val !== undefined && val !== null) {
+            formData.append(key, String(val));
+          }
+        });
+        if (userData.socialLinks) {
+          formData.append('socialLinks', JSON.stringify(userData.socialLinks));
+        }
+        // Append files
+        if (userData.governmentIdFile) formData.append('governmentIdFile', userData.governmentIdFile);
+        if (userData.labelGovIdFile) formData.append('labelGovIdFile', userData.labelGovIdFile);
+        if (userData.incorporationCertFile) formData.append('incorporationCertFile', userData.incorporationCertFile);
+        if (userData.gstCertFile) formData.append('gstCertFile', userData.gstCertFile);
+
+        response = await axios.post<AuthResponse>('/auth/register', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        response = await axios.post<AuthResponse>('/auth/register', userData);
+      }
+
       const { token } = response.data.data;
-      
-      // Save token in cookie
-      Cookies.set('token', token, { expires: 30, sameSite: 'Lax' });
-      
-      // Decode token to get user data
-      const decoded: any = jwtDecode(token);
-      console.log('Decoded token after signup:', decoded);
-      
-      // Update user state based on token data
-      const user = {
-        id: decoded.id,
-        name: decoded.name,
-        email: decoded.email,
-        role: decoded.role,
-        artistName: decoded.artistName
-      };
-      
-      setUser(user);
-      
-      // Force a small delay to ensure state updates
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Redirect to dashboard
-      window.location.href = '/dashboard';
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      throw new Error(error.response?.data?.message || 'Signup failed');
+
+      Cookies.set('token', token, {
+        expires: 30,
+        sameSite: 'Lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      });
+
+      setUser(toUser(jwtDecode<DecodedToken>(token)));
+      window.location.assign('/dashboard');
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Signup failed'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout function
-  const logout = () => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-    
-    // Remove token from cookies
-    Cookies.remove('token');
-    
-    // Clear user state
-    setUser(null);
-    
-    // Redirect to login page
-    window.location.href = '/login';
-  };
-
-  // Get token from cookies
-  const getToken = (): string | null => {
-    if (typeof window === 'undefined') return null; // Skip during SSR
-    return Cookies.get('token') || null;
-  };
-
-  // Check if user is authenticated
-  const isAuthenticated = !!user;
-
-  // Context value
   const contextValue: AuthContextType = {
     user,
     isLoading,
-    isAuthenticated,
+    isAuthenticated: !!user,
     login,
     signup,
     logout,
     getToken,
   };
 
-  // Always render children to prevent hydration mismatch
-  // Use CSS to hide content during loading instead of conditional rendering
   return (
     <AppContext.Provider value={contextValue}>
-      <div style={{ visibility: isInitialized ? 'visible' : 'hidden' }}>
-        {children}
-      </div>
+      <div style={{ visibility: isInitialized ? 'visible' : 'hidden' }}>{children}</div>
     </AppContext.Provider>
   );
 }
 
-// Custom hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AppContext);
-  if (context === undefined) {
-    // During SSR or hydration, return a safe default instead of throwing
-    if (typeof window === 'undefined') {
-      return {
-        user: null,
-        isLoading: true,
-        isAuthenticated: false,
-        login: async () => {},
-        signup: async () => {},
-        logout: () => {},
-        getToken: () => null
-      };
-    }
-    // Also handle client-side hydration issues
-    console.warn('useAuth called outside AppContextProvider, returning safe defaults');
-    return {
-      user: null,
-      isLoading: true,
-      isAuthenticated: false,
-      login: async () => { throw new Error('Auth not initialized'); },
-      signup: async () => { throw new Error('Auth not initialized'); },
-      logout: () => { console.warn('Auth not initialized'); },
-      getToken: () => null
-    };
-  }
-  return context;
+  return context ?? fallbackAuthContext;
 };

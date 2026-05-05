@@ -6,6 +6,32 @@ import generateToken from '../utils/generateToken';
 import { successResponse, errorResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
 
+// Escape special regex characters in a string
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Check artist name availability
+ * @route GET /api/auth/check-artist-name
+ * @access Public
+ */
+export const checkArtistName = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name } = req.query;
+
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      throw new ApiError('Name query parameter is required', 400);
+    }
+
+    const exists = await User.findOne({
+      artistName: { $regex: new RegExp(`^${escapeRegex(name.trim())}$`, 'i') },
+    });
+
+    successResponse(res, { available: !exists }, 'Artist name availability checked');
+  } catch (error) {
+    errorResponse(res, 'Failed to check artist name', error);
+  }
+};
+
 /**
  * Register a new user
  * @route POST /api/auth/register
@@ -16,13 +42,39 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Check if signups are enabled
     const signupSetting = await SettingsModel.findOne({ key: 'signupEnabled' });
     const signupsEnabled = signupSetting ? signupSetting.value === true : true;
-    
-    // If signups are disabled and the user is not an admin (admins can always create users)
+
     if (!signupsEnabled && (!req.body.role || req.body.role !== 'admin')) {
       throw new ApiError('New user registration is currently disabled', 403);
     }
 
-    const { email, password, name, role, artistName, bio, socialLinks } = req.body;
+    const {
+      email,
+      password,
+      name,
+      role,
+      accountType,
+      // artist fields
+      artistName,
+      legalName,
+      idType,
+      idNumber,
+      legalAddress,
+      phoneNumber,
+      numberOfTracks,
+      numberOfReleases,
+      // label fields
+      labelName,
+      registrationType,
+      legalEntityName,
+      companyType,
+      totalArtists,
+      totalRevenue,
+      catalogSize,
+      rightsType,
+      companyWebsite,
+      socialLinks,
+      bio,
+    } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
@@ -30,29 +82,91 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       throw new ApiError('User already exists with this email', 400);
     }
 
+    // Check artist name uniqueness
+    if (artistName) {
+      const artistNameExists = await User.findOne({
+        artistName: { $regex: new RegExp(`^${escapeRegex(artistName)}$`, 'i') },
+      });
+      if (artistNameExists) {
+        throw new ApiError('Artist name is already taken', 400);
+      }
+    }
+
+    // Build onboarding sub-document
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+
+    let onboarding: Record<string, unknown> | undefined;
+
+    if (accountType === 'artist') {
+      onboarding = {
+        legalName,
+        idType,
+        idNumber,
+        legalAddress,
+        phoneNumber,
+        numberOfTracks: Number(numberOfTracks) || 0,
+        numberOfReleases: Number(numberOfReleases) || 0,
+        governmentIdFile: files?.governmentIdFile?.[0]?.path || '',
+      };
+    } else if (accountType === 'label') {
+      const parsedSocialLinks =
+        typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
+
+      onboarding = {
+        labelName,
+        registrationType,
+        legalName: registrationType === 'individual' ? legalName : undefined,
+        labelGovIdFile:
+          registrationType === 'individual'
+            ? files?.labelGovIdFile?.[0]?.path || ''
+            : undefined,
+        legalEntityName:
+          registrationType === 'registered_company' ? legalEntityName : undefined,
+        companyType: registrationType === 'registered_company' ? companyType : undefined,
+        certificateFile:
+          registrationType === 'registered_company'
+            ? companyType === 'private'
+              ? files?.incorporationCertFile?.[0]?.path || ''
+              : files?.gstCertFile?.[0]?.path || ''
+            : undefined,
+        totalArtists: Number(totalArtists) || 0,
+        totalRevenue: Number(totalRevenue) || 0,
+        catalogSize: Number(catalogSize) || 0,
+        rightsType,
+        companyWebsite: companyWebsite || undefined,
+        socialLinks: parsedSocialLinks || undefined,
+      };
+    }
+
     // Create user
     const user = await User.create({
       name,
       email,
       password,
-      role,
-      artistName: artistName || name,
+      role: role || (accountType === 'label' ? 'label' : 'artist'),
+      accountType,
+      artistName: artistName || undefined,
       bio,
-      socialLinks
+      onboarding,
     });
 
     // Generate token
     const token = generateToken(user);
 
-    // Return user data and token
-    successResponse(res, {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      artistName: user.artistName,
-      token
-    }, 'User registered successfully', 201);
+    successResponse(
+      res,
+      {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        artistName: user.artistName,
+        accountType: user.accountType,
+        token,
+      },
+      'User registered successfully',
+      201
+    );
   } catch (error) {
     errorResponse(res, 'Registration failed', error);
   }

@@ -5,7 +5,6 @@ import {
   Container,
   Box,
   Typography,
-  Grid,
   Paper,
   Select,
   MenuItem,
@@ -30,6 +29,7 @@ import {
   FormLabel,
   InputAdornment,
 } from '@mui/material';
+import Grid from '@mui/material/GridLegacy';
 import {
   BarChart,
   Bar,
@@ -173,14 +173,15 @@ export default function RoyaltiesPage() {
       const response = await royaltyAPI.getRoyalties();
       
       if (response.success) {
+        const royaltyItems = response.data || [];
         // Extract unique tracks from royalty data
         const uniqueTracks = Array.from(
-          new Set(response.data.map((item: any) => item.trackId))
+          new Set(royaltyItems.map((item: any) => item.trackId))
         ).map((trackId) => {
-          const track = response.data.find((item: any) => item.trackId === trackId);
+          const track = royaltyItems.find((item: any) => item.trackId === trackId);
           return {
             id: trackId,
-            title: track.trackTitle,
+            title: track?.trackTitle || 'Untitled Track',
           };
         });
         
@@ -319,15 +320,25 @@ export default function RoyaltiesPage() {
   const COLORS = ['#3E51B5', '#F50057', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4'];
   
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mb: 5 }}>
+    <Container maxWidth={false} disableGutters sx={{ width: '100%' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 3.5 },
+          mb: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+        }}
+      >
         <Typography variant="h4" component="h1" fontWeight={700}>
           Royalties & Earnings
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
           Track your music performance and request payouts
         </Typography>
-      </Box>
+      </Paper>
       
       {/* Top stats cards */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -376,7 +387,9 @@ export default function RoyaltiesPage() {
               p: 3,
               borderRadius: 2,
               height: '100%',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -532,7 +545,7 @@ export default function RoyaltiesPage() {
       </Grid>
       
       {/* Tabs for royalty views */}
-      <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+      <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden', border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs
             value={activeTab}
@@ -679,7 +692,7 @@ export default function RoyaltiesPage() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
                           outerRadius={80}
                           fill="#8884d8"
                           dataKey="amount"

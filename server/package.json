@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "nodemon --exec ts-node src/index.ts",
-    "lint": "eslint . --ext .ts",
+    "lint": "eslint .",
     "seed:admin": "ts-node src/scripts/seedAdmin.ts"
   },
   "dependencies": {

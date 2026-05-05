@@ -13,14 +13,14 @@ import {
   Chip, 
   CircularProgress, 
   Alert, 
-  Divider, 
-  Grid,
+  Divider,
   useTheme,
   useMediaQuery,
   Avatar,
   IconButton,
   CardActions
 } from '@mui/material';
+import Grid from '@mui/material/GridLegacy';
 
 import {
   PlayArrow as PlayArrowIcon,
@@ -37,6 +37,7 @@ import {
   Cancel as CancelIcon,
   ShowChart as ShowChartIcon,
   Logout as LogoutIcon,
+  Podcasts as PodcastsIcon,
   Group,
   MonetizationOn,
   TrendingUp,
@@ -232,18 +233,45 @@ function DashboardPage() {
     logout();
   };
   
+  const panelSx = {
+    border: '1px solid',
+    borderColor: 'divider',
+    borderRadius: 2,
+    bgcolor: 'background.paper',
+    color: 'text.primary',
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 18px 44px rgba(0, 0, 0, 0.22)'
+      : '0 18px 44px rgba(15, 23, 42, 0.06)',
+  } as const;
+
+  const metricCardSx = {
+    height: '100%',
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+    backgroundColor: 'background.paper',
+    transition: 'box-shadow 0.2s ease, transform 0.2s ease',
+    '&:hover': {
+      transform: 'translateY(-2px)',
+      boxShadow: theme.palette.mode === 'dark'
+        ? '0 14px 30px rgba(0, 0, 0, 0.28)'
+        : '0 14px 30px rgba(15, 23, 42, 0.10)',
+    },
+  } as const;
+
   // Render dashboard
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
+    <Container maxWidth={false} disableGutters sx={{ width: '100%' }}>
       {/* Header */}
-      <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+      <Paper elevation={0} sx={{ ...panelSx, p: { xs: 2.5, md: 3.5 }, mb: 3 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
           <Box>
             <Typography 
               variant={isMobile ? "h5" : "h4"} 
               component="h1" 
               fontWeight={700}
-              style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+              color="text.primary"
+              sx={{ letterSpacing: 0 }}
             >
               Welcome, {user?.artistName || user?.name}
             </Typography>
@@ -265,26 +293,14 @@ function DashboardPage() {
             Logout
           </Button>
         </Box>
-      </Box>
+      </Paper>
 
       {/* Stats Overview */}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         <Grid item xs={6} sm={4} md={3}>
           <Card 
             elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
+            sx={metricCardSx}
           >
             <CardContent sx={{ p: 2, pb: '16px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -323,19 +339,7 @@ function DashboardPage() {
         <Grid item xs={6} sm={4} md={3}>
           <Card 
             elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
+            sx={metricCardSx}
           >
             <CardContent sx={{ p: 2, pb: '16px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -374,19 +378,7 @@ function DashboardPage() {
         <Grid item xs={6} sm={4} md={3}>
           <Card 
             elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
+            sx={metricCardSx}
           >
             <CardContent sx={{ p: 2, pb: '16px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -425,19 +417,7 @@ function DashboardPage() {
         <Grid item xs={6} sm={4} md={3}>
           <Card 
             elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
+            sx={metricCardSx}
           >
             <CardContent sx={{ p: 2, pb: '16px !important' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -575,6 +555,38 @@ function DashboardPage() {
         <Grid item xs={12} sm={6} md={3}>
           <Button
             component={Link}
+            href="/dashboard/podcasts"
+            variant="outlined"
+            color="info"
+            startIcon={<PodcastsIcon />}
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              height: '100%',
+              borderWidth: 2,
+              textTransform: 'none',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              justifyContent: 'flex-start',
+              borderColor: mode === 'dark' 
+                ? `rgba(255, 255, 255, 0.23)` 
+                : `rgba(0, 0, 0, 0.23)`,
+              '&:hover': {
+                borderWidth: 2,
+                backgroundColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.08)` 
+                  : `rgba(0, 0, 0, 0.04)`,
+              }
+            }}
+            fullWidth
+          >
+            Manage Podcasts
+          </Button>
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={3}>
+          <Button
+            component={Link}
             href="/dashboard/settings"
             variant="outlined"
             color="warning"
@@ -609,11 +621,9 @@ function DashboardPage() {
       <Paper
         elevation={0}
         sx={{
-          p: 3,
-          borderRadius: 3,
+          ...panelSx,
+          p: { xs: 2.5, md: 3 },
           mb: 4,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
         }}
       >
         <Typography variant="h6" fontWeight={600} sx={{ mb: 2 }}>
@@ -731,7 +741,7 @@ function DashboardPage() {
                     }}
                   >
                     <Chip
-                      icon={getStatusIcon(track.status)}
+                      icon={getStatusIcon(track.status) || undefined}
                       label={track.status.charAt(0).toUpperCase() + track.status.slice(1)}
                       color={getStatusColor(track.status) as any}
                       size="small"

@@ -1,5 +1,5 @@
 "use client";
-import { Box, Container, Typography, Paper, Divider, Switch, FormControlLabel, Button, TextField, Alert } from "@mui/material";
+import { Box, Typography, Paper, Divider, Switch, FormControlLabel, Button, TextField, Alert } from "@mui/material";
 import { useState } from "react";
 
 export default function SettingsPage() {
@@ -15,11 +15,36 @@ export default function SettingsPage() {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 6 }}>
-      <Paper elevation={1} sx={{ p: 4, borderRadius: 3 }}>
+    <Box sx={{ width: "100%" }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 3.5 },
+          mb: 3,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+        }}
+      >
         <Typography variant="h5" fontWeight={700} gutterBottom>
           Account Settings
         </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Keep your artist profile and account preferences current.
+        </Typography>
+      </Paper>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 4 },
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          maxWidth: 760,
+        }}
+      >
         <Divider sx={{ mb: 3 }} />
         <Box sx={{ mb: 3 }}>
           <TextField
@@ -47,6 +72,6 @@ export default function SettingsPage() {
           Save Changes
         </Button>
       </Paper>
-    </Container>
+    </Box>
   );
 }

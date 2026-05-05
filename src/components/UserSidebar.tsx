@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -29,7 +29,7 @@ import {
   Album,
   TrendingUp,
   CloudUpload as CloudUploadIcon,
-  AccountBalance
+  Podcasts as PodcastsIcon
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -72,6 +72,16 @@ const menuItems = [
     path: '/dashboard/payouts',
   },
   {
+    text: 'Podcasts',
+    icon: <PodcastsIcon />,
+    path: '/dashboard/podcasts',
+    subItems: [
+      { text: 'My Podcast', path: '/dashboard/podcasts' },
+      { text: 'Episodes', path: '/dashboard/podcasts?view=episodes' },
+      { text: 'Analytics', path: '/dashboard/podcasts?view=analytics' },
+    ],
+  },
+  {
     text: 'Settings',
     icon: <SettingsIcon />,
     path: '/dashboard/settings',
@@ -81,10 +91,18 @@ const menuItems = [
 export default function UserSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+
+  // Auto-expand Podcasts submenu when on podcasts route
+  useEffect(() => {
+    if (pathname.startsWith('/dashboard/podcasts')) {
+      setOpenSubMenu('/dashboard/podcasts');
+    }
+  }, [pathname]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -101,6 +119,18 @@ export default function UserSidebar() {
     return pathname.startsWith(path);
   };
 
+  // For sub-items that may include query params
+  const isSubItemActive = (path: string) => {
+    const [subPath, subQuery] = path.split('?');
+    if (!subQuery) {
+      // No query param — active only when pathname matches and no view param set
+      return pathname === subPath && !searchParams.get('view');
+    }
+    const subParams = new URLSearchParams(subQuery);
+    const subView = subParams.get('view');
+    return pathname === subPath && searchParams.get('view') === subView;
+  };
+
   const drawer = (
     <Box 
       sx={{ 
@@ -108,7 +138,18 @@ export default function UserSidebar() {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.8)' : 'rgba(245, 245, 245, 0.8)',
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(18, 18, 32, 0.94)' : '#ffffff',
+        borderRight: '1px solid',
+        borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)',
+        // ultra-thin scrollbar
+        scrollbarWidth: 'thin',
+        scrollbarColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22) transparent' : 'rgba(15,23,42,0.22) transparent',
+        '&::-webkit-scrollbar': { width: 6 },
+        '&::-webkit-scrollbar-thumb': {
+          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.22)',
+          borderRadius: 10,
+        },
+        '&::-webkit-scrollbar-track': { background: 'transparent' },
       }}
     >
       <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -136,8 +177,27 @@ export default function UserSidebar() {
       </Box>
       <Divider sx={{ borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)' }} />
       <List sx={{ px: 1, py: 2, flex: 1 }}>
+        <Box sx={{ px: 3, pb: 1.25 }}>
+          <Typography
+            variant="overline"
+            sx={{ color: 'text.secondary', letterSpacing: 1.2, fontWeight: 700 }}
+          >
+            Music Distribution
+          </Typography>
+        </Box>
         {menuItems.map((item) => (
           <div key={item.path}>
+            {item.text === 'Podcasts' && (
+              <Box sx={{ px: 3, pt: 2, pb: 1.25 }}>
+                <Divider sx={{ mb: 2 }} />
+                <Typography
+                  variant="overline"
+                  sx={{ color: 'text.secondary', letterSpacing: 1.2, fontWeight: 700 }}
+                >
+                  Podcasts
+                </Typography>
+              </Box>
+            )}
             <ListItem disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton
                 selected={isActive(item.path)}
@@ -150,6 +210,7 @@ export default function UserSidebar() {
                   borderRadius: 2,
                   mx: 1,
                   py: 1.2,
+                  position: 'relative',
                   '&.Mui-selected': {
                     backgroundColor: theme.palette.mode === 'dark' 
                       ? 'rgba(74, 108, 247, 0.15)' 
@@ -168,6 +229,16 @@ export default function UserSidebar() {
                     backgroundColor: theme.palette.mode === 'dark' 
                       ? 'rgba(255, 255, 255, 0.08)' 
                       : 'rgba(0, 0, 0, 0.04)',
+                  },
+                  '&.Mui-selected::before': {
+                    content: '""',
+                    position: 'absolute',
+                    left: 0,
+                    top: 10,
+                    bottom: 10,
+                    width: 3,
+                    borderRadius: 4,
+                    backgroundColor: theme.palette.primary.main,
                   },
                 }}
               >
@@ -197,7 +268,7 @@ export default function UserSidebar() {
                   {item.subItems.map((subItem) => (
                     <ListItemButton
                       key={subItem.path}
-                      selected={pathname === subItem.path}
+                      selected={isSubItemActive(subItem.path)}
                       onClick={() => router.push(subItem.path)}
                       sx={{
                         borderRadius: 2,

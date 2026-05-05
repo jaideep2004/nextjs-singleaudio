@@ -288,8 +288,9 @@ export default function AdminReleasesPage({ searchParams }: any) {
         elevation={0} 
         sx={{ 
           borderRadius: 3,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
           mb: 4
         }}
       >
@@ -300,14 +301,24 @@ export default function AdminReleasesPage({ searchParams }: any) {
           variant={isMobile ? "scrollable" : "fullWidth"}
           scrollButtons="auto"
           sx={{
-            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            px: 1,
+            pt: 1,
+            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
             '& .MuiTab-root': {
-              color: mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+              textTransform: 'none',
+              fontWeight: 600,
+              minHeight: 54,
+              borderRadius: 2,
+              mx: 0.5,
+              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'rgba(15,23,42,0.72)',
               '&.Mui-selected': {
-                color: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+                color: mode === 'dark' ? '#b7c5ff' : '#2841c6',
+                backgroundColor: mode === 'dark' ? 'rgba(120,141,255,0.14)' : 'rgba(74,108,247,0.10)',
               },
             },
             '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: 999,
               backgroundColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
             },
           }}

@@ -1,37 +1,23 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { fetchBackend } from '@/app/api/_lib/backend';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Get authentication token from cookies
-    const cookieStore = cookies();
-    const token = await cookieStore.get('token')?.value;
+    const result = await fetchBackend('/api/users/stats');
+    const data = result.data as {
+      data?: {
+        totalUsers?: number;
+        totalTracks?: number;
+        pendingTracks?: number;
+        pendingPayouts?: number;
+        totalRevenue?: number;
+        totalReleases?: number;
+        pendingReleases?: number;
+      };
+    } | null;
 
-    if (!token) {
-      return NextResponse.json({
-        success: false,
-        message: 'Authentication required',
-        data: null
-      }, { status: 401 });
-    }
-    
-    // Connect to the backend API
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    console.log('Fetching stats from backend:', `${backendUrl}/api/users/stats`);
-    
-    const response = await fetch(`${backendUrl}/api/users/stats`, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-    });
-    
-    const data = await response.json();
-    console.log('Backend stats response:', data);
-    
-    // Format the response to match what the frontend expects
-  return NextResponse.json({
-    success: true,
+    return NextResponse.json({
+      success: result.ok,
       data: {
         totalUsers: data.data?.totalUsers || 0,
         totalTracks: data.data?.totalTracks || 0,
@@ -41,22 +27,21 @@ export async function GET(request: Request) {
         totalReleases: data.data?.totalReleases || 0,
         pendingReleases: data.data?.pendingReleases || 0
       }
-    });
+    }, { status: result.status });
   } catch (error) {
-    console.error('Error fetching stats from backend:', error);
-    // Return default stats as fallback
+    const message = error instanceof Error ? error.message : 'Failed to fetch stats from backend';
     return NextResponse.json({
       success: false,
-      message: 'Failed to fetch stats from backend',
-    data: {
-      totalUsers: 0,
-      totalTracks: 0,
-      pendingTracks: 0,
-      pendingPayouts: 0,
-      totalRevenue: 0,
-      totalReleases: 0,
-      pendingReleases: 0
-    }
+      message,
+      data: {
+        totalUsers: 0,
+        totalTracks: 0,
+        pendingTracks: 0,
+        pendingPayouts: 0,
+        totalRevenue: 0,
+        totalReleases: 0,
+        pendingReleases: 0
+      }
     }, { status: 500 });
   }
 }

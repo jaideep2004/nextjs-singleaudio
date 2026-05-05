@@ -1,6 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useColorMode } from '@/context/ColorModeContext';
 import useAdminAuth from '@/hooks/useAdminAuth';
@@ -28,7 +27,6 @@ import {
   TableContainer, 
   TableHead, 
   TableRow, 
-  Grid,
   useTheme,
   useMediaQuery,
   Skeleton
@@ -37,43 +35,11 @@ import {
   MusicNote,
   Group,
   MonetizationOn,
-  Notifications,
   Album,
-  PersonAdd,
   BarChart,
-  CheckCircle,
   PendingActions,
-  Error as ErrorIcon,
-  PlayArrow,
-  TrendingUp,
-  Storage,
-  AccountBalance
+  type SvgIconComponent,
 } from '@mui/icons-material';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faApple, 
-  faSpotify, 
-  faYoutube, 
-  faAmazon, 
-  faSoundcloud, 
-  faDeezer,
-  faTidal,
-  faTiktok,
-  faFacebook,
-  faInstagram
-} from '@fortawesome/free-brands-svg-icons';
-
-// DSP mapping for better visualization with Font Awesome icons
-const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
-  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
-  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
-  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
-  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
-  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
-  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
-  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
-  'default': { icon: 'store', color: '#4a6cf7', name: 'Other' }
-};
 
 interface DashboardStats {
   totalUsers: number;
@@ -85,8 +51,65 @@ interface DashboardStats {
   pendingReleases: number;
 }
 
+interface DashboardUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'artist' | string;
+  createdAt: string;
+}
+
+interface DashboardRelease {
+  _id: string;
+  releaseTitle?: string;
+  primaryArtist?: string;
+  status: 'approved' | 'pending' | 'rejected' | string;
+  tracks?: unknown[];
+  updatedAt: string;
+}
+
+interface DashboardUsersResponse {
+  users?: DashboardUser[];
+}
+
+interface StatCardConfig {
+  label: string;
+  value: number;
+  icon: SvgIconComponent;
+  avatarColor: 'primary' | 'secondary' | 'warning' | 'error';
+}
+
+const statGridStyles = {
+  display: 'grid',
+  gap: 2,
+  mb: 4,
+  gridTemplateColumns: {
+    xs: 'repeat(2, minmax(0, 1fr))',
+    sm: 'repeat(2, minmax(0, 1fr))',
+    md: 'repeat(4, minmax(0, 1fr))',
+  },
+} as const;
+
+const panelGridStyles = {
+  display: 'grid',
+  gap: 3,
+  gridTemplateColumns: {
+    xs: '1fr',
+    md: 'repeat(2, minmax(0, 1fr))',
+  },
+} as const;
+
+const quickActionGridStyles = {
+  display: 'grid',
+  gap: 2,
+  mb: 4,
+  gridTemplateColumns: {
+    xs: 'repeat(2, minmax(0, 1fr))',
+    sm: 'repeat(4, minmax(0, 1fr))',
+  },
+} as const;
+
 export default function AdminDashboard() {
-  const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { mode } = useColorMode();
@@ -103,10 +126,9 @@ export default function AdminDashboard() {
     totalReleases: 0,
     pendingReleases: 0,
   });
-  const [recentUsers, setRecentUsers] = useState<any[]>([]);
-  const [pendingReleases, setPendingReleases] = useState<any[]>([]);
-  const [allReleases, setAllReleases] = useState<any[]>([]);
-  const [pendingPayouts, setPendingPayouts] = useState<any[]>([]);
+  const [recentUsers, setRecentUsers] = useState<DashboardUser[]>([]);
+  const [pendingReleases, setPendingReleases] = useState<DashboardRelease[]>([]);
+  const [allReleases, setAllReleases] = useState<DashboardRelease[]>([]);
   
   // Fetch data on component mount
   useEffect(() => {
@@ -122,9 +144,6 @@ export default function AdminDashboard() {
     setError(null);
     
     try {
-      console.log('Fetching admin dashboard data...');
-      
-      // Initialize default stats with all required properties
       const defaultStats: DashboardStats = {
         totalUsers: 0,
         totalTracks: 0,
@@ -135,11 +154,8 @@ export default function AdminDashboard() {
         pendingReleases: 0,
       };
       
-      // Try to fetch dashboard stats
       try {
-        console.log('Fetching dashboard stats...');
         const statsResponse = await adminAPI.getDashboardStats();
-        console.log('Stats response:', statsResponse);
         
         if (statsResponse.success && statsResponse.data) {
           setStats({
@@ -154,25 +170,18 @@ export default function AdminDashboard() {
         setStats(defaultStats);
       }
       
-      // Fetch recent users
       try {
-        console.log('Fetching users...');
         const usersResponse = await adminAPI.getUsers({ limit: 5, sort: '-createdAt' });
-        console.log('Users response:', usersResponse);
         
         if (usersResponse.success && usersResponse.data) {
-          // The backend returns users in data.users with pagination info
-          const users = usersResponse.data.users || [];
-          console.log('Processed users:', users);
+          const users = (usersResponse.data as DashboardUsersResponse).users || [];
           
           if (Array.isArray(users) && users.length > 0) {
-          setRecentUsers(users);
+            setRecentUsers(users);
           } else {
-            console.log('No users found or invalid users array');
             setRecentUsers([]);
           }
         } else {
-          console.log('Invalid users response:', usersResponse);
           setRecentUsers([]);
         }
       } catch (usersError) {
@@ -180,14 +189,12 @@ export default function AdminDashboard() {
         setRecentUsers([]);
       }
       
-      // Fetch all releases and pending releases
       try {
-        console.log('Fetching all releases...');
         const releasesResponse = await releaseAPI.getReleases();
         if (releasesResponse.success && Array.isArray(releasesResponse.data)) {
-          setAllReleases(releasesResponse.data);
-          // Pending releases are those with status 'pending'
-          setPendingReleases(releasesResponse.data.filter(r => r.status === 'pending'));
+          const releases = releasesResponse.data as DashboardRelease[];
+          setAllReleases(releases);
+          setPendingReleases(releases.filter((release) => release.status === 'pending'));
         } else {
           setAllReleases([]);
           setPendingReleases([]);
@@ -197,40 +204,13 @@ export default function AdminDashboard() {
         setAllReleases([]);
         setPendingReleases([]);
       }
-      
-      // Fetch pending payouts
-      try {
-        console.log('Fetching payouts...');
-        const payoutsResponse = await adminAPI.getPayouts({ 
-          status: 'pending',
-          limit: 5
-        });
-        console.log('Payouts response:', payoutsResponse);
-        
-        if (payoutsResponse.success && payoutsResponse.data) {
-          const payouts = Array.isArray(payoutsResponse.data) 
-            ? payoutsResponse.data 
-            : [];
-          setPendingPayouts(payouts);
-        }
-      } catch (payoutsError) {
-        console.error('Error fetching payouts:', payoutsError);
-        setPendingPayouts([]);
-      }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load dashboard data';
       console.error('Error fetching dashboard data:', error);
-      setError(error.message || 'Failed to load dashboard data');
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
   };
   
   // Format date
@@ -241,6 +221,13 @@ export default function AdminDashboard() {
       day: 'numeric',
     });
   };
+
+  const statCards: StatCardConfig[] = [
+    { label: 'Total Users', value: stats.totalUsers, icon: Group, avatarColor: 'primary' },
+    { label: 'Total Releases', value: allReleases.length, icon: Album, avatarColor: 'secondary' },
+    { label: 'Pending Approvals', value: stats.pendingReleases, icon: PendingActions, avatarColor: 'warning' },
+    { label: 'Pending Payouts', value: stats.pendingPayouts, icon: MonetizationOn, avatarColor: 'error' },
+  ];
   
   // Render auth loading state
   if (isAuthLoading) {
@@ -286,25 +273,20 @@ export default function AdminDashboard() {
           <Skeleton variant="text" width={200} height={20} />
         </Box>
         
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Box sx={statGridStyles}>
           {[...Array(4)].map((_, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Skeleton variant="rounded" height={120} />
-            </Grid>
+            <Skeleton key={index} variant="rounded" height={120} />
           ))}
-        </Grid>
-        
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
-            <Skeleton variant="rounded" height={300} />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Skeleton variant="rounded" height={300} />
-          </Grid>
-          <Grid item xs={12}>
-            <Skeleton variant="rounded" height={400} />
-          </Grid>
-        </Grid>
+        </Box>
+
+        <Box sx={panelGridStyles}>
+          <Skeleton variant="rounded" height={300} />
+          <Skeleton variant="rounded" height={300} />
+        </Box>
+
+        <Box sx={{ mt: 3 }}>
+          <Skeleton variant="rounded" height={400} />
+        </Box>
       </Container>
     );
   }
@@ -339,9 +321,10 @@ export default function AdminDashboard() {
       </Box>
 
       {/* Stats Overview */}
-      <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
+      <Box sx={statGridStyles}>
+        {statCards.map(({ label, value, icon: Icon, avatarColor }) => (
           <Card 
+            key={label}
             elevation={0}
             sx={{ 
               height: '100%',
@@ -363,11 +346,11 @@ export default function AdminDashboard() {
                   sx={{ 
                     width: 40, 
                     height: 40, 
-                    bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                    bgcolor: mode === 'dark' ? `${avatarColor}.dark` : `${avatarColor}.light`,
                     mr: 1.5
                   }}
                 >
-                  <Group sx={{ fontSize: 20 }} />
+                  <Icon sx={{ fontSize: 20 }} />
                 </Avatar>
                 <Box>
                   <Typography 
@@ -376,184 +359,31 @@ export default function AdminDashboard() {
                     fontWeight={700}
                     sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
                   >
-                    {stats.totalUsers}
+                    {value}
                   </Typography>
                   <Typography 
                     variant="caption" 
                     color="text.secondary"
                     sx={{ fontSize: '0.7rem' }}
                   >
-                    Total Users
+                    {label}
                   </Typography>
                 </Box>
               </Box>
             </CardContent>
           </Card>
-        </Grid>
-        
-        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
-          <Card 
-            elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
-          >
-            <CardContent sx={{ p: 2, pb: '16px !important' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Avatar 
-                  sx={{ 
-                    width: 40, 
-                    height: 40, 
-                    bgcolor: mode === 'dark' ? 'secondary.dark' : 'secondary.light',
-                    mr: 1.5
-                  }}
-                >
-                  <Album sx={{ fontSize: 20 }} />
-                </Avatar>
-                <Box>
-                  <Typography 
-                    variant="h6" 
-                    component="div" 
-                    fontWeight={700}
-                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
-                  >
-                    {allReleases.length}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary"
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    Total Releases
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
-          <Card 
-            elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
-          >
-            <CardContent sx={{ p: 2, pb: '16px !important' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Avatar 
-                  sx={{ 
-                    width: 40, 
-                    height: 40, 
-                    bgcolor: mode === 'dark' ? 'warning.dark' : 'warning.light',
-                    mr: 1.5
-                  }}
-                >
-                  <PendingActions sx={{ fontSize: 20 }} />
-                </Avatar>
-                <Box>
-                  <Typography 
-                    variant="h6" 
-                    component="div" 
-                    fontWeight={700}
-                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
-                  >
-                    {stats.pendingReleases}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary"
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    Pending Approvals
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        
-        <Grid item xs={6} sm={4} md={3} sx={{ flex: '1' }}>
-          <Card 
-            elevation={0}
-            sx={{ 
-              height: '100%',
-              borderRadius: 3,
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: mode === 'dark' 
-                  ? '0 12px 20px rgba(0, 0, 0, 0.3)' 
-                  : '0 12px 20px rgba(0, 0, 0, 0.1)',
-              }
-            }}
-          >
-            <CardContent sx={{ p: 2, pb: '16px !important' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <Avatar 
-                  sx={{ 
-                    width: 40, 
-                    height: 40, 
-                    bgcolor: mode === 'dark' ? 'error.dark' : 'error.light',
-                    mr: 1.5
-                  }}
-                >
-                  <MonetizationOn sx={{ fontSize: 20 }} />
-                </Avatar>
-                <Box>
-                  <Typography 
-                    variant="h6" 
-                    component="div" 
-                    fontWeight={700}
-                    sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}
-                  >
-                    {stats.pendingPayouts}
-                  </Typography>
-                  <Typography 
-                    variant="caption" 
-                    color="text.secondary"
-                    sx={{ fontSize: '0.7rem' }}
-                  >
-                    Pending Payouts
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+        ))}
+      </Box>
       
       {/* Quick Actions */}
-      <Grid container spacing={2} sx={{ mb: 4 }} component="div">
+      <Box sx={quickActionGridStyles}>
         {[
           { title: 'Manage Users', icon: <Group />, href: '/admin/users', color: 'primary' },
           { title: 'Pending Releases', icon: <MusicNote />, href: '/admin/releases?status=pending', color: 'warning' },
           { title: 'Payout Requests', icon: <MonetizationOn />, href: '/admin/payouts', color: 'error' },
           { title: 'View Analytics', icon: <BarChart />, href: '/admin/analytics', color: 'success' },
         ].map((item, index) => (
-          <Grid item xs={6} sm={3} key={index} sx={{ flex: '1' }}>
+          <Box key={index}>
             <Button
               component={Link}
               href={item.href}
@@ -583,125 +413,122 @@ export default function AdminDashboard() {
             >
               {item.title}
             </Button>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
       
       {/* Dashboard Content */}
-      <Grid container spacing={3} style={{flexWrap: 'nowrap'}}>
+      <Box sx={panelGridStyles}>
         {/* Recent Users */}
-        <Grid item xs={12} md={6} component="div">
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              height: '100%',
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight={600}>
-                Recent Users
-              </Typography>
-              <Button
-                component={Link}
-                href="/admin/users"
-                size="small"
-                color="primary"
-                variant="outlined"
-                sx={{
-                  borderColor: mode === 'dark' 
-                    ? `rgba(255, 255, 255, 0.23)` 
-                    : `rgba(0, 0, 0, 0.23)`,
-                }}
-              >
-                View All
-              </Button>
-            </Box>
-            
-            <Divider sx={{ mb: 2 }} />
-            
-            <List sx={{ px: 0 }}>
-              {recentUsers.length > 0 ? (
-                recentUsers.map((user) => (
-                  <ListItem
-                    key={user._id}
-                    sx={{
-                      px: 0,
-                      py: 1,
-                      borderBottom: '1px solid',
-                      borderColor: 'divider',
-                      '&:last-child': {
-                        borderBottom: 'none',
-                      },
-                    }}
-                  >
-                    <ListItemAvatar>
-                      <Avatar sx={{ width: 36, height: 36 }}>
-                        {user.name.charAt(0)}
-                      </Avatar>
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={
-                        <Typography variant="body2" fontWeight={500}>
-                          {user.name}
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            height: '100%',
+            border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={600}>
+              Recent Users
+            </Typography>
+            <Button
+              component={Link}
+              href="/admin/users"
+              size="small"
+              color="primary"
+              variant="outlined"
+              sx={{
+                borderColor: mode === 'dark' 
+                  ? `rgba(255, 255, 255, 0.23)` 
+                  : `rgba(0, 0, 0, 0.23)`,
+              }}
+            >
+              View All
+            </Button>
+          </Box>
+          
+          <Divider sx={{ mb: 2 }} />
+          
+          <List sx={{ px: 0 }}>
+            {recentUsers.length > 0 ? (
+              recentUsers.map((user) => (
+                <ListItem
+                  key={user._id}
+                  sx={{
+                    px: 0,
+                    py: 1,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                    '&:last-child': {
+                      borderBottom: 'none',
+                    },
+                  }}
+                >
+                  <ListItemAvatar>
+                    <Avatar sx={{ width: 36, height: 36 }}>
+                      {user.name.charAt(0)}
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      <Typography variant="body2" fontWeight={500}>
+                        {user.name}
+                      </Typography>
+                    }
+                    secondary={
+                      <>
+                        <Typography 
+                          component="span" 
+                          variant="caption" 
+                          color="text.secondary"
+                        >
+                          {user.email}
                         </Typography>
-                      }
-                      secondary={
-                        <>
-                          <Typography 
-                            component="span" 
-                            variant="caption" 
-                            color="text.secondary"
-                          >
-                            {user.email}
-                          </Typography>
-                          <br />
-                          <Typography 
-                            component="span" 
-                            variant="caption" 
-                            color="text.secondary"
-                          >
-                            Joined {formatDate(user.createdAt)}
-                          </Typography>
-                        </>
-                      }
-                    />
-                    <Chip
-                      label={user.role}
-                      size="small"
-                      color={user.role === 'admin' ? 'secondary' : 'primary'}
-                      sx={{ 
-                        height: 20, 
-                        fontSize: '0.65rem',
-                        minWidth: 60
-                      }}
-                    />
-                  </ListItem>
-                ))
-              ) : (
-                <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
-                  No recent users
-                </Typography>
-              )}
-            </List>
-          </Paper>
-        </Grid>
+                        <br />
+                        <Typography 
+                          component="span" 
+                          variant="caption" 
+                          color="text.secondary"
+                        >
+                          Joined {formatDate(user.createdAt)}
+                        </Typography>
+                      </>
+                    }
+                  />
+                  <Chip
+                    label={user.role}
+                    size="small"
+                    color={user.role === 'admin' ? 'secondary' : 'primary'}
+                    sx={{ 
+                      height: 20, 
+                      fontSize: '0.65rem',
+                      minWidth: 60
+                    }}
+                  />
+                </ListItem>
+              ))
+            ) : (
+              <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
+                No recent users
+              </Typography>
+            )}
+          </List>
+        </Paper>
 
         {/* Pending Releases */}
-        <Grid item xs={12} md={6} component="div">
-          <Paper
-            elevation={0}
-            sx={{
-              p: 3,
-              borderRadius: 3,
-              height: '100%',
-              border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-              backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
-            }}
-          >
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 3,
+            height: '100%',
+            border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          }}
+        >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight={600}>
                 Pending Releases
@@ -790,11 +617,10 @@ export default function AdminDashboard() {
                 No pending releases
               </Typography>
             )}
-          </Paper>
-        </Grid>
+        </Paper>
 
         {/* All Releases Table */}
-        <Grid item xs={12}>
+        <Box sx={{ gridColumn: { xs: 'auto', md: '1 / -1' } }}>
           <Paper 
             elevation={0} 
             sx={{ 
@@ -891,8 +717,8 @@ export default function AdminDashboard() {
               </Typography>
             )}
           </Paper>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Container>
   );
 }

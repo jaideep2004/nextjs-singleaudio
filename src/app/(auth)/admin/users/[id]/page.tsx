@@ -22,6 +22,11 @@ import {
   useTheme,
   Tabs,
   Tab,
+  Checkbox,
+  Divider,
+  Stack,
+  Avatar,
+  useMediaQuery,
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
 import Link from 'next/link';
@@ -29,6 +34,7 @@ import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
 import ViewUser from './components/ViewUser';
+import { ALL_DSP_KEYS, DSP_META_BY_KEY, DspKey } from '@/lib/platforms';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -65,6 +71,7 @@ export default function EditUserPage() {
   const theme = useTheme();
   const { mode } = useColorMode();
   const { isAdmin } = useAdminAuth();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
   const userId = params?.id ?? '';
   
@@ -82,11 +89,35 @@ export default function EditUserPage() {
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [platformKeys, setPlatformKeys] = useState<DspKey[]>(ALL_DSP_KEYS);
+  const [platformsLoading, setPlatformsLoading] = useState(false);
+  const [platformsError, setPlatformsError] = useState('');
 
   useEffect(() => {
     if (isAdmin && userId) {
       fetchUser();
     }
+  }, [isAdmin, userId]);
+
+  useEffect(() => {
+    const loadPlatforms = async () => {
+      if (!isAdmin || !userId) return;
+      try {
+        setPlatformsLoading(true);
+        setPlatformsError('');
+        const res = await fetch(`/api/admin/platforms/${userId}`, { cache: 'no-store' });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to load platforms');
+        const keys = Array.isArray(json?.data?.dspKeys) ? (json.data.dspKeys as DspKey[]) : ALL_DSP_KEYS;
+        setPlatformKeys(keys);
+      } catch (e) {
+        setPlatformsError(e instanceof Error ? e.message : 'Failed to load platforms');
+        setPlatformKeys(ALL_DSP_KEYS);
+      } finally {
+        setPlatformsLoading(false);
+      }
+    };
+    void loadPlatforms();
   }, [isAdmin, userId]);
 
   const fetchUser = async () => {
@@ -208,9 +239,13 @@ export default function EditUserPage() {
         </Breadcrumbs>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Typography variant="h4" component="h1">
-            User Management
-          </Typography>
+        <Typography
+          variant={isMobile ? "h5" : "h4"}
+          component="h1"
+          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
+        >
+          User Management
+        </Typography>
           <Button
             variant="outlined"
             startIcon={<ArrowBack />}
@@ -236,9 +271,11 @@ export default function EditUserPage() {
 
       <Paper 
         sx={{ 
-          borderRadius: 2,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          borderRadius: 3,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.14)' : 'rgba(15, 23, 42, 0.14)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
+          overflow: 'hidden',
         }}
       >
         <Tabs 
@@ -246,20 +283,31 @@ export default function EditUserPage() {
           onChange={handleTabChange} 
           aria-label="user tabs"
           sx={{
-            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            px: 1,
+            pt: 1,
+            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)'}`,
             '& .MuiTab-root': {
-              color: mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)',
+              color: mode === 'dark' ? 'rgba(255, 255, 255, 0.74)' : 'rgba(15, 23, 42, 0.72)',
+              textTransform: 'none',
+              fontWeight: 600,
+              minHeight: 54,
+              borderRadius: 2,
+              mx: 0.5,
               '&.Mui-selected': {
-                color: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+                color: mode === 'dark' ? '#b7c5ff' : '#2841c6',
+                backgroundColor: mode === 'dark' ? 'rgba(120, 141, 255, 0.14)' : 'rgba(74, 108, 247, 0.10)',
               },
             },
             '& .MuiTabs-indicator': {
               backgroundColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+              height: 3,
+              borderRadius: 99,
             },
           }}
         >
           <Tab label="View User" {...a11yProps(0)} />
           <Tab label="Edit User" {...a11yProps(1)} />
+          <Tab label="Platforms" {...a11yProps(2)} />
         </Tabs>
         
         <TabPanel value={tabValue} index={0}>
@@ -350,6 +398,115 @@ export default function EditUserPage() {
               </Button>
             </Box>
           </form>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={2}>
+          <Stack spacing={2}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>
+                Platform Access (DSPs)
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Admin controls which distribution providers appear for this user in “Distribution Providers” step.
+              </Typography>
+            </Box>
+
+            {platformsError && <Alert severity="error">{platformsError}</Alert>}
+
+            <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setPlatformKeys(ALL_DSP_KEYS)}
+                  disabled={platformsLoading}
+                >
+                  Allow all
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => setPlatformKeys([])}
+                  disabled={platformsLoading}
+                >
+                  Revoke all
+                </Button>
+              </Box>
+              <Divider sx={{ my: 2 }} />
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                {ALL_DSP_KEYS.map((key) => {
+                  const checked = platformKeys.includes(key);
+                  const meta = DSP_META_BY_KEY[key];
+                  return (
+                    <FormControlLabel
+                      key={key}
+                      control={
+                        <Checkbox
+                          checked={checked}
+                          onChange={(e) => {
+                            setPlatformKeys((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, key])) : prev.filter((k) => k !== key)
+                            );
+                          }}
+                        />
+                      }
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar
+                            src={meta.logo}
+                            alt={meta.name}
+                            variant="rounded"
+                            sx={{
+                              width: 56,
+                              height: 56,
+                              borderRadius: 2,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              bgcolor: 'background.default',
+                              p: 0.6,
+                            }}
+                          />
+                          <Box>
+                            <Typography variant="body2" fontWeight={500}>
+                              {meta.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      }
+                    />
+                  );
+                })}
+              </Box>
+
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Button
+                  variant="contained"
+                  disabled={platformsLoading}
+                  onClick={async () => {
+                    try {
+                      setPlatformsLoading(true);
+                      setPlatformsError('');
+                      const res = await fetch(`/api/admin/platforms/${userId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dspKeys: platformKeys }),
+                      });
+                      const json = await res.json().catch(() => null);
+                      if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to save platforms');
+                    } catch (e) {
+                      setPlatformsError(e instanceof Error ? e.message : 'Failed to save platforms');
+                    } finally {
+                      setPlatformsLoading(false);
+                    }
+                  }}
+                >
+                  Save platform access
+                </Button>
+              </Box>
+            </Paper>
+          </Stack>
         </TabPanel>
       </Paper>
     </Box>

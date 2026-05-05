@@ -126,8 +126,23 @@ export default function ReleasesPage() {
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', mt: 6 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">All Releases</Typography>
+    <Box sx={{ width: '100%' }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 3.5 },
+          mb: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Typography variant="h4" gutterBottom fontWeight="bold" color="text.primary">All Releases</Typography>
+        <Typography variant="body1" color="text.secondary">
+          Review release status, stores, dates, and track counts from one workspace.
+        </Typography>
+      </Paper>
       {loading ? (
         <CircularProgress />
       ) : error ? (
@@ -135,7 +150,17 @@ export default function ReleasesPage() {
       ) : releases.length === 0 ? (
         <Alert severity="info">No releases found.</Alert>
       ) : (
-        <Paper sx={{ p: 3, bgcolor: 'background.paper', color: 'text.primary' }}>
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2, md: 3 },
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+          }}
+        >
           <List>
             {releases.map((release, idx) => (
               <div key={release._id || idx}>

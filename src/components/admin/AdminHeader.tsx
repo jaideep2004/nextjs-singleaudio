@@ -22,8 +22,8 @@ import {
   Logout as LogoutIcon, 
   Settings as SettingsIcon, 
   Person as PersonIcon,
-  Brightness4,
-  Brightness7
+  DarkMode,
+  LightMode
 } from '@mui/icons-material';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useColorMode } from '@/context/ColorModeContext';
@@ -80,12 +80,14 @@ export default function AdminHeader() {
             onClick={toggleColorMode}
             sx={{
               bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+              border: '1px solid',
+              borderColor: 'divider',
               '&:hover': {
                 bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
               }
             }}
           >
-            {theme.palette.mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+            {theme.palette.mode === 'dark' ? <LightMode /> : <DarkMode />}
           </IconButton>
           
           <IconButton 

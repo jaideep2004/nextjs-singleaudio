@@ -16,6 +16,7 @@ export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 // Roles
 export enum UserRole {
   ARTIST = 'artist',
+  LABEL = 'label',
   ADMIN = 'admin'
 }
 
@@ -26,6 +27,7 @@ export const UPLOAD_DIR = isServerlessRuntime
   : path.join(process.cwd(), 'uploads');
 export const TRACKS_DIR = path.join(UPLOAD_DIR, 'tracks');
 export const ARTWORK_DIR = path.join(UPLOAD_DIR, 'artwork');
+export const REGISTRATION_DIR = path.join(UPLOAD_DIR, 'registration');
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for audio files
 
 // Supported file types

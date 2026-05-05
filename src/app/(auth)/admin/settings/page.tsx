@@ -183,7 +183,17 @@ export default function AdminSettingsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 4 }}>
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2.5, md: 3 },
+          mb: 3,
+          borderRadius: 3,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
+        }}
+      >
         <Typography
           variant="h4"
           component="h1"
@@ -195,15 +205,46 @@ export default function AdminSettingsPage() {
         <Typography variant="body1" color="text.secondary">
           Configure platform settings and preferences
         </Typography>
-      </Box>
+      </Paper>
 
-      <Paper sx={{ mb: 3 }}>
+      <Paper
+        sx={{
+          mb: 3,
+          borderRadius: 3,
+          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
+          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
+          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
+          overflow: 'hidden',
+        }}
+      >
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
           aria-label="settings tabs"
           variant="scrollable"
           scrollButtons="auto"
+          sx={{
+            px: 1,
+            pt: 1,
+            borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              minHeight: 54,
+              borderRadius: 2,
+              mx: 0.5,
+              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'rgba(15,23,42,0.72)',
+              '&.Mui-selected': {
+                color: mode === 'dark' ? '#b7c5ff' : '#2841c6',
+                backgroundColor: mode === 'dark' ? 'rgba(120,141,255,0.14)' : 'rgba(74,108,247,0.10)',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: 999,
+              backgroundColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+            },
+          }}
         >
           <Tab icon={<Person />} label="General" {...a11yProps(0)} />
           <Tab icon={<Security />} label="Security" {...a11yProps(1)} />

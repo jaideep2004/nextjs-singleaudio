@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, ToggleButton, ToggleButtonGroup, Autocomplete, TextField, Chip, Stack, Button, Divider, Grid, Paper } from '@mui/material';
-import countries, { continents } from '../../utils/countries';
+import { Box, Typography, ToggleButton, ToggleButtonGroup, Autocomplete, TextField, Chip, Stack, Button, Divider, Paper } from '@mui/material';
+import countries from '../../utils/countries';
 
 export type TerritoryMode = 'allowed' | 'disallowed';
 
@@ -64,31 +64,6 @@ const TerritoryManager: React.FC<TerritoryManagerProps> = ({ value, mode, onChan
         >
           {selected.length < countries.length ? 'Select All' : 'Clear All'}
         </Button>
-        <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
-        {continents.map(ct => (
-          <Button
-            key={ct.key}
-            variant="outlined"
-            size="small"
-            onClick={() => {
-              // Toggle continent selection: if all codes for this continent are included, remove them; else add missing
-              const set = new Set(selected);
-              const allIn = ct.countryCodes.every(code => set.has(code));
-              if (allIn) {
-                const next = selected.filter(code => !ct.countryCodes.includes(code));
-                setSelected(next);
-                onChange(next, currentMode);
-              } else {
-                ct.countryCodes.forEach(code => set.add(code));
-                const next = Array.from(set);
-                setSelected(next);
-                onChange(next, currentMode);
-              }
-            }}
-          >
-            {ct.name}
-          </Button>
-        ))}
       </Stack>
       <Autocomplete
         multiple

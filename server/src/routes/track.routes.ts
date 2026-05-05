@@ -3,14 +3,14 @@ import * as trackController from '../controllers/track.controller';
 import { protect, authorize } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validator.middleware';
 import { createTrackValidator, updateTrackValidator, approveRejectTrackValidator } from '../validators/track.validator';
-import { uploadAudio, uploadImage } from '../utils/fileUpload';
+import { uploadTrackFiles } from '../utils/fileUpload';
 import { UserRole } from '../config/constants';
 
 const router = Router();
 
 // Set up multer upload middleware
 const uploadMiddleware = [
-  uploadAudio.fields([
+  uploadTrackFiles.fields([
     { name: 'audio', maxCount: 1 },
     { name: 'artwork', maxCount: 1 }
   ])

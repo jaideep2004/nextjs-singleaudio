@@ -109,6 +109,15 @@ export default function AdminSidebar() {
         display: 'flex',
         flexDirection: 'column',
         bgcolor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.8)' : 'rgba(245, 245, 245, 0.8)',
+        // ultra-thin scrollbar
+        scrollbarWidth: 'thin',
+        scrollbarColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22) transparent' : 'rgba(15,23,42,0.22) transparent',
+        '&::-webkit-scrollbar': { width: 6 },
+        '&::-webkit-scrollbar-thumb': {
+          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.22)',
+          borderRadius: 10,
+        },
+        '&::-webkit-scrollbar-track': { background: 'transparent' },
       }}
     >
       <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
