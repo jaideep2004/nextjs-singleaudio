@@ -10,11 +10,15 @@ import {
   uploadFileForScan,
 } from '../services/acrCloud.service';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { UserRole } from '../config/constants';
+import { LOCAL_FFMPEG_ENABLED, UserRole } from '../config/constants';
 import Track from '../models/track.model';
 
 export async function analyzeAudioHandler(req: Request, res: Response) {
   try {
+    if (!LOCAL_FFMPEG_ENABLED) {
+      return res.status(503).json({ error: 'Local ffmpeg analysis is disabled in this environment' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }

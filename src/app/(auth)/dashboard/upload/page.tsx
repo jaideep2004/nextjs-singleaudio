@@ -65,9 +65,13 @@ import {
 } from '@/lib/acrCloud';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
-const API_BASE = typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-  ? process.env.NEXT_PUBLIC_API_URL!
-  : 'http://localhost:5000/api';
+const API_BASE = (
+  typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
+    ? process.env.NEXT_PUBLIC_API_URL!
+    : 'http://localhost:5000/api'
+)
+  .replace(/\/+$/, '')
+  .replace(/\/api$/, '') + '/api';
 
 type AcrCloudUploadState = AcrCloudStatusLike;
 

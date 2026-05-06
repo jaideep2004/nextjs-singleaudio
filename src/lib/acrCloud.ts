@@ -97,10 +97,14 @@ export function getAcrCloudRightsClaims(raw: unknown) {
   return Array.isArray(result.rights_claim) ? result.rights_claim : [];
 }
 
-const API_BASE =
-  typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-    ? `${process.env.NEXT_PUBLIC_API_URL!}/api`
-    : 'http://localhost:5000/api';
+const getApiBase = () => {
+  const configuredBase =
+    typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
+      ? process.env.NEXT_PUBLIC_API_URL!
+      : 'http://localhost:5000/api';
+
+  return configuredBase.replace(/\/+$/, '').replace(/\/api$/, '') + '/api';
+};
 
 export const getAcrCloudState = (acrCloud?: AcrCloudStatusLike | null): AcrCloudState | undefined =>
   acrCloud?.scanState || acrCloud?.state;
@@ -179,7 +183,7 @@ export const getAcrCloudSummary = (acrCloud?: AcrCloudStatusLike | null): string
 
 export async function fetchAcrCloudScanResult(fileId: string): Promise<AcrCloudStatusLike> {
   const token = Cookies.get('token');
-  const response = await fetch(`${API_BASE}/audio/acr/scan/${fileId}`, {
+  const response = await fetch(`${getApiBase()}/audio/acr/scan/${fileId}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 

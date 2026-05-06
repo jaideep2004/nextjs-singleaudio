@@ -81,7 +81,7 @@
       "source_file": "server\\src\\config\\db.ts",
       "source_location": "L1",
       "id": "server_src_config_db_ts",
-      "community": 50,
+      "community": 51,
       "norm_label": "db.ts"
     },
     {
@@ -90,7 +90,7 @@
       "source_file": "server\\src\\config\\db.ts",
       "source_location": "L23",
       "id": "config_db_connectdb",
-      "community": 50,
+      "community": 51,
       "norm_label": "connectdb()"
     },
     {
@@ -115,7 +115,7 @@
       "label": "deleteTempFile()",
       "file_type": "code",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L29",
+      "source_location": "L33",
       "id": "controllers_audiocontroller_deletetempfile",
       "community": 0,
       "norm_label": "deletetempfile()"
@@ -124,7 +124,7 @@
       "label": "identifyWithAcrCloudHandler()",
       "file_type": "code",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L38",
+      "source_location": "L42",
       "id": "controllers_audiocontroller_identifywithacrcloudhandler",
       "community": 0,
       "norm_label": "identifywithacrcloudhandler()"
@@ -133,7 +133,7 @@
       "label": "scanWithAcrCloudHandler()",
       "file_type": "code",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L68",
+      "source_location": "L72",
       "id": "controllers_audiocontroller_scanwithacrcloudhandler",
       "community": 0,
       "norm_label": "scanwithacrcloudhandler()"
@@ -142,7 +142,7 @@
       "label": "getAcrCloudScanResultHandler()",
       "file_type": "code",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L98",
+      "source_location": "L102",
       "id": "controllers_audiocontroller_getacrcloudscanresulthandler",
       "community": 0,
       "norm_label": "getacrcloudscanresulthandler()"
@@ -151,7 +151,7 @@
       "label": "acrCloudCallbackHandler()",
       "file_type": "code",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L126",
+      "source_location": "L130",
       "id": "controllers_audiocontroller_acrcloudcallbackhandler",
       "community": 0,
       "norm_label": "acrcloudcallbackhandler()"
@@ -162,7 +162,7 @@
       "source_file": "server\\src\\controllers\\auditLog.controller.ts",
       "source_location": "L1",
       "id": "server_src_controllers_auditlog_controller_ts",
-      "community": 51,
+      "community": 52,
       "norm_label": "auditlog.controller.ts"
     },
     {
@@ -171,7 +171,7 @@
       "source_file": "server\\src\\controllers\\auditLog.controller.ts",
       "source_location": "L4",
       "id": "controllers_auditlog_controller_getauditlogs",
-      "community": 51,
+      "community": 52,
       "norm_label": "getauditlogs()"
     },
     {
@@ -477,7 +477,7 @@
       "source_file": "server\\src\\controllers\\settings.controller.ts",
       "source_location": "L1",
       "id": "server_src_controllers_settings_controller_ts",
-      "community": 52,
+      "community": 53,
       "norm_label": "settings.controller.ts"
     },
     {
@@ -486,7 +486,7 @@
       "source_file": "server\\src\\controllers\\settings.controller.ts",
       "source_location": "L67",
       "id": "controllers_settings_controller_initializedefaultsettings",
-      "community": 52,
+      "community": 53,
       "norm_label": "initializedefaultsettings()"
     },
     {
@@ -774,7 +774,7 @@
       "source_file": "server\\src\\middleware\\cors.middleware.ts",
       "source_location": "L1",
       "id": "server_src_middleware_cors_middleware_ts",
-      "community": 53,
+      "community": 54,
       "norm_label": "cors.middleware.ts"
     },
     {
@@ -783,7 +783,7 @@
       "source_file": "server\\src\\middleware\\cors.middleware.ts",
       "source_location": "L17",
       "id": "middleware_cors_middleware_setupcors",
-      "community": 53,
+      "community": 54,
       "norm_label": "setupcors()"
     },
     {
@@ -837,7 +837,7 @@
       "source_file": "server\\src\\middleware\\validator.middleware.ts",
       "source_location": "L1",
       "id": "server_src_middleware_validator_middleware_ts",
-      "community": 54,
+      "community": 55,
       "norm_label": "validator.middleware.ts"
     },
     {
@@ -846,7 +846,7 @@
       "source_file": "server\\src\\middleware\\validator.middleware.ts",
       "source_location": "L10",
       "id": "middleware_validator_middleware_validate",
-      "community": 54,
+      "community": 55,
       "norm_label": "validate()"
     },
     {
@@ -1188,7 +1188,7 @@
       "source_file": "server\\src\\scripts\\seedAdmin.ts",
       "source_location": "L1",
       "id": "server_src_scripts_seedadmin_ts",
-      "community": 55,
+      "community": 56,
       "norm_label": "seedadmin.ts"
     },
     {
@@ -1197,7 +1197,7 @@
       "source_file": "server\\src\\scripts\\seedAdmin.ts",
       "source_location": "L23",
       "id": "scripts_seedadmin_seedadmin",
-      "community": 55,
+      "community": 56,
       "norm_label": "seedadmin()"
     },
     {
@@ -1386,16 +1386,25 @@
       "source_file": "server\\src\\services\\audioAnalysisService.ts",
       "source_location": "L1",
       "id": "server_src_services_audioanalysisservice_ts",
-      "community": 56,
+      "community": 43,
       "norm_label": "audioanalysisservice.ts"
+    },
+    {
+      "label": "getFfmpeg()",
+      "file_type": "code",
+      "source_file": "server\\src\\services\\audioAnalysisService.ts",
+      "source_location": "L14",
+      "id": "services_audioanalysisservice_getffmpeg",
+      "community": 43,
+      "norm_label": "getffmpeg()"
     },
     {
       "label": "analyzeAudio()",
       "file_type": "code",
       "source_file": "server\\src\\services\\audioAnalysisService.ts",
-      "source_location": "L28",
+      "source_location": "L39",
       "id": "services_audioanalysisservice_analyzeaudio",
-      "community": 56,
+      "community": 43,
       "norm_label": "analyzeaudio()"
     },
     {
@@ -2637,7 +2646,7 @@
       "source_file": "server\\src\\utils\\ApiError.ts",
       "source_location": "L1",
       "id": "server_src_utils_apierror_ts",
-      "community": 43,
+      "community": 44,
       "norm_label": "apierror.ts"
     },
     {
@@ -2646,7 +2655,7 @@
       "source_file": "server\\src\\utils\\ApiError.ts",
       "source_location": "L3",
       "id": "utils_apierror_apierror",
-      "community": 43,
+      "community": 44,
       "norm_label": "apierror"
     },
     {
@@ -2655,7 +2664,7 @@
       "source_file": "server\\src\\utils\\ApiError.ts",
       "source_location": "L8",
       "id": "utils_apierror_apierror_constructor",
-      "community": 43,
+      "community": 44,
       "norm_label": ".constructor()"
     },
     {
@@ -2716,7 +2725,7 @@
       "label": "analyzeAudio()",
       "file_type": "code",
       "source_file": "server\\src\\utils\\audioAnalysis.ts",
-      "source_location": "L11",
+      "source_location": "L12",
       "id": "utils_audioanalysis_analyzeaudio",
       "community": 0,
       "norm_label": "analyzeaudio()"
@@ -2916,7 +2925,7 @@
       "source_file": "src\\middleware.ts",
       "source_location": "L1",
       "id": "src_middleware_ts",
-      "community": 44,
+      "community": 45,
       "norm_label": "middleware.ts"
     },
     {
@@ -2925,7 +2934,7 @@
       "source_file": "src\\middleware.ts",
       "source_location": "L18",
       "id": "src_middleware_validatetoken",
-      "community": 44,
+      "community": 45,
       "norm_label": "validatetoken()"
     },
     {
@@ -2934,7 +2943,7 @@
       "source_file": "src\\middleware.ts",
       "source_location": "L36",
       "id": "src_middleware_middleware",
-      "community": 44,
+      "community": 45,
       "norm_label": "middleware()"
     },
     {
@@ -3168,7 +3177,7 @@
       "source_file": "src\\app\\(auth)\\admin\\dashboard\\page.tsx",
       "source_location": "L1",
       "id": "src_app_auth_admin_dashboard_page_tsx",
-      "community": 14,
+      "community": 13,
       "norm_label": "page.tsx"
     },
     {
@@ -3177,7 +3186,7 @@
       "source_file": "src\\app\\(auth)\\admin\\dashboard\\page.tsx",
       "source_location": "L142",
       "id": "dashboard_page_fetchdashboarddata",
-      "community": 14,
+      "community": 13,
       "norm_label": "fetchdashboarddata()"
     },
     {
@@ -3186,7 +3195,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L251",
       "id": "dashboard_page_formatdate",
-      "community": 14,
+      "community": 13,
       "norm_label": "formatdate()"
     },
     {
@@ -3636,7 +3645,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L1",
       "id": "src_app_auth_admin_users_page_tsx",
-      "community": 13,
+      "community": 14,
       "norm_label": "page.tsx"
     },
     {
@@ -3645,7 +3654,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L144",
       "id": "users_page_handlechangepage",
-      "community": 13,
+      "community": 14,
       "norm_label": "handlechangepage()"
     },
     {
@@ -3654,7 +3663,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L148",
       "id": "users_page_handlechangerowsperpage",
-      "community": 13,
+      "community": 14,
       "norm_label": "handlechangerowsperpage()"
     },
     {
@@ -3663,7 +3672,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L153",
       "id": "users_page_handlesearch",
-      "community": 13,
+      "community": 14,
       "norm_label": "handlesearch()"
     },
     {
@@ -3672,7 +3681,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L158",
       "id": "users_page_handleedituser",
-      "community": 13,
+      "community": 14,
       "norm_label": "handleedituser()"
     },
     {
@@ -3681,7 +3690,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L162",
       "id": "users_page_handleviewuser",
-      "community": 13,
+      "community": 14,
       "norm_label": "handleviewuser()"
     },
     {
@@ -3690,7 +3699,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L166",
       "id": "users_page_handlecreateuser",
-      "community": 13,
+      "community": 14,
       "norm_label": "handlecreateuser()"
     },
     {
@@ -3699,7 +3708,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L170",
       "id": "users_page_handledeleteclick",
-      "community": 13,
+      "community": 14,
       "norm_label": "handledeleteclick()"
     },
     {
@@ -3708,7 +3717,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L175",
       "id": "users_page_handledeleteconfirm",
-      "community": 13,
+      "community": 14,
       "norm_label": "handledeleteconfirm()"
     },
     {
@@ -3717,7 +3726,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L195",
       "id": "users_page_handlestatustoggle",
-      "community": 13,
+      "community": 14,
       "norm_label": "handlestatustoggle()"
     },
     {
@@ -3726,7 +3735,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L222",
       "id": "users_page_showsnackbar",
-      "community": 13,
+      "community": 14,
       "norm_label": "showsnackbar()"
     },
     {
@@ -3735,7 +3744,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L226",
       "id": "users_page_handleclosesnackbar",
-      "community": 13,
+      "community": 14,
       "norm_label": "handleclosesnackbar()"
     },
     {
@@ -3744,7 +3753,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\page.tsx",
       "source_location": "L230",
       "id": "users_page_handleclosedeletedialog",
-      "community": 13,
+      "community": 14,
       "norm_label": "handleclosedeletedialog()"
     },
     {
@@ -3753,7 +3762,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\new\\page.tsx",
       "source_location": "L1",
       "id": "src_app_auth_admin_users_new_page_tsx",
-      "community": 45,
+      "community": 46,
       "norm_label": "page.tsx"
     },
     {
@@ -3762,7 +3771,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\new\\page.tsx",
       "source_location": "L41",
       "id": "new_page_handlechange",
-      "community": 45,
+      "community": 46,
       "norm_label": "handlechange()"
     },
     {
@@ -3771,7 +3780,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\new\\page.tsx",
       "source_location": "L57",
       "id": "new_page_handlesubmit",
-      "community": 45,
+      "community": 46,
       "norm_label": "handlesubmit()"
     },
     {
@@ -3843,7 +3852,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\[id]\\view.tsx",
       "source_location": "L1",
       "id": "src_app_auth_admin_users_id_view_tsx",
-      "community": 46,
+      "community": 47,
       "norm_label": "view.tsx"
     },
     {
@@ -3852,7 +3861,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\[id]\\view.tsx",
       "source_location": "L50",
       "id": "id_view_fetchuser",
-      "community": 46,
+      "community": 47,
       "norm_label": "fetchuser()"
     },
     {
@@ -3861,7 +3870,7 @@
       "source_file": "src\\app\\(auth)\\admin\\users\\[id]\\view.tsx",
       "source_location": "L68",
       "id": "id_view_handlestatustoggle",
-      "community": 46,
+      "community": 47,
       "norm_label": "handlestatustoggle()"
     },
     {
@@ -3897,7 +3906,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L1",
       "id": "src_app_auth_dashboard_page_tsx",
-      "community": 14,
+      "community": 13,
       "norm_label": "page.tsx"
     },
     {
@@ -3906,7 +3915,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L73",
       "id": "dashboard_page_getacrcloudstate",
-      "community": 14,
+      "community": 13,
       "norm_label": "getacrcloudstate()"
     },
     {
@@ -3915,7 +3924,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L75",
       "id": "dashboard_page_getacrcloudlabel",
-      "community": 14,
+      "community": 13,
       "norm_label": "getacrcloudlabel()"
     },
     {
@@ -3924,7 +3933,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L92",
       "id": "dashboard_page_getacrcloudcolor",
-      "community": 14,
+      "community": 13,
       "norm_label": "getacrcloudcolor()"
     },
     {
@@ -3933,7 +3942,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L143",
       "id": "dashboard_page_fetchtracks",
-      "community": 14,
+      "community": 13,
       "norm_label": "fetchtracks()"
     },
     {
@@ -3942,7 +3951,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L164",
       "id": "dashboard_page_fetchreleases",
-      "community": 14,
+      "community": 13,
       "norm_label": "fetchreleases()"
     },
     {
@@ -3951,7 +3960,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L197",
       "id": "dashboard_page_handleplaypause",
-      "community": 14,
+      "community": 13,
       "norm_label": "handleplaypause()"
     },
     {
@@ -3960,7 +3969,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L223",
       "id": "dashboard_page_getstatuscolor",
-      "community": 14,
+      "community": 13,
       "norm_label": "getstatuscolor()"
     },
     {
@@ -3969,7 +3978,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L237",
       "id": "dashboard_page_getstatusicon",
-      "community": 14,
+      "community": 13,
       "norm_label": "getstatusicon()"
     },
     {
@@ -3978,7 +3987,7 @@
       "source_file": "src\\app\\(auth)\\dashboard\\page.tsx",
       "source_location": "L274",
       "id": "dashboard_page_handlelogout",
-      "community": 14,
+      "community": 13,
       "norm_label": "handlelogout()"
     },
     {
@@ -4300,7 +4309,7 @@
       "label": "resizeList()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L74",
+      "source_location": "L78",
       "id": "upload_page_resizelist",
       "community": 4,
       "norm_label": "resizelist()"
@@ -4309,7 +4318,7 @@
       "label": "uploadArtworkToServer()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L80",
+      "source_location": "L84",
       "id": "upload_page_uploadartworktoserver",
       "community": 4,
       "norm_label": "uploadartworktoserver()"
@@ -4318,7 +4327,7 @@
       "label": "uploadAudioToServer()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L97",
+      "source_location": "L101",
       "id": "upload_page_uploadaudiotoserver",
       "community": 4,
       "norm_label": "uploadaudiotoserver()"
@@ -4327,7 +4336,7 @@
       "label": "loadAllowed()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L769",
+      "source_location": "L773",
       "id": "upload_page_loadallowed",
       "community": 4,
       "norm_label": "loadallowed()"
@@ -4336,7 +4345,7 @@
       "label": "if()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L921",
+      "source_location": "L925",
       "id": "upload_page_if",
       "community": 4,
       "norm_label": "if()"
@@ -4345,7 +4354,7 @@
       "label": "async()",
       "file_type": "code",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L1424",
+      "source_location": "L1428",
       "id": "upload_page_async",
       "community": 4,
       "norm_label": "async()"
@@ -4707,25 +4716,25 @@
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
       "source_location": "L1",
       "id": "src_app_api_audio_analyze_route_ts",
-      "community": 47,
+      "community": 48,
       "norm_label": "route.ts"
     },
     {
       "label": "saveFileToDisk()",
       "file_type": "code",
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
-      "source_location": "L12",
+      "source_location": "L14",
       "id": "analyze_route_savefiletodisk",
-      "community": 47,
+      "community": 48,
       "norm_label": "savefiletodisk()"
     },
     {
       "label": "POST()",
       "file_type": "code",
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
-      "source_location": "L34",
+      "source_location": "L36",
       "id": "analyze_route_post",
-      "community": 47,
+      "community": 48,
       "norm_label": "post()"
     },
     {
@@ -5103,7 +5112,7 @@
       "source_file": "src\\app\\services\\api.ts",
       "source_location": "L1",
       "id": "src_app_services_api_ts",
-      "community": 48,
+      "community": 49,
       "norm_label": "api.ts"
     },
     {
@@ -5112,7 +5121,7 @@
       "source_file": "src\\app\\services\\api.ts",
       "source_location": "L21",
       "id": "services_api_fetchoptions",
-      "community": 48,
+      "community": 49,
       "norm_label": "fetchoptions()"
     },
     {
@@ -5121,7 +5130,7 @@
       "source_file": "src\\app\\services\\api.ts",
       "source_location": "L40",
       "id": "services_api_handleresponse",
-      "community": 48,
+      "community": 49,
       "norm_label": "handleresponse()"
     },
     {
@@ -5661,7 +5670,7 @@
       "source_file": "src\\context\\ColorModeContext.tsx",
       "source_location": "L1",
       "id": "src_context_colormodecontext_tsx",
-      "community": 49,
+      "community": 50,
       "norm_label": "colormodecontext.tsx"
     },
     {
@@ -5670,7 +5679,7 @@
       "source_file": "src\\context\\ColorModeContext.tsx",
       "source_location": "L19",
       "id": "context_colormodecontext_usecolormode",
-      "community": 49,
+      "community": 50,
       "norm_label": "usecolormode()"
     },
     {
@@ -5679,7 +5688,7 @@
       "source_file": "src\\context\\ColorModeContext.tsx",
       "source_location": "L52",
       "id": "context_colormodecontext_togglecolormode",
-      "community": 49,
+      "community": 50,
       "norm_label": "togglecolormode()"
     },
     {
@@ -5782,10 +5791,19 @@
       "norm_label": "getacrcloudrightsclaims()"
     },
     {
+      "label": "getApiBase()",
+      "file_type": "code",
+      "source_file": "src\\lib\\acrCloud.ts",
+      "source_location": "L100",
+      "id": "lib_acrcloud_getapibase",
+      "community": 3,
+      "norm_label": "getapibase()"
+    },
+    {
       "label": "getAcrCloudState()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L105",
+      "source_location": "L109",
       "id": "lib_acrcloud_getacrcloudstate",
       "community": 3,
       "norm_label": "getacrcloudstate()"
@@ -5794,7 +5812,7 @@
       "label": "getAcrCloudLabel()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L108",
+      "source_location": "L112",
       "id": "lib_acrcloud_getacrcloudlabel",
       "community": 3,
       "norm_label": "getacrcloudlabel()"
@@ -5803,7 +5821,7 @@
       "label": "getAcrCloudColor()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L125",
+      "source_location": "L129",
       "id": "lib_acrcloud_getacrcloudcolor",
       "community": 3,
       "norm_label": "getacrcloudcolor()"
@@ -5812,7 +5830,7 @@
       "label": "formatProbability()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L142",
+      "source_location": "L146",
       "id": "lib_acrcloud_formatprobability",
       "community": 3,
       "norm_label": "formatprobability()"
@@ -5821,7 +5839,7 @@
       "label": "getAcrCloudSummary()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L147",
+      "source_location": "L151",
       "id": "lib_acrcloud_getacrcloudsummary",
       "community": 3,
       "norm_label": "getacrcloudsummary()"
@@ -5830,7 +5848,7 @@
       "label": "fetchAcrCloudScanResult()",
       "file_type": "code",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L180",
+      "source_location": "L184",
       "id": "lib_acrcloud_fetchacrcloudscanresult",
       "community": 3,
       "norm_label": "fetchacrcloudscanresult()"
@@ -6162,7 +6180,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L29",
+      "source_location": "L33",
       "weight": 1.0,
       "_src": "server_src_controllers_audiocontroller_ts",
       "_tgt": "controllers_audiocontroller_deletetempfile",
@@ -6174,7 +6192,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L38",
+      "source_location": "L42",
       "weight": 1.0,
       "_src": "server_src_controllers_audiocontroller_ts",
       "_tgt": "controllers_audiocontroller_identifywithacrcloudhandler",
@@ -6186,7 +6204,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L68",
+      "source_location": "L72",
       "weight": 1.0,
       "_src": "server_src_controllers_audiocontroller_ts",
       "_tgt": "controllers_audiocontroller_scanwithacrcloudhandler",
@@ -6198,7 +6216,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L98",
+      "source_location": "L102",
       "weight": 1.0,
       "_src": "server_src_controllers_audiocontroller_ts",
       "_tgt": "controllers_audiocontroller_getacrcloudscanresulthandler",
@@ -6210,7 +6228,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L126",
+      "source_location": "L130",
       "weight": 1.0,
       "_src": "server_src_controllers_audiocontroller_ts",
       "_tgt": "controllers_audiocontroller_acrcloudcallbackhandler",
@@ -6234,7 +6252,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L64",
+      "source_location": "L68",
       "weight": 1.0,
       "_src": "controllers_audiocontroller_identifywithacrcloudhandler",
       "_tgt": "controllers_audiocontroller_deletetempfile",
@@ -6246,7 +6264,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\controllers\\audioController.ts",
-      "source_location": "L94",
+      "source_location": "L98",
       "weight": 1.0,
       "_src": "controllers_audiocontroller_scanwithacrcloudhandler",
       "_tgt": "controllers_audiocontroller_deletetempfile",
@@ -8970,11 +8988,35 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\services\\audioAnalysisService.ts",
-      "source_location": "L28",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_src": "server_src_services_audioanalysisservice_ts",
+      "_tgt": "services_audioanalysisservice_getffmpeg",
+      "source": "server_src_services_audioanalysisservice_ts",
+      "target": "services_audioanalysisservice_getffmpeg",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\src\\services\\audioAnalysisService.ts",
+      "source_location": "L39",
       "weight": 1.0,
       "_src": "server_src_services_audioanalysisservice_ts",
       "_tgt": "services_audioanalysisservice_analyzeaudio",
       "source": "server_src_services_audioanalysisservice_ts",
+      "target": "services_audioanalysisservice_analyzeaudio",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "server\\src\\services\\audioAnalysisService.ts",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_src": "services_audioanalysisservice_analyzeaudio",
+      "_tgt": "services_audioanalysisservice_getffmpeg",
+      "source": "services_audioanalysisservice_getffmpeg",
       "target": "services_audioanalysisservice_analyzeaudio",
       "confidence_score": 1.0
     },
@@ -10890,7 +10932,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "server\\src\\utils\\audioAnalysis.ts",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "_src": "server_src_utils_audioanalysis_ts",
       "_tgt": "utils_audioanalysis_analyzeaudio",
@@ -12810,7 +12852,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L74",
+      "source_location": "L78",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_resizelist",
@@ -12822,7 +12864,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L80",
+      "source_location": "L84",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_uploadartworktoserver",
@@ -12834,7 +12876,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L97",
+      "source_location": "L101",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_uploadaudiotoserver",
@@ -12846,7 +12888,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L769",
+      "source_location": "L773",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_loadallowed",
@@ -12858,7 +12900,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L921",
+      "source_location": "L925",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_if",
@@ -12870,7 +12912,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L1424",
+      "source_location": "L1428",
       "weight": 1.0,
       "_src": "src_app_auth_dashboard_upload_page_tsx",
       "_tgt": "upload_page_async",
@@ -12882,7 +12924,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\(auth)\\dashboard\\upload\\page.tsx",
-      "source_location": "L1427",
+      "source_location": "L1431",
       "weight": 1.0,
       "_src": "upload_page_async",
       "_tgt": "upload_page_uploadartworktoserver",
@@ -13446,7 +13488,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
-      "source_location": "L12",
+      "source_location": "L14",
       "weight": 1.0,
       "_src": "src_app_api_audio_analyze_route_ts",
       "_tgt": "analyze_route_savefiletodisk",
@@ -13458,7 +13500,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
-      "source_location": "L34",
+      "source_location": "L36",
       "weight": 1.0,
       "_src": "src_app_api_audio_analyze_route_ts",
       "_tgt": "analyze_route_post",
@@ -13470,7 +13512,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\app\\api\\audio\\analyze\\route.ts",
-      "source_location": "L47",
+      "source_location": "L49",
       "weight": 1.0,
       "_src": "analyze_route_post",
       "_tgt": "analyze_route_savefiletodisk",
@@ -14874,7 +14916,19 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L105",
+      "source_location": "L100",
+      "weight": 1.0,
+      "_src": "src_lib_acrcloud_ts",
+      "_tgt": "lib_acrcloud_getapibase",
+      "source": "src_lib_acrcloud_ts",
+      "target": "lib_acrcloud_getapibase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\lib\\acrCloud.ts",
+      "source_location": "L109",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_getacrcloudstate",
@@ -14886,7 +14940,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L108",
+      "source_location": "L112",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_getacrcloudlabel",
@@ -14898,7 +14952,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L125",
+      "source_location": "L129",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_getacrcloudcolor",
@@ -14910,7 +14964,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L142",
+      "source_location": "L146",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_formatprobability",
@@ -14922,7 +14976,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L147",
+      "source_location": "L151",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_getacrcloudsummary",
@@ -14934,7 +14988,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L180",
+      "source_location": "L184",
       "weight": 1.0,
       "_src": "src_lib_acrcloud_ts",
       "_tgt": "lib_acrcloud_fetchacrcloudscanresult",
@@ -14970,7 +15024,19 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L109",
+      "source_location": "L186",
+      "weight": 1.0,
+      "_src": "lib_acrcloud_fetchacrcloudscanresult",
+      "_tgt": "lib_acrcloud_getapibase",
+      "source": "lib_acrcloud_getapibase",
+      "target": "lib_acrcloud_fetchacrcloudscanresult",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "source_file": "src\\lib\\acrCloud.ts",
+      "source_location": "L113",
       "weight": 1.0,
       "_src": "lib_acrcloud_getacrcloudlabel",
       "_tgt": "lib_acrcloud_getacrcloudstate",
@@ -14982,7 +15048,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L126",
+      "source_location": "L130",
       "weight": 1.0,
       "_src": "lib_acrcloud_getacrcloudcolor",
       "_tgt": "lib_acrcloud_getacrcloudstate",
@@ -14994,7 +15060,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L166",
+      "source_location": "L170",
       "weight": 1.0,
       "_src": "lib_acrcloud_getacrcloudsummary",
       "_tgt": "lib_acrcloud_getacrcloudstate",
@@ -15006,7 +15072,7 @@
       "relation": "calls",
       "confidence": "EXTRACTED",
       "source_file": "src\\lib\\acrCloud.ts",
-      "source_location": "L162",
+      "source_location": "L166",
       "weight": 1.0,
       "_src": "lib_acrcloud_getacrcloudsummary",
       "_tgt": "lib_acrcloud_formatprobability",

@@ -1,11 +1,11 @@
 # Graph Report - nextjs-singleaudio  (2026-05-06)
 
 ## Corpus Check
-- 192 files · ~632,877 words
+- 192 files · ~415,695 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 677 nodes · 772 edges · 32 communities detected
+- 679 nodes · 776 edges · 33 communities detected
 - Extraction: 79% EXTRACTED · 21% INFERRED · 0% AMBIGUOUS · INFERRED: 165 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
@@ -41,7 +41,8 @@
 - [[_COMMUNITY_Community 41|Community 41]]
 - [[_COMMUNITY_Community 43|Community 43]]
 - [[_COMMUNITY_Community 44|Community 44]]
-- [[_COMMUNITY_Community 47|Community 47]]
+- [[_COMMUNITY_Community 45|Community 45]]
+- [[_COMMUNITY_Community 48|Community 48]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `errorResponse()` - 43 edges
@@ -83,7 +84,7 @@ Nodes (16): GET(), DELETE(), GET(), PUT(), GET(), PUT(), fetchBackend(), getAuth
 
 ### Community 3 - "Community 3"
 Cohesion: 0.12
-Nodes (12): formatAcrTime(), formatAcrTimeRange(), refreshPending(), fetchAcrCloudScanResult(), formatProbability(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudProviderMetadata() (+4 more)
+Nodes (13): formatAcrTime(), formatAcrTimeRange(), refreshPending(), fetchAcrCloudScanResult(), formatProbability(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudProviderMetadata() (+5 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.11
@@ -115,11 +116,11 @@ Nodes (2): fetchPayouts(), onPayoutSubmit()
 
 ### Community 13 - "Community 13"
 Cohesion: 0.18
-Nodes (3): handleDeleteConfirm(), handleStatusToggle(), showSnackbar()
+Nodes (4): formatDate(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudState()
 
 ### Community 14 - "Community 14"
 Cohesion: 0.18
-Nodes (4): formatDate(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudState()
+Nodes (3): handleDeleteConfirm(), handleStatusToggle(), showSnackbar()
 
 ### Community 15 - "Community 15"
 Cohesion: 0.22
@@ -186,14 +187,18 @@ Cohesion: 1.0
 Nodes (2): connectDB(), startServer()
 
 ### Community 43 - "Community 43"
+Cohesion: 1.0
+Nodes (2): analyzeAudio(), getFfmpeg()
+
+### Community 44 - "Community 44"
 Cohesion: 0.67
 Nodes (1): ApiError
 
-### Community 44 - "Community 44"
+### Community 45 - "Community 45"
 Cohesion: 1.0
 Nodes (2): middleware(), validateToken()
 
-### Community 47 - "Community 47"
+### Community 48 - "Community 48"
 Cohesion: 1.0
 Nodes (2): POST(), saveFileToDisk()
 
@@ -220,11 +225,13 @@ Nodes (2): POST(), saveFileToDisk()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 41`** (3 nodes): `index.ts`, `connectDB()`, `startServer()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 43`** (3 nodes): `ApiError.ts`, `ApiError`, `.constructor()`
+- **Thin community `Community 43`** (3 nodes): `audioAnalysisService.ts`, `analyzeAudio()`, `getFfmpeg()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 44`** (3 nodes): `middleware()`, `middleware.ts`, `validateToken()`
+- **Thin community `Community 44`** (3 nodes): `ApiError.ts`, `ApiError`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (3 nodes): `POST()`, `saveFileToDisk()`, `route.ts`
+- **Thin community `Community 45`** (3 nodes): `middleware()`, `middleware.ts`, `validateToken()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 48`** (3 nodes): `POST()`, `saveFileToDisk()`, `route.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions

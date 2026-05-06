@@ -6,7 +6,9 @@ import { createWriteStream } from 'fs';
 import { Readable } from 'stream';
 import { promisify } from 'util';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
+  .replace(/\/+$/, '')
+  .replace(/\/api$/, '');
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 async function saveFileToDisk(file: File) {   

@@ -1,5 +1,6 @@
 import { parseFile } from 'music-metadata';
 import { spawn } from 'child_process';
+import { LOCAL_FFMPEG_ENABLED } from '../config/constants';
 
 export interface AudioAnalysisResult {
   format: string;
@@ -15,7 +16,11 @@ export async function analyzeAudio(filePath: string): Promise<AudioAnalysisResul
   const duration = metadata.format.duration || 0;
   const bitrate = metadata.format.bitrate ? Math.round(metadata.format.bitrate / 1000) : 0;
 
-  // 2. Get loudness using ffmpeg CLI
+  if (!LOCAL_FFMPEG_ENABLED) {
+    return { format, duration, bitrate, loudness: null };
+  }
+
+  // Local-only loudness scan using ffmpeg CLI.
   const loudness = await new Promise<number | null>((resolve) => {
     const ffmpeg = spawn('ffmpeg', [
       '-i', filePath,

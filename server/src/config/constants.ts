@@ -21,8 +21,12 @@ export enum UserRole {
 }
 
 // File Upload
-const isServerlessRuntime = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
-export const UPLOAD_DIR = isServerlessRuntime
+export const IS_SERVERLESS_RUNTIME = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+export const LOCAL_FFMPEG_ENABLED =
+  !IS_PRODUCTION &&
+  !IS_SERVERLESS_RUNTIME &&
+  process.env.ENABLE_LOCAL_FFMPEG !== 'false';
+export const UPLOAD_DIR = IS_SERVERLESS_RUNTIME
   ? path.join(os.tmpdir(), 'nextjs-singleaudio', 'uploads')
   : path.join(process.cwd(), 'uploads');
 export const TRACKS_DIR = path.join(UPLOAD_DIR, 'tracks');
