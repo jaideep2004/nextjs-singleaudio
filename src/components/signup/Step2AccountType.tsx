@@ -10,6 +10,7 @@ import {
 } from '@mui/material';
 import { MusicNote, Business } from '@mui/icons-material';
 import { SignupFormValues } from '@/app/(public)/signup/types';
+import { formSectionSx, sectionCaptionSx, sectionTitleSx } from './styles';
 
 export interface Step2Props {
   control: Control<SignupFormValues>;
@@ -23,12 +24,12 @@ export default function Step2AccountType({
   onAccountTypeChange,
 }: Step2Props) {
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} sx={formSectionSx}>
       <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
+        <Typography variant="h6" sx={sectionTitleSx}>
           Account Type
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <Typography variant="body2" sx={sectionCaptionSx}>
           Choose how you want to register on the platform
         </Typography>
       </Box>
@@ -50,7 +51,7 @@ export default function Step2AccountType({
               }}
               sx={{
                 display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
+                gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
                 gap: 2,
                 width: '100%',
                 '& .MuiToggleButtonGroup-grouped': {
@@ -64,7 +65,8 @@ export default function Step2AccountType({
                 value="artist"
                 aria-label="Artist account"
                 sx={{
-                  p: 3,
+                  minHeight: { xs: 150, sm: 190 },
+                  p: { xs: 2.5, sm: 3 },
                   flexDirection: 'column',
                   gap: 1.5,
                   textTransform: 'none',
@@ -114,7 +116,8 @@ export default function Step2AccountType({
                 value="label"
                 aria-label="Label account"
                 sx={{
-                  p: 3,
+                  minHeight: { xs: 150, sm: 190 },
+                  p: { xs: 2.5, sm: 3 },
                   flexDirection: 'column',
                   gap: 1.5,
                   textTransform: 'none',

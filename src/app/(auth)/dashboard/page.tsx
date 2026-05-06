@@ -58,10 +58,52 @@ interface Track {
   artworkUrl: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
+  acrCloud?: {
+    fileId?: string;
+    state?: 'not_configured' | 'pending' | 'ready' | 'no_results' | 'error';
+    scanState?: 'not_configured' | 'pending' | 'ready' | 'no_results' | 'error';
+    lastError?: string;
+    checkedAt?: string;
+  };
   createdAt: string;
 }
 
 import AuthGuard from '@/components/AuthGuard';
+
+const getAcrCloudState = (track: Track) => track.acrCloud?.scanState || track.acrCloud?.state;
+
+const getAcrCloudLabel = (track: Track) => {
+  switch (getAcrCloudState(track)) {
+    case 'pending':
+      return 'ACR testing';
+    case 'ready':
+      return 'ACR passed';
+    case 'no_results':
+      return 'ACR no match';
+    case 'error':
+      return 'ACR error';
+    case 'not_configured':
+      return 'ACR off';
+    default:
+      return 'ACR queued';
+  }
+};
+
+const getAcrCloudColor = (track: Track) => {
+  switch (getAcrCloudState(track)) {
+    case 'ready':
+    case 'no_results':
+      return 'success';
+    case 'pending':
+      return 'warning';
+    case 'error':
+      return 'error';
+    case 'not_configured':
+      return 'default';
+    default:
+      return 'info';
+  }
+};
 
 export default function ArtistDashboard() {
   return (
@@ -484,7 +526,7 @@ function DashboardPage() {
             }}
             fullWidth
           >
-            Upload New Track
+            Upload New Release
           </Button>
         </Grid>
         
@@ -782,6 +824,17 @@ function DashboardPage() {
                   <Typography variant="body2" color="text.secondary">
                     Uploaded: {formatDate(track.createdAt)}
                   </Typography>
+                  {track.acrCloud && (
+                    <Chip
+                      icon={getAcrCloudState(track) === 'pending' ? <CircularProgress size={12} /> : <QueryStatsIcon fontSize="small" />}
+                      label={getAcrCloudLabel(track)}
+                      color={getAcrCloudColor(track) as any}
+                      size="small"
+                      variant="outlined"
+                      title={track.acrCloud.lastError || 'ACRCloud verification status'}
+                      sx={{ mt: 1.25 }}
+                    />
+                  )}
                   
                   {track.status === 'rejected' && track.rejectionReason && (
                     <Alert severity="error" sx={{ mt: 2, fontSize: '0.8rem' }}>

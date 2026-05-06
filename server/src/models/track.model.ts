@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { ReleaseStatus, STORES } from '../config/constants';
+import { AcrCloudAiDetection, AcrCloudFingerprintMatch, AcrCloudScanState } from '../types/acrCloud';
 
 export interface ITrack extends Document {
   title: string;
@@ -20,6 +21,18 @@ export interface ITrack extends Document {
   audioFile: string;
   artwork: string;
   duration?: number;
+  format?: string;
+  bitrate?: number;
+  loudness?: number | null;
+  acrCloud?: {
+    fileId?: string;
+    scanState: AcrCloudScanState;
+    aiDetection: AcrCloudAiDetection[];
+    fingerprintMatches: AcrCloudFingerprintMatch[];
+    rawResult?: unknown;
+    lastError?: string;
+    checkedAt?: Date;
+  };
   stores: string[];
   status: ReleaseStatus;
   rejectionReason?: string;
@@ -122,6 +135,34 @@ const TrackSchema: Schema = new Schema(
     },
     loudness: {
       type: Number
+    },
+    acrCloud: {
+      fileId: {
+        type: String,
+        index: true
+      },
+      scanState: {
+        type: String,
+        enum: ['not_configured', 'pending', 'ready', 'no_results', 'error'],
+        default: 'pending'
+      },
+      aiDetection: {
+        type: [Schema.Types.Mixed],
+        default: []
+      },
+      fingerprintMatches: {
+        type: [Schema.Types.Mixed],
+        default: []
+      },
+      rawResult: {
+        type: Schema.Types.Mixed
+      },
+      lastError: {
+        type: String
+      },
+      checkedAt: {
+        type: Date
+      }
     },
     stores: {
       type: [String],

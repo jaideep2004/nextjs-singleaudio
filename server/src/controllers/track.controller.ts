@@ -9,6 +9,7 @@ import { ApiError } from '../middleware/errorHandler.middleware';
 import { getFileUrl, deleteFile } from '../utils/fileUpload';
 import { ReleaseStatus, TRACKS_DIR, ARTWORK_DIR, UserRole } from '../config/constants';
 import * as notificationService from '../services/notification.service';
+import { startTrackAcrCloudScan } from '../services/acrCloud.service';
 
 /**
  * Upload a new track
@@ -71,8 +72,16 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
       format: analysis.format,
       duration: analysis.duration,
       bitrate: analysis.bitrate,
-      loudness: analysis.loudness
+      loudness: analysis.loudness,
+      acrCloud: {
+        scanState: 'pending',
+        aiDetection: [],
+        fingerprintMatches: [],
+        checkedAt: new Date()
+      }
     });
+
+    void startTrackAcrCloudScan(track._id.toString(), audioPath, title);
 
     // Generate file URLs
     const audioUrl = getFileUrl(audioFile, 'audio');

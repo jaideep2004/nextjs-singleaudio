@@ -31,7 +31,6 @@ import {
   Slide,
   Avatar,
   Snackbar,
-  Collapse,
 } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
 import {
@@ -56,11 +55,27 @@ import { useAuth } from '@/context/AppContext';
 import Cookies from 'js-cookie';
 import countries from '@/utils/countries';
 import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
+import {
+  AcrCloudStatusLike,
+  fetchAcrCloudScanResult,
+  getAcrCloudColor,
+  getAcrCloudLabel,
+  getAcrCloudState,
+  getAcrCloudSummary,
+} from '@/lib/acrCloud';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
 const API_BASE = typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
   ? process.env.NEXT_PUBLIC_API_URL!
   : 'http://localhost:5000/api';
+
+type AcrCloudUploadState = AcrCloudStatusLike;
+
+const resizeList = <T,>(items: T[], length: number, fallback: T): T[] => {
+  if (items.length === length) return items;
+  if (items.length > length) return items.slice(0, length);
+  return [...items, ...Array.from({ length: length - items.length }, () => fallback)];
+};
 
 async function uploadArtworkToServer(file: File): Promise<{ url: string; filename: string }> {
   const fd = new FormData();
@@ -82,7 +97,7 @@ async function uploadArtworkToServer(file: File): Promise<{ url: string; filenam
 async function uploadAudioToServer(
   file: File,
   onProgress?: (percent: number) => void
-): Promise<{ url: string; filename: string }> {
+): Promise<{ url: string; filename: string; acrCloud?: AcrCloudUploadState }> {
   const fd = new FormData();
   fd.append('audio', file);
   const token = Cookies.get('token');
@@ -102,7 +117,7 @@ async function uploadAudioToServer(
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const data = JSON.parse(xhr.responseText);
-          resolve({ url: data.url, filename: data.filename });
+          resolve({ url: data.url, filename: data.filename, acrCloud: data.acrCloud });
         } catch {
           reject(new Error('Invalid upload response'));
         }
@@ -251,6 +266,59 @@ const formatBitrate = (bpsOrKbps?: number) => {
   return bpsOrKbps > 10000 ? `${Math.round(bpsOrKbps / 1000)} kbps` : `${Math.round(bpsOrKbps)} kbps`;
 };
 
+function AcrCloudResultPanel({
+  acrCloud,
+  progress,
+}: {
+  acrCloud?: AcrCloudUploadState | null;
+  progress: number;
+}) {
+  if (!acrCloud) return null;
+
+  const state = getAcrCloudState(acrCloud);
+  const showProgress = state === 'pending' || (progress > 0 && progress < 100);
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', mb: 1.5 }}>
+        <Box>
+          <Typography variant="subtitle2" fontWeight={700}>ACRCloud verification</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Scan details are available to admins during release review.
+          </Typography>
+        </Box>
+        <Chip
+          size="small"
+          icon={state === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+          label={getAcrCloudLabel(acrCloud)}
+          color={getAcrCloudColor(acrCloud) as any}
+          variant="outlined"
+        />
+      </Box>
+
+      {showProgress ? (
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+            <Typography variant="caption" color="text.secondary">ACR scan progress</Typography>
+            <Typography variant="caption" color="text.secondary">{progress}%</Typography>
+          </Box>
+          <LinearProgress
+            variant={state === 'pending' ? 'determinate' : 'determinate'}
+            value={Math.min(100, Math.max(0, progress))}
+            sx={{ height: 7, borderRadius: 4, '& .MuiLinearProgress-bar': { borderRadius: 4 } }}
+          />
+        </Box>
+      ) : null}
+
+      {acrCloud.lastError ? (
+        <Alert severity={state === 'not_configured' ? 'info' : 'error'} sx={{ mb: 2 }}>
+          {acrCloud.lastError}
+        </Alert>
+      ) : null}
+    </Paper>
+  );
+}
+
 import TerritoryManager, { TerritoryMode } from '@/components/territory/TerritoryManager';
 import RightsManager, { RightsType } from '@/components/rights/RightsManager';
 // --- TrackInfo type (inline, since not using TrackInfoForm) ---
@@ -377,12 +445,15 @@ export default function UploadPage() {
   // Track upload progress indicator (indeterminate for now)
   const [trackUploading, setTrackUploading] = useState<boolean[]>([]);
   const [audioUploadPct, setAudioUploadPct] = useState<number[]>([]);
+  const [acrCloudProgressPct, setAcrCloudProgressPct] = useState<number[]>([]);
   const appendTracksInputRef = useRef<HTMLInputElement | null>(null);
+  const acrCloudPollRef = useRef<Record<number, string>>({});
   // Uploaded media (server) state
   const [artworkUploadedUrl, setArtworkUploadedUrl] = useState<string | null>(null);
   const [artworkUploadedFilename, setArtworkUploadedFilename] = useState<string | null>(null);
   const [audioUploadedUrls, setAudioUploadedUrls] = useState<(string | null)[]>([]);
   const [audioUploadedFilenames, setAudioUploadedFilenames] = useState<(string | null)[]>([]);
+  const [audioAcrCloudStatuses, setAudioAcrCloudStatuses] = useState<(AcrCloudUploadState | null)[]>([]);
   const [territoryCountries, setTerritoryCountries] = useState<string[]>([]);
   const [territoryMode, setTerritoryMode] = useState<TerritoryMode>('allowed');
   const [rightsType, setRightsType] = useState<RightsType>('exclusive');
@@ -399,7 +470,7 @@ export default function UploadPage() {
     return DSP_LIST.filter((dsp: DspItem) => allow.has(dsp.key));
   }, [allowedDspKeys]);
 
-  const [selectedDSPs, setSelectedDSPs] = useState<string[]>([]);
+  const [selectedDSPs, setSelectedDSPs] = useState<DspKey[]>([]);
   const [releaseWorldwide, setReleaseWorldwide] = useState(true);
   const [releaseDate, setReleaseDate] = useState<string>("");
   const [originalReleaseDate, setOriginalReleaseDate] = useState<string>("");
@@ -409,10 +480,47 @@ export default function UploadPage() {
   const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
   // Snackbar for "Apply to all"
   const [snackOpen, setSnackOpen] = useState(false);
+  const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
 
   // Computed values (not state)
   const allSelected = selectedDSPs.length === visibleDSPs.length;
+
+  const ensureTrackStateLength = (length: number) => {
+    setAnalysisResults((arr) => resizeList(arr, length, null));
+    setAnalysisLoading((arr) => resizeList(arr, length, false));
+    setAnalysisErrors((arr) => resizeList(arr, length, null));
+    setTrackUploading((arr) => resizeList(arr, length, false));
+    setAudioUploadPct((arr) => resizeList(arr, length, 0));
+    setAcrCloudProgressPct((arr) => resizeList(arr, length, 0));
+    setAudioUploadedUrls((arr) => resizeList(arr, length, null));
+    setAudioUploadedFilenames((arr) => resizeList(arr, length, null));
+    setAudioAcrCloudStatuses((arr) => resizeList(arr, length, null));
+    setTrackInfos((arr) => {
+      if (arr.length === length) return arr;
+      if (arr.length > length) return arr.slice(0, length);
+      return [
+        ...arr,
+        ...Array.from({ length: length - arr.length }, (_, offset) => ({
+          ...createDefaultTrackInfo(),
+          trackNumber: arr.length + offset + 1,
+        })),
+      ];
+    });
+  };
+
+  const setTrackTitleFromFile = (index: number, file: File) => {
+    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    if (!baseName) return;
+    setTrackInfos((prev) =>
+      prev.map((info, i) => (i === index ? { ...info, title: info.title.trim() ? info.title : baseName } : info))
+    );
+  };
+
+  const setAcrCloudPending = (index: number, progress = 5) => {
+    setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { ...(status || {}), state: 'pending' } : status)));
+    setAcrCloudProgressPct((prev) => prev.map((pct, i) => (i === index ? Math.max(pct, progress) : pct)));
+  };
 
   const getContributorNames = (track: TrackInfo, role: ContributorRole) =>
     track.contributors
@@ -471,6 +579,7 @@ export default function UploadPage() {
         originalReleaseDate: t.originalReleaseDate || originalReleaseDate,
         audioUrl: audioUploadedUrls[idx] || null,
         audioFile: audioUploadedFilenames[idx] || null,
+        acrCloud: audioAcrCloudStatuses[idx] || null,
       }))
     };
     try {
@@ -496,7 +605,7 @@ export default function UploadPage() {
   const isDistributionValid = selectedDSPs.length > 0;
 
   // Event handlers
-  const handleDSPToggle = (key: string) => {
+  const handleDSPToggle = (key: DspKey) => {
     setSelectedDSPs(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
   const handleSelectAll = () => {
@@ -582,6 +691,43 @@ export default function UploadPage() {
   const trackHasListedArtist = (info: TrackInfo) =>
     info.contributors.some((c) => c.role === 'artist' && c.name.trim());
 
+  const getTrackInfoIssues = () => {
+    const issues: Array<{ trackIndex: number | null; message: string }> = [];
+
+    if (tracks.length < minTracksRequired) {
+      issues.push({
+        trackIndex: null,
+        message: `Add at least ${minTracksRequired} track${minTracksRequired === 1 ? '' : 's'} for ${selectedReleaseTypeConfig?.label || 'this release type'}.`,
+      });
+    }
+
+    tracks.forEach((_, idx) => {
+      const info = trackInfos[idx];
+      const label = `Track ${idx + 1}`;
+      if (!info) {
+        issues.push({ trackIndex: idx, message: `${label}: metadata is not ready yet.` });
+        return;
+      }
+      if (!info.title.trim()) issues.push({ trackIndex: idx, message: `${label}: track title is required.` });
+      if (!trackHasListedArtist(info)) issues.push({ trackIndex: idx, message: `${label}: add at least one Artist contributor.` });
+      if (!info.metadataLanguage) issues.push({ trackIndex: idx, message: `${label}: metadata language is required.` });
+      if (!(info.audioLanguage || info.language)) issues.push({ trackIndex: idx, message: `${label}: audio language is required.` });
+      if (!info.genre) issues.push({ trackIndex: idx, message: `${label}: genre is required.` });
+    });
+
+    if (!releaseDate.trim()) {
+      issues.push({ trackIndex: selectedTrackIdx, message: 'Digital release date is required.' });
+    }
+
+    return issues;
+  };
+
+  const trackInfoIssues = getTrackInfoIssues();
+  const selectedTrackMissingArtist =
+    trackValidationAttempted &&
+    Boolean(trackInfos[selectedTrackIdx]) &&
+    !trackHasListedArtist(trackInfos[selectedTrackIdx]);
+
   const isTrackInfoListValid =
     tracks.length >= minTracksRequired &&
     tracks.every((_, idx) => {
@@ -594,12 +740,29 @@ export default function UploadPage() {
         (info.audioLanguage || info.language) &&
         info.genre
       );
-    });
+    }) &&
+    releaseDate.trim();
+
+  const handleTracksInfoContinue = () => {
+    setTrackValidationAttempted(true);
+    const issues = getTrackInfoIssues();
+    if (issues.length) {
+      const firstTrackIssue = issues.find((issue) => typeof issue.trackIndex === 'number');
+      if (typeof firstTrackIssue?.trackIndex === 'number') {
+        setSelectedTrackIdx(firstTrackIssue.trackIndex);
+      }
+      return;
+    }
+    handleNext();
+  };
 
   // All useEffect hooks
   // Set mounted state to true after component mounts
   useEffect(() => {
     setMounted(true);
+    return () => {
+      acrCloudPollRef.current = {};
+    };
   }, []);
 
   useEffect(() => {
@@ -627,14 +790,12 @@ export default function UploadPage() {
   // Keep analysis / upload state arrays in sync with tracks array length
   useEffect(() => {
     const len = tracks.length;
-    setAnalysisResults((arr) => (arr.length === len ? arr : Array(len).fill(null)));
-    setAnalysisLoading((arr) => (arr.length === len ? arr : Array(len).fill(false)));
-    setAnalysisErrors((arr) => (arr.length === len ? arr : Array(len).fill(null)));
-    setTrackUploading((arr) => (arr.length === len ? arr : Array(len).fill(false)));
-    setAudioUploadPct((arr) => {
-      if (arr.length === len) return arr;
-      return Array.from({ length: len }, (_, i) => (i < arr.length ? arr[i] : 0));
-    });
+    setAnalysisResults((arr) => resizeList(arr, len, null));
+    setAnalysisLoading((arr) => resizeList(arr, len, false));
+    setAnalysisErrors((arr) => resizeList(arr, len, null));
+    setTrackUploading((arr) => resizeList(arr, len, false));
+    setAudioUploadPct((arr) => resizeList(arr, len, 0));
+    setAcrCloudProgressPct((arr) => resizeList(arr, len, 0));
   }, [tracks.length]);
 
   // When release type changes, only enforce max track count (no empty placeholder slots)
@@ -717,8 +878,9 @@ export default function UploadPage() {
 
   // Keep uploaded audio arrays in sync with tracks length
   useEffect(() => {
-    setAudioUploadedUrls(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(null));
-    setAudioUploadedFilenames(arr => arr.length === tracks.length ? arr : Array(tracks.length).fill(null));
+    setAudioUploadedUrls(arr => resizeList(arr, tracks.length, null));
+    setAudioUploadedFilenames(arr => resizeList(arr, tracks.length, null));
+    setAudioAcrCloudStatuses(arr => resizeList(arr, tracks.length, null));
   }, [tracks.length]);
 
   // Safe access to auth context
@@ -737,11 +899,21 @@ export default function UploadPage() {
   };
 
   const handleRemoveTrack = (index: number) => {
+    delete acrCloudPollRef.current[index];
     setTracks((prev) => {
       const next = prev.filter((_, i) => i !== index);
       setSelectedTrackIdx((si) => (next.length === 0 ? 0 : Math.min(si, next.length - 1)));
       return next;
     });
+    setAnalysisResults((prev) => prev.filter((_, i) => i !== index));
+    setAnalysisLoading((prev) => prev.filter((_, i) => i !== index));
+    setAnalysisErrors((prev) => prev.filter((_, i) => i !== index));
+    setTrackUploading((prev) => prev.filter((_, i) => i !== index));
+    setAudioUploadPct((prev) => prev.filter((_, i) => i !== index));
+    setAcrCloudProgressPct((prev) => prev.filter((_, i) => i !== index));
+    setAudioUploadedUrls((prev) => prev.filter((_, i) => i !== index));
+    setAudioUploadedFilenames((prev) => prev.filter((_, i) => i !== index));
+    setAudioAcrCloudStatuses((prev) => prev.filter((_, i) => i !== index));
   };
 
   /** Replace audio for an existing row, or remove row when `file` is null. */
@@ -762,16 +934,15 @@ export default function UploadPage() {
       if (index < next.length) next[index] = file;
       return next;
     });
+    ensureTrackStateLength(Math.max(tracks.length, index + 1));
 
     setAnalysisResults((prev) => prev.map((r, i) => (i === index ? null : r)));
     setAnalysisErrors((prev) => prev.map((e, i) => (i === index ? null : e)));
     setTrackUploading((prev) => prev.map((u, i) => (i === index ? true : u)));
-    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 0 : p)));
-
-    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-    setTrackInfos((prev) =>
-      prev.map((info, i) => (i === index ? { ...info, title: info.title ? info.title : baseName } : info))
-    );
+    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 1 : p)));
+    setAcrCloudPending(index);
+    delete acrCloudPollRef.current[index];
+    setTrackTitleFromFile(index, file);
     setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? true : l)));
 
     try {
@@ -803,14 +974,21 @@ export default function UploadPage() {
     }
 
     try {
-      const { url, filename } = await uploadAudioToServer(file, (pct) =>
+      const { url, filename, acrCloud } = await uploadAudioToServer(file, (pct) =>
         setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
       );
       setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
       setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? (acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }) : status)));
       setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p)));
+      if (acrCloud?.fileId && getAcrCloudState(acrCloud) === 'pending') {
+        void pollAcrCloudStatus(index, acrCloud.fileId);
+      }
     } catch (e) {
       console.error('Audio upload failed:', e);
+      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' } : status)));
+      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
     }
     setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
   };
@@ -830,6 +1008,7 @@ export default function UploadPage() {
 
     const startIdx = tracks.length;
     setTracks((prev) => [...prev, ...incoming]);
+    ensureTrackStateLength(startIdx + incoming.length);
     if (appendTracksInputRef.current) appendTracksInputRef.current.value = '';
 
     for (let i = 0; i < incoming.length; i++) {
@@ -887,6 +1066,7 @@ export default function UploadPage() {
   // Helper: analyze and upload one track (reuses same logic as handleTrackFileChange)
   const analyzeAndUploadForIndex = async (index: number, file: File) => {
     // Set file and reset states
+    ensureTrackStateLength(Math.max(tracks.length, index + 1));
     setTracks(prev => {
       const next = [...prev];
       next[index] = file;
@@ -895,10 +1075,12 @@ export default function UploadPage() {
     setAnalysisResults(prev => prev.map((r, i) => (i === index ? null : r)));
     setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
     setTrackUploading(prev => prev.map((u, i) => (i === index ? true : u)));
+    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 1 : p)));
+    setAcrCloudPending(index);
+    delete acrCloudPollRef.current[index];
 
     // Autofill title and analyze
-    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-    setTrackInfos(prev => prev.map((info, i) => i === index ? { ...info, title: info.title ? info.title : baseName } : info));
+    setTrackTitleFromFile(index, file);
     setAnalysisLoading(prev => prev.map((l, i) => (i === index ? true : l)));
     try {
       const formData = new FormData();
@@ -923,17 +1105,71 @@ export default function UploadPage() {
     }
 
     try {
-      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 0 : p)));
-      const { url, filename } = await uploadAudioToServer(file, (pct) =>
+      const { url, filename, acrCloud } = await uploadAudioToServer(file, (pct) =>
         setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
       );
       setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
       setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? (acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }) : status)));
       setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p)));
+      if (acrCloud?.fileId && getAcrCloudState(acrCloud) === 'pending') {
+        void pollAcrCloudStatus(index, acrCloud.fileId);
+      }
     } catch (e) {
       console.error('Audio upload failed:', e);
+      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' } : status)));
+      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
     } finally {
       setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
+    }
+  };
+
+  const pollAcrCloudStatus = async (index: number, fileId: string) => {
+    acrCloudPollRef.current[index] = fileId;
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      if (acrCloudPollRef.current[index] !== fileId) return;
+      setAcrCloudProgressPct((prev) =>
+        prev.map((pct, i) => (i === index ? Math.max(pct, Math.min(90, 25 + attempt * 2)) : pct))
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2500 : 4000));
+      if (acrCloudPollRef.current[index] !== fileId) return;
+
+      try {
+        const nextStatus = await fetchAcrCloudScanResult(fileId);
+        if (acrCloudPollRef.current[index] !== fileId) return;
+
+        setAudioAcrCloudStatuses((prev) =>
+          prev.map((status, i) => (i === index ? { ...(status || {}), ...nextStatus } : status))
+        );
+        setAcrCloudProgressPct((prev) =>
+          prev.map((pct, i) => (i === index ? (getAcrCloudState(nextStatus) === 'pending' ? Math.max(pct, 35) : 100) : pct))
+        );
+
+        if (getAcrCloudState(nextStatus) !== 'pending') {
+          delete acrCloudPollRef.current[index];
+          return;
+        }
+      } catch (error) {
+        if (attempt >= 5) {
+          setAudioAcrCloudStatuses((prev) =>
+            prev.map((status, i) =>
+              i === index
+                ? {
+                    ...(status || {}),
+                    state: 'error',
+                    lastError: error instanceof Error ? error.message : 'Failed to refresh ACRCloud status',
+                  }
+                : status
+            )
+          );
+          setAcrCloudProgressPct((prev) => prev.map((pct, i) => (i === index ? 100 : pct)));
+          delete acrCloudPollRef.current[index];
+          return;
+        }
+      }
     }
   };
 
@@ -947,6 +1183,7 @@ export default function UploadPage() {
     if (!files.length) return;
 
     setTracks(files);
+    ensureTrackStateLength(files.length);
     setSelectedTrackIdx(0);
 
     for (let i = 0; i < files.length; i++) {
@@ -1255,6 +1492,26 @@ export default function UploadPage() {
               </Paper>
             )}
 
+            {trackValidationAttempted && trackInfoIssues.length > 0 && (
+              <Alert severity="warning" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                  Complete these items before continuing
+                </Typography>
+                <Box component="ul" sx={{ pl: 2.25, m: 0 }}>
+                  {trackInfoIssues.slice(0, 6).map((issue, issueIdx) => (
+                    <li key={`${issue.message}-${issueIdx}`}>
+                      <Typography variant="body2">{issue.message}</Typography>
+                    </li>
+                  ))}
+                  {trackInfoIssues.length > 6 ? (
+                    <li>
+                      <Typography variant="body2">{trackInfoIssues.length - 6} more item{trackInfoIssues.length - 6 === 1 ? '' : 's'} need attention.</Typography>
+                    </li>
+                  ) : null}
+                </Box>
+              </Alert>
+            )}
+
             <Box
               sx={{
                 display: 'flex',
@@ -1374,18 +1631,22 @@ export default function UploadPage() {
                             sx={{ mt: 1, mb: 1, maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
                             variant="outlined"
                           />
-                          {(audioUploadPct[idx] ?? 0) < 100 && (analysisLoading[idx] || (audioUploadPct[idx] ?? 0) > 0) && (
-                            <LinearProgress
-                              variant={analysisLoading[idx] ? 'indeterminate' : 'determinate'}
-                              value={audioUploadPct[idx] ?? 0}
-                              sx={{
-                                mb: 1,
-                                mt: 0.5,
-                                height: 6,
-                                borderRadius: 3,
-                                '& .MuiLinearProgress-bar': { borderRadius: 3 },
-                              }}
-                            />
+                          {(trackUploading[idx] || analysisLoading[idx] || (audioUploadPct[idx] ?? 0) > 0) && (audioUploadPct[idx] ?? 0) < 100 && (
+                            <Box sx={{ mb: 1 }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                <Typography variant="caption" color="text.secondary">Audio upload</Typography>
+                                <Typography variant="caption" color="text.secondary">{audioUploadPct[idx] ?? 0}%</Typography>
+                              </Box>
+                              <LinearProgress
+                                variant={analysisLoading[idx] && (audioUploadPct[idx] ?? 0) <= 1 ? 'indeterminate' : 'determinate'}
+                                value={audioUploadPct[idx] ?? 0}
+                                sx={{
+                                  height: 6,
+                                  borderRadius: 3,
+                                  '& .MuiLinearProgress-bar': { borderRadius: 3 },
+                                }}
+                              />
+                            </Box>
                           )}
                           {trackPreviewUrls[idx] && (
                             <Box sx={{ width: '100%', mt: 1 }}>
@@ -1397,6 +1658,42 @@ export default function UploadPage() {
                               <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <CheckCircle sx={{ fontSize: 14 }} /> Upload complete
                               </Typography>
+                            </Box>
+                          )}
+                          {audioAcrCloudStatuses[idx] && (
+                            <Box sx={{ mb: 1 }}>
+                              <Tooltip title={audioAcrCloudStatuses[idx]?.lastError || 'ACRCloud verification status'}>
+                                <Chip
+                                  size="small"
+                                  icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                                  label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
+                                  color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
+                                  variant="outlined"
+                                  sx={{ maxWidth: '100%' }}
+                                />
+                              </Tooltip>
+                              {getAcrCloudSummary(audioAcrCloudStatuses[idx]) && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                  {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
+                                </Typography>
+                              )}
+                              {(acrCloudProgressPct[idx] ?? 0) > 0 && (acrCloudProgressPct[idx] ?? 0) < 100 && (
+                                <Box sx={{ mt: 1 }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                    <Typography variant="caption" color="text.secondary">ACR scan</Typography>
+                                    <Typography variant="caption" color="text.secondary">{acrCloudProgressPct[idx] ?? 0}%</Typography>
+                                  </Box>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={acrCloudProgressPct[idx] ?? 0}
+                                    sx={{
+                                      height: 6,
+                                      borderRadius: 3,
+                                      '& .MuiLinearProgress-bar': { borderRadius: 3 },
+                                    }}
+                                  />
+                                </Box>
+                              )}
                             </Box>
                           )}
                           {analysisLoading[idx] && (
@@ -1468,6 +1765,8 @@ export default function UploadPage() {
                             required
                             value={trackInfos[selectedTrackIdx]?.title || ''}
                             onChange={e => handleTrackInfoChange(selectedTrackIdx, 'title', e.target.value)}
+                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.title?.trim()}
+                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.title?.trim() ? 'Track title is required.' : ''}
                             InputProps={{ endAdornment: <InputAdornment position="end"><Tooltip title="Use a clear, searchable name. Avoid extra version text here."><Info fontSize="small" /></Tooltip></InputAdornment> }}
                           />
                           <TextField
@@ -1479,6 +1778,11 @@ export default function UploadPage() {
                           />
                         </Box>
                       </Box>
+
+                      <AcrCloudResultPanel
+                        acrCloud={audioAcrCloudStatuses[selectedTrackIdx]}
+                        progress={acrCloudProgressPct[selectedTrackIdx] ?? 0}
+                      />
 
                       <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.75 }}>
@@ -1493,6 +1797,11 @@ export default function UploadPage() {
                           Add credits here. Include at least one row with role <strong>Artist</strong> (required).
                           Use <strong>Performer</strong> for featuring guests.
                         </Typography>
+                        {selectedTrackMissingArtist && (
+                          <Alert severity="warning" sx={{ mb: 1.5 }}>
+                            Add at least one contributor with role Artist and a name.
+                          </Alert>
+                        )}
                         <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
                           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' }, gap: 1, px: 1.5, py: 1, bgcolor: 'action.hover' }}>
                             <Typography variant="caption" fontWeight={700}>Role</Typography>
@@ -1515,6 +1824,8 @@ export default function UploadPage() {
                                 label="Contributor name"
                                 value={contributor.name}
                                 onChange={e => updateContributor(selectedTrackIdx, contributorIdx, 'name', e.target.value)}
+                                error={selectedTrackMissingArtist && contributor.role === 'artist' && !contributor.name.trim()}
+                                helperText={selectedTrackMissingArtist && contributor.role === 'artist' && !contributor.name.trim() ? 'Required' : ''}
                               />
                               <Tooltip title="Remove contributor">
                                 <IconButton size="small" color="error" onClick={() => removeContributor(selectedTrackIdx, contributorIdx)}>
@@ -1529,18 +1840,45 @@ export default function UploadPage() {
                       <Box>
                         <Typography variant="overline" sx={{ color: 'text.secondary' }}>Metadata</Typography>
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
-                          <TextField select label="Metadata Language *" fullWidth required value={trackInfos[selectedTrackIdx]?.metadataLanguage || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'metadataLanguage', e.target.value)}>
+                          <TextField
+                            select
+                            label="Metadata Language *"
+                            fullWidth
+                            required
+                            value={trackInfos[selectedTrackIdx]?.metadataLanguage || ''}
+                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'metadataLanguage', e.target.value)}
+                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.metadataLanguage}
+                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.metadataLanguage ? 'Metadata language is required.' : ''}
+                          >
                             {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
                           </TextField>
-                          <TextField select label="Audio Language *" fullWidth required value={trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language || ''} onChange={e => {
-                            handleTrackInfoChange(selectedTrackIdx, 'audioLanguage', e.target.value);
-                            handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value);
-                          }}>
+                          <TextField
+                            select
+                            label="Audio Language *"
+                            fullWidth
+                            required
+                            value={trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language || ''}
+                            onChange={e => {
+                              handleTrackInfoChange(selectedTrackIdx, 'audioLanguage', e.target.value);
+                              handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value);
+                            }}
+                            error={trackValidationAttempted && !(trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language)}
+                            helperText={trackValidationAttempted && !(trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language) ? 'Audio language is required.' : ''}
+                          >
                             {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
                           </TextField>
                         </Box>
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
-                          <TextField select label="Genre *" fullWidth required value={trackInfos[selectedTrackIdx]?.genre || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)}>
+                          <TextField
+                            select
+                            label="Genre *"
+                            fullWidth
+                            required
+                            value={trackInfos[selectedTrackIdx]?.genre || ''}
+                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)}
+                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre}
+                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre ? 'Genre is required.' : ''}
+                          >
                             {genres.map(g => (<MenuItem key={g} value={g}>{g}</MenuItem>))}
                           </TextField>
                           <TextField label="Subgenre" fullWidth value={trackInfos[selectedTrackIdx]?.subgenre || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)} />
@@ -1563,7 +1901,8 @@ export default function UploadPage() {
                             InputLabelProps={{ shrink: true }}
                             value={releaseDate}
                             onChange={(e) => setReleaseDate(e.target.value)}
-                            helperText="Date stores should go live."
+                            error={trackValidationAttempted && !releaseDate.trim()}
+                            helperText={trackValidationAttempted && !releaseDate.trim() ? 'Digital release date is required.' : 'Date stores should go live.'}
                           />
                         </Box>
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
@@ -1650,13 +1989,10 @@ export default function UploadPage() {
                 variant="contained"
                 color="primary"
                 sx={{ borderRadius: 2, px: 3 }}
-                onClick={handleNext}
+                onClick={handleTracksInfoContinue}
                 disabled={
-                  !isTrackInfoListValid ||
                   analysisLoading.some(Boolean) ||
-                  trackUploading.some(Boolean) ||
-                  tracks.length < minTracksRequired ||
-                  !releaseDate.trim()
+                  trackUploading.some(Boolean)
                 }
               >
                 Continue
@@ -1830,6 +2166,22 @@ export default function UploadPage() {
                       {track.copyrightC ? `© ${track.copyrightC} · ` : ''}
                       {track.copyrightP ? `℗ ${track.copyrightP}` : ''}
                     </div>
+                    {audioAcrCloudStatuses[idx] && (
+                      <div style={{ marginTop: 6 }}>
+                        <Chip
+                          size="small"
+                          icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                          label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
+                          color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
+                          variant="outlined"
+                        />
+                        {getAcrCloudSummary(audioAcrCloudStatuses[idx]) ? (
+                          <div style={{ fontSize: 12, color: 'var(--mui-palette-text-secondary)', marginTop: 4 }}>
+                            {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                     {(track.composers || track.publishers || track.producers) && (
                       <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
                         {track.composers ? `Composers: ${track.composers} · ` : ''}

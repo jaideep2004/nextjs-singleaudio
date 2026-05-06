@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Alert,
@@ -152,7 +152,7 @@ function episodeStep1Valid(form: EpisodeFormState) {
   return form.title.trim().length > 0 && form.description.trim().length > 0;
 }
 
-export default function PodcastsPage() {
+function PodcastsContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1319,5 +1319,19 @@ export default function PodcastsPage() {
         </Paper>
       )}
     </Box>
+  );
+}
+
+export default function PodcastsPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <PodcastsContent />
+    </Suspense>
   );
 }

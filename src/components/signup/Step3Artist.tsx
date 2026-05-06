@@ -9,7 +9,6 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   InputAdornment,
-  Chip,
   CircularProgress,
 } from '@mui/material';
 import {
@@ -23,6 +22,15 @@ import {
 } from '@mui/icons-material';
 import FileDropZone from './FileDropZone';
 import { SignupFormValues } from '@/app/(public)/signup/types';
+import {
+  compactToggleGroupSx,
+  fieldSx,
+  formSectionSx,
+  multilineFieldSx,
+  sectionCaptionSx,
+  sectionTitleSx,
+  twoColumnGridSx,
+} from './styles';
 
 export type ArtistNameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'error';
 
@@ -33,28 +41,6 @@ export interface Step3ArtistProps {
   artistNameStatus: ArtistNameStatus;
   onArtistNameBlur: () => void;
 }
-
-const fieldSx = {
-  '& .MuiOutlinedInput-root': {
-    minHeight: 60,
-    borderRadius: '18px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.12)' },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.25)' },
-    '&.Mui-focused fieldset': { borderColor: '#4a6cf7' },
-  },
-  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#4a6cf7' },
-  '& .MuiInputBase-input': { color: '#f8fafc' },
-};
-
-const multilineSx = {
-  ...fieldSx,
-  '& .MuiOutlinedInput-root': {
-    ...fieldSx['& .MuiOutlinedInput-root'],
-    minHeight: 'unset',
-  },
-};
 
 function ArtistNameAdornment({ status }: { status: ArtistNameStatus }) {
   if (status === 'checking') return <CircularProgress size={18} sx={{ color: '#4a6cf7' }} />;
@@ -72,12 +58,12 @@ export default function Step3Artist({
   onArtistNameBlur,
 }: Step3ArtistProps) {
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2.5} sx={formSectionSx}>
       <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
+        <Typography variant="h6" sx={sectionTitleSx}>
           Artist Details
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <Typography variant="body2" sx={sectionCaptionSx}>
           Provide your professional and legal information
         </Typography>
       </Box>
@@ -198,23 +184,7 @@ export default function Step3Artist({
               exclusive
               value={field.value}
               onChange={(_e, val) => val && field.onChange(val)}
-              sx={{
-                mb: 2,
-                '& .MuiToggleButton-root': {
-                  color: 'rgba(255,255,255,0.5)',
-                  borderColor: 'rgba(255,255,255,0.12)',
-                  borderRadius: '12px !important',
-                  px: 3,
-                  py: 1,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&.Mui-selected': {
-                    color: '#4a6cf7',
-                    background: 'rgba(74, 108, 247, 0.12)',
-                    borderColor: '#4a6cf7 !important',
-                  },
-                },
-              }}
+              sx={{ ...compactToggleGroupSx, mb: 2 }}
             >
               <ToggleButton value="pan">PAN Card</ToggleButton>
               <ToggleButton value="aadhaar">Aadhaar Card</ToggleButton>
@@ -298,7 +268,7 @@ export default function Step3Artist({
             error={!!errors.legalAddress}
             helperText={errors.legalAddress?.message}
             disabled={isSubmitting}
-            sx={multilineSx}
+            sx={multilineFieldSx}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start" sx={{ alignSelf: 'flex-start', mt: 1.5 }}>
@@ -343,7 +313,7 @@ export default function Step3Artist({
       />
 
       {/* Tracks & Releases */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+      <Box sx={twoColumnGridSx}>
         <Controller
           name="numberOfTracks"
           control={control}

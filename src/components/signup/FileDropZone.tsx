@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, DragEvent, ChangeEvent } from 'react';
-import { Box, Typography, Button, IconButton } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import { CloudUpload, Close, InsertDriveFile } from '@mui/icons-material';
 
 export interface FileDropZoneProps {
@@ -12,6 +12,7 @@ export interface FileDropZoneProps {
   onChange: (file: File | null) => void;
   error?: string;
   disabled?: boolean;
+  maxSizeMB?: number;
 }
 
 export default function FileDropZone({
@@ -22,6 +23,7 @@ export default function FileDropZone({
   onChange,
   error,
   disabled,
+  maxSizeMB = 10,
 }: FileDropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -37,6 +39,11 @@ export default function FileDropZone({
         ? 'Only PDF files are accepted'
         : 'Only JPEG or PNG images are accepted';
       setLocalError(msg);
+      onChange(null);
+      return;
+    }
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      setLocalError(`File must be ${maxSizeMB} MB or smaller`);
       onChange(null);
       return;
     }
@@ -133,6 +140,11 @@ export default function FileDropZone({
             }`,
             borderRadius: '14px',
             p: 3,
+            minHeight: 154,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
             textAlign: 'center',
             cursor: disabled ? 'not-allowed' : 'pointer',
             background: isDragging

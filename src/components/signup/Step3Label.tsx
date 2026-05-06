@@ -23,6 +23,14 @@ import {
 } from '@mui/icons-material';
 import FileDropZone from './FileDropZone';
 import { SignupFormValues } from '@/app/(public)/signup/types';
+import {
+  compactToggleGroupSx,
+  fieldSx,
+  formSectionSx,
+  sectionCaptionSx,
+  sectionTitleSx,
+  twoColumnGridSx,
+} from './styles';
 
 export interface Step3LabelProps {
   control: Control<SignupFormValues>;
@@ -32,46 +40,6 @@ export interface Step3LabelProps {
   companyType: 'private' | 'public' | '';
 }
 
-const fieldSx = {
-  '& .MuiOutlinedInput-root': {
-    minHeight: 60,
-    borderRadius: '18px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.12)' },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.25)' },
-    '&.Mui-focused fieldset': { borderColor: '#4a6cf7' },
-  },
-  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#4a6cf7' },
-  '& .MuiInputBase-input': { color: '#f8fafc' },
-  '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
-};
-
-const toggleGroupSx = {
-  mb: 2,
-  '& .MuiToggleButton-root': {
-    color: 'rgba(255,255,255,0.5)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: '12px !important',
-    px: 3,
-    py: 1,
-    textTransform: 'none',
-    fontWeight: 600,
-    '&.Mui-selected': {
-      color: '#4a6cf7',
-      background: 'rgba(74, 108, 247, 0.12)',
-      borderColor: '#4a6cf7 !important',
-    },
-  },
-};
-
-const urlValidation = {
-  pattern: {
-    value: /^https?:\/\/.+/,
-    message: 'Enter a valid URL (e.g. https://example.com)',
-  },
-};
-
 export default function Step3Label({
   control,
   errors,
@@ -80,12 +48,12 @@ export default function Step3Label({
   companyType,
 }: Step3LabelProps) {
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2.5} sx={formSectionSx}>
       <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
+        <Typography variant="h6" sx={sectionTitleSx}>
           Label Details
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <Typography variant="body2" sx={sectionCaptionSx}>
           Provide your label and legal information
         </Typography>
       </Box>
@@ -133,7 +101,7 @@ export default function Step3Label({
                 exclusive
                 value={field.value || null}
                 onChange={(_e, val) => val && field.onChange(val)}
-                sx={toggleGroupSx}
+                sx={{ ...compactToggleGroupSx, mb: 2 }}
               >
                 <ToggleButton value="individual">Individual</ToggleButton>
                 <ToggleButton value="registered_company">Registered Company</ToggleButton>
@@ -239,7 +207,7 @@ export default function Step3Label({
                     exclusive
                     value={field.value || null}
                     onChange={(_e, val) => val && field.onChange(val)}
-                    sx={toggleGroupSx}
+                    sx={{ ...compactToggleGroupSx, mb: 2 }}
                   >
                     <ToggleButton value="private">Private</ToggleButton>
                     <ToggleButton value="public">Public</ToggleButton>
@@ -306,7 +274,7 @@ export default function Step3Label({
         Catalog Information
       </Typography>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+      <Box sx={twoColumnGridSx}>
         <Controller
           name="totalArtists"
           control={control}
@@ -352,7 +320,7 @@ export default function Step3Label({
         />
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+      <Box sx={twoColumnGridSx}>
         <Controller
           name="catalogSize"
           control={control}
@@ -433,7 +401,7 @@ export default function Step3Label({
       />
 
       {/* Social Links */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+      <Box sx={twoColumnGridSx}>
         {(
           [
             { name: 'socialLinks.instagram', label: 'Instagram', icon: <Instagram /> },

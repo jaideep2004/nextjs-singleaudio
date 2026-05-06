@@ -11,7 +11,6 @@ import {
   Alert,
   CircularProgress,
   Chip,
-  useTheme,
 } from '@mui/material';
 import {
   ArrowForward,
@@ -51,7 +50,6 @@ const LABEL_STEP3_FIELDS: (keyof SignupFormValues)[] = [
 
 export default function SignupPage() {
   const { signup } = useAuth();
-  const theme = useTheme();
 
   const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -78,7 +76,6 @@ export default function SignupPage() {
   const accountType = watch('accountType');
   const registrationType = watch('registrationType');
   const companyType = watch('companyType');
-  const artistNameValue = watch('artistName');
 
   useEffect(() => {
     setMounted(true);
@@ -367,14 +364,13 @@ export default function SignupPage() {
           'linear-gradient(180deg, #08111f 0%, #0d1726 45%, #121a2d 100%)',
       }}
     >
-      {/* Background glows */}
       <Box
         sx={{
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
           background:
-            'radial-gradient(circle at 12% 18%, rgba(70,127,255,0.22), transparent 24%), radial-gradient(circle at 88% 16%, rgba(124,58,237,0.18), transparent 20%), radial-gradient(circle at 78% 78%, rgba(95,201,173,0.12), transparent 22%)',
+            'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, transparent 34%, rgba(15,118,110,0.1) 100%)',
         }}
       />
 
@@ -389,9 +385,9 @@ export default function SignupPage() {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', lg: '1.1fr minmax(480px, 560px)' },
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) minmax(520px, 600px)' },
             gap: { xs: 3, md: 4, lg: 5 },
-            alignItems: 'start',
+            alignItems: 'stretch',
           }}
         >
           {/* Left panel — brand */}
@@ -400,7 +396,7 @@ export default function SignupPage() {
               display: { xs: 'none', lg: 'flex' },
               borderRadius: '36px',
               p: { md: 5 },
-              minHeight: 720,
+              minHeight: { lg: 760 },
               flexDirection: 'column',
               justifyContent: 'space-between',
               color: '#f8fafc',
@@ -420,7 +416,7 @@ export default function SignupPage() {
                 position: 'absolute',
                 inset: 0,
                 background:
-                  'radial-gradient(circle at top right, rgba(89,153,255,0.22), transparent 22%), radial-gradient(circle at bottom left, rgba(124,58,237,0.18), transparent 18%)',
+                  'linear-gradient(135deg, rgba(89,153,255,0.18) 0%, transparent 42%, rgba(124,58,237,0.12) 100%)',
               }}
             />
 
@@ -444,7 +440,7 @@ export default function SignupPage() {
                     fontSize: { md: '2.8rem', lg: '3.2rem' },
                     lineHeight: 1.05,
                     fontWeight: 800,
-                    letterSpacing: '-0.04em',
+                    letterSpacing: 0,
                   }}
                 >
                   Join the platform built for serious music operations.
@@ -514,8 +510,11 @@ export default function SignupPage() {
           <Box
             sx={{
               width: '100%',
+              maxWidth: { xs: 640, lg: 'none' },
+              mx: { xs: 'auto', lg: 0 },
               borderRadius: { xs: '28px', md: '32px' },
-              p: { xs: 3, sm: 4, md: 5 },
+              p: { xs: 2.5, sm: 4, md: 5 },
+              alignSelf: 'stretch',
               background:
                 'linear-gradient(180deg, rgba(17,24,39,0.92), rgba(15,23,42,0.85))',
               border: '1px solid rgba(255,255,255,0.08)',
@@ -545,7 +544,7 @@ export default function SignupPage() {
                   fontSize: { xs: '1.7rem', sm: '2rem' },
                   fontWeight: 800,
                   color: '#f8fafc',
-                  letterSpacing: '-0.03em',
+                  letterSpacing: 0,
                   lineHeight: 1.1,
                 }}
               >
@@ -622,7 +621,7 @@ export default function SignupPage() {
 
               {/* Navigation buttons */}
               <Stack
-                direction="row"
+                direction={{ xs: 'column-reverse', sm: 'row' }}
                 spacing={2}
                 sx={{ mt: 4, justifyContent: 'space-between' }}
               >
@@ -637,6 +636,7 @@ export default function SignupPage() {
                       border: '1px solid rgba(255,255,255,0.12)',
                       px: 3,
                       py: 1.5,
+                      width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
                       fontWeight: 600,
                       '&:hover': {
@@ -663,6 +663,7 @@ export default function SignupPage() {
                       fontSize: '1rem',
                       px: 4,
                       py: 1.5,
+                      width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
                       background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
                       boxShadow: '0 12px 28px rgba(37,99,235,0.22)',
@@ -692,6 +693,7 @@ export default function SignupPage() {
                       fontSize: '1rem',
                       px: 4,
                       py: 1.5,
+                      width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
                       background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
                       boxShadow: '0 12px 28px rgba(37,99,235,0.22)',

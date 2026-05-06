@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -37,6 +37,7 @@ import {
   Link as LinkIcon,
   PlayArrow,
   Pause,
+  PlaylistAddCheck,
 } from "@mui/icons-material";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -55,6 +56,16 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { releaseAPI } from "@/services/api";
 import { useColorMode } from '@/context/ColorModeContext';
+import {
+  getAcrCloudProviderMetadata,
+  fetchAcrCloudScanResult,
+  getAcrCloudColor,
+  getAcrCloudLabel,
+  getAcrCloudRightsClaims,
+  getAcrCloudState,
+  getAcrCloudSummary,
+  stringifyAcrCloudRawResult,
+} from '@/lib/acrCloud';
 
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
@@ -71,6 +82,24 @@ const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = 
   'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
 };
 
+const formatAcrProbability = (value?: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
+  return `${value.toFixed(value >= 10 ? 0 : 1)}%`;
+};
+
+const formatAcrTime = (value?: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const mins = Math.floor(value / 60);
+  const secs = Math.round(value % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const formatAcrTimeRange = (start?: number, end?: number) => {
+  const startText = formatAcrTime(start);
+  const endText = formatAcrTime(end);
+  return startText && endText ? `${startText}-${endText}` : null;
+};
+
 export default function AdminReleaseDetailPage() {
   const router = useRouter();   
   const theme = useTheme();
@@ -84,9 +113,17 @@ export default function AdminReleaseDetailPage() {
   const [release, setRelease] = useState<any | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const acrRefreshRef = useRef<Record<string, boolean>>({});
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+
+  const mergeTrackAcrCloudStatus = (tracks: any[], fileId: string, acrCloud: any) =>
+    tracks.map((track: any) =>
+      track?.acrCloud?.fileId === fileId
+        ? { ...track, acrCloud: { ...(track.acrCloud || {}), ...acrCloud } }
+        : track
+    );
 
   const statusColor = useMemo(() => {
     if (!release?.status) return "default" as const;
@@ -131,6 +168,53 @@ export default function AdminReleaseDetailPage() {
       }
     };
   }, [releaseId]);
+
+  useEffect(() => {
+    if (!Array.isArray(release?.tracks)) return;
+
+    const pendingTracks = release.tracks.filter(
+      (track: any) =>
+        track?.acrCloud?.fileId &&
+        getAcrCloudState(track.acrCloud) === 'pending' &&
+        !acrRefreshRef.current[track.acrCloud.fileId]
+    );
+    if (!pendingTracks.length) return;
+
+    let cancelled = false;
+
+    const refreshPending = async () => {
+      for (const track of pendingTracks) {
+        if (cancelled) return;
+        acrRefreshRef.current[track.acrCloud.fileId] = true;
+
+        try {
+          const nextStatus = await fetchAcrCloudScanResult(track.acrCloud.fileId);
+          if (cancelled) return;
+
+          setRelease((prev: any) =>
+            prev
+              ? {
+                  ...prev,
+                  tracks: Array.isArray(prev.tracks)
+                    ? mergeTrackAcrCloudStatus(prev.tracks, track.acrCloud.fileId, nextStatus)
+                    : prev.tracks,
+                }
+              : prev
+          );
+        } catch {
+          // Leave pending if refresh fails.
+        } finally {
+          delete acrRefreshRef.current[track.acrCloud.fileId];
+        }
+      }
+    };
+
+    void refreshPending();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [release]);
 
   const handleApprove = async () => {
     try {
@@ -259,6 +343,196 @@ export default function AdminReleaseDetailPage() {
     );
   };
 
+  const renderAcrCloudReview = (acrCloud: any) => {
+    if (!acrCloud) return null;
+
+    const state = getAcrCloudState(acrCloud);
+    const aiDetections = Array.isArray(acrCloud.aiDetection) ? acrCloud.aiDetection : [];
+    const fingerprintMatches = Array.isArray(acrCloud.fingerprintMatches) ? acrCloud.fingerprintMatches : [];
+    const rawResult = stringifyAcrCloudRawResult(acrCloud);
+
+    return (
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 1.5,
+          p: 2,
+          borderRadius: 2,
+          bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', flexWrap: 'wrap', mb: 1.5 }}>
+          <Box>
+            <Typography variant="subtitle2" fontWeight={700}>
+              ACRCloud admin review
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Full scan payload. Visible to admins only.
+            </Typography>
+          </Box>
+          <Chip
+            size="small"
+            icon={state === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+            label={getAcrCloudLabel(acrCloud)}
+            color={getAcrCloudColor(acrCloud) as any}
+            variant="outlined"
+          />
+        </Box>
+
+        {acrCloud.lastError ? (
+          <Paper variant="outlined" sx={{ p: 1.5, mb: 1.5, borderRadius: 1.5, borderColor: 'error.main' }}>
+            <Typography variant="caption" color="error.main" fontWeight={700}>ACRCloud error</Typography>
+            <Typography variant="body2">{acrCloud.lastError}</Typography>
+          </Paper>
+        ) : null}
+
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.5 }}>
+          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
+            <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover' }}>
+              <Typography variant="caption" fontWeight={700}>AI detection</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, display: 'grid', gap: 1 }}>
+              {aiDetections.length ? aiDetections.map((item: any, idx: number) => {
+                const source = item.likelySource || item.likely_source || item.prediction || 'Unknown';
+                const probability = item.aiProbability ?? item.ai_probability;
+                const sourceProbabilities = item.sourceProbabilities || item.source_probabilities || [];
+                return (
+                  <Box key={`${source}-${idx}`} sx={{ display: 'grid', gap: 0.5 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" fontWeight={600}>{source}</Typography>
+                      <Chip size="small" label={`AI ${formatAcrProbability(probability)}`} color="warning" variant="outlined" />
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {[item.prediction, formatAcrTimeRange(item.start, item.end), item.stem].filter(Boolean).join(' | ')}
+                    </Typography>
+                    {sourceProbabilities.length ? (
+                      <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                        {sourceProbabilities.slice(0, 4).map((probabilityItem: any, probabilityIdx: number) => (
+                          <Chip
+                            key={`${probabilityItem.source || 'source'}-${probabilityIdx}`}
+                            size="small"
+                            label={`${probabilityItem.source || 'Source'} ${formatAcrProbability(probabilityItem.probability)}`}
+                            variant="outlined"
+                          />
+                        ))}
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
+              }) : (
+                <Typography variant="body2" color="text.secondary">No AI detection segments returned.</Typography>
+              )}
+            </Box>
+          </Box>
+
+          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
+            <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover' }}>
+              <Typography variant="caption" fontWeight={700}>Fingerprint, DSP and rights</Typography>
+            </Box>
+            <Box sx={{ p: 1.5, display: 'grid', gap: 1.25 }}>
+              {fingerprintMatches.length ? fingerprintMatches.map((match: any, idx: number) => {
+                const providerMetadata = getAcrCloudProviderMetadata(match.raw);
+                const rightsClaims = getAcrCloudRightsClaims(match.raw);
+                return (
+                  <Box key={`${match.acrid || match.title || 'match'}-${idx}`} sx={{ display: 'grid', gap: 0.75 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="body2" fontWeight={600}>{match.title || 'Untitled match'}</Typography>
+                      {typeof match.score === 'number' ? <Chip size="small" label={`Score ${match.score}`} color="info" variant="outlined" /> : null}
+                    </Box>
+                    <Typography variant="caption" color="text.secondary">
+                      {[match.artist, match.album, match.isrc ? `ISRC ${match.isrc}` : null, match.upc ? `UPC ${match.upc}` : null].filter(Boolean).join(' | ')}
+                    </Typography>
+
+                    {providerMetadata.length ? (
+                      <Box sx={{ display: 'grid', gap: 0.75 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          DSP / provider metadata
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                          {providerMetadata.map((provider) => (
+                            <Tooltip
+                              key={`${provider.provider}-${provider.trackId || provider.albumId || idx}`}
+                              title={[
+                                provider.isYoutube ? 'YouTube video ID. This is not a guaranteed Content ID enrollment flag.' : null,
+                                provider.trackId ? `Track ${provider.trackId}` : null,
+                                provider.albumId ? `Album ${provider.albumId}` : null,
+                                provider.artistIds.length ? `Artists ${provider.artistIds.join(', ')}` : null,
+                              ].filter(Boolean).join(' | ') || 'Provider metadata returned by ACRCloud'}
+                            >
+                              <Chip
+                                size="small"
+                                color={provider.isYoutube ? 'error' : 'default'}
+                                label={`${provider.label}${provider.trackId ? `: ${provider.trackId}` : ''}`}
+                                variant="outlined"
+                              />
+                            </Tooltip>
+                          ))}
+                        </Box>
+                      </Box>
+                    ) : null}
+
+                    {rightsClaims.length ? (
+                      <Box sx={{ display: 'grid', gap: 0.75 }}>
+                        <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                          Rights / distributor claims
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                          {rightsClaims.slice(0, 6).map((claim: any, claimIdx: number) => {
+                            const distributorName = claim?.distributor?.name || 'Distributor';
+                            const territories = Array.isArray(claim?.territories) ? claim.territories.length : 0;
+                            return (
+                              <Tooltip
+                                key={`${distributorName}-${claimIdx}`}
+                                title={[
+                                  claim?.rights_claim_policy ? `Policy ${claim.rights_claim_policy}` : null,
+                                  territories ? `${territories} territories` : null,
+                                ].filter(Boolean).join(' | ') || 'Rights claim returned by ACRCloud'}
+                              >
+                                <Chip size="small" label={distributorName} color="secondary" variant="outlined" />
+                              </Tooltip>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    ) : null}
+                  </Box>
+                );
+              }) : (
+                <Typography variant="body2" color="text.secondary">No fingerprint match returned.</Typography>
+              )}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* {rawResult ? (
+          <Box sx={{ mt: 1.5 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={700}>
+              Full raw ACRCloud response
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                mt: 0.75,
+                p: 1.5,
+                maxHeight: 320,
+                overflow: 'auto',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1.5,
+                bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.04)',
+                fontSize: 12,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}
+            >
+              {rawResult}
+            </Box>
+          </Box>
+        ) : null} */}
+      </Paper>
+    );
+  };
+
   // Render tracks table
   const renderTracks = () => {
     // Check different possible track structures
@@ -327,6 +601,23 @@ export default function AdminReleaseDetailPage() {
                     <Typography variant="caption" color="text.secondary">
                       {isrc}
                     </Typography>
+                    {track.acrCloud && (
+                      <Box sx={{ mt: 0.75, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
+                        <Chip
+                          size="small"
+                          icon={getAcrCloudState(track.acrCloud) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                          label={getAcrCloudLabel(track.acrCloud)}
+                          color={getAcrCloudColor(track.acrCloud) as any}
+                          variant="outlined"
+                        />
+                        {getAcrCloudSummary(track.acrCloud) && (
+                          <Typography variant="caption" color="text.secondary">
+                            {getAcrCloudSummary(track.acrCloud)}
+                          </Typography>
+                        )}
+                        {renderAcrCloudReview(track.acrCloud)}
+                      </Box>
+                    )}
                   </Box>
                   <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
                     {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}

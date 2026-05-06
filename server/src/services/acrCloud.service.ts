@@ -1,0 +1,387 @@
+import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import Track from '../models/track.model';
+import {
+  AcrCloudAiDetection,
+  AcrCloudDataType,
+  AcrCloudFingerprintMatch,
+  AcrCloudIdentifyResult,
+  AcrCloudScanState,
+  AcrCloudScanSummary,
+} from '../types/acrCloud';
+
+const IDENTIFY_ENDPOINT = '/v1/identify';
+const SIGNATURE_VERSION = '1';
+const MAX_IDENTIFY_BYTES = 5 * 1024 * 1024;
+
+interface AcrCloudConfig {
+  consoleToken?: string;
+  fsRegion?: string;
+  fsContainerId?: string;
+  identifyHost?: string;
+  identifyAccessKey?: string;
+  identifyAccessSecret?: string;
+}
+
+function getConfig(): AcrCloudConfig {
+  return {
+    consoleToken: process.env.ACRCLOUD_CONSOLE_TOKEN,
+    fsRegion: process.env.ACRCLOUD_FS_REGION,
+    fsContainerId: process.env.ACRCLOUD_FS_CONTAINER_ID,
+    identifyHost: process.env.ACRCLOUD_IDENTIFY_HOST,
+    identifyAccessKey: process.env.ACRCLOUD_IDENTIFY_ACCESS_KEY,
+    identifyAccessSecret: process.env.ACRCLOUD_IDENTIFY_ACCESS_SECRET,
+  };
+}
+
+function requireValue(value: string | undefined, name: string): string {
+  if (!value) {
+    throw new Error(`${name} is not configured`);
+  }
+  return value;
+}
+
+function getFsBaseUrl(region: string): string {
+  return `https://api-${region}.acrcloud.com/api`;
+}
+
+function signIdentifyRequest(
+  accessSecret: string,
+  accessKey: string,
+  dataType: AcrCloudDataType,
+  timestamp: string
+): string {
+  const stringToSign = ['POST', IDENTIFY_ENDPOINT, accessKey, dataType, SIGNATURE_VERSION, timestamp].join('\n');
+  return crypto.createHmac('sha1', accessSecret).update(Buffer.from(stringToSign, 'utf8')).digest('base64');
+}
+
+function mapScanState(state: unknown): AcrCloudScanState {
+  if (state === 0 || state === '0') return 'pending';
+  if (state === 1 || state === '1') return 'ready';
+  if (state === -1 || state === '-1') return 'no_results';
+  if (state === -2 || state === '-2' || state === -3 || state === '-3') return 'error';
+  return 'pending';
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeAiDetection(results: any): AcrCloudAiDetection[] {
+  const detections = Array.isArray(results?.ai_detection) ? results.ai_detection : [];
+
+  return detections.map((item: any) => ({
+    start: toNumber(item.start),
+    end: toNumber(item.end),
+    prediction: item.prediction || '',
+    likelySource: item.likely_source || item.likelySource || '',
+    aiProbability: toNumber(item.ai_probability ?? item.aiProbability),
+    duration: toNumber(item.duration),
+    stem: item.stem,
+    sourceProbabilities: Array.isArray(item.source_probabilities)
+      ? item.source_probabilities.map((source: any) => ({
+          source: source.source || '',
+          probability: toNumber(source.probability),
+        }))
+      : [],
+    segments: Array.isArray(item.segments)
+      ? item.segments.map((segment: any) => ({
+          start: toNumber(segment.start),
+          end: toNumber(segment.end),
+          prediction: segment.prediction || '',
+          likelySource: segment.likely_source || segment.likelySource || '',
+          aiProbability: toNumber(segment.ai_probability ?? segment.aiProbability),
+        }))
+      : undefined,
+  }));
+}
+
+function extractTextList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item)).filter(Boolean);
+}
+
+function normalizeFingerprintMatches(results: any): AcrCloudFingerprintMatch[] {
+  const musicMatches = Array.isArray(results?.music) ? results.music : [];
+  const customMatches = Array.isArray(results?.custom_files) ? results.custom_files : [];
+  const rawMatches = [...musicMatches, ...customMatches];
+
+  return rawMatches.map((item: any) => {
+    const result = item.result || item;
+    const externalIds = result.external_ids || {};
+    const artists = extractTextList(result.artists?.map?.((artist: any) => artist?.name) || result.artist);
+
+    return {
+      score: toOptionalNumber(item.score ?? result.score),
+      title: result.title || result.name,
+      artist: artists.join(', ') || undefined,
+      album: result.album?.name,
+      isrc: externalIds.isrc,
+      upc: externalIds.upc,
+      acrid: result.acrid,
+      raw: item,
+    };
+  });
+}
+
+export function normalizeScanPayload(payload: any): AcrCloudScanSummary {
+  const root = Array.isArray(payload) ? payload[0] : payload;
+  const payloadData = root?.data;
+  const data = Array.isArray(payloadData) ? payloadData[0] : payloadData || root;
+  const results = data?.results || root?.results || {};
+
+  return {
+    fileId: data?.id || root?.file_id,
+    state: mapScanState(data?.state ?? root?.state),
+    aiDetection: normalizeAiDetection(results),
+    fingerprintMatches: normalizeFingerprintMatches(results),
+    rawResult: root,
+  };
+}
+
+async function postMultipart(
+  url: string,
+  filePath: string,
+  fields: Record<string, string | number>,
+  headers: Record<string, string> = {},
+  binaryField = 'file'
+): Promise<any> {
+  const buffer = await fs.readFile(filePath);
+  const form = new FormData();
+  form.append(binaryField, new Blob([new Uint8Array(buffer)]), path.basename(filePath));
+
+  Object.entries(fields).forEach(([key, value]) => {
+    form.append(key, String(value));
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : {};
+
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || `ACRCloud request failed with ${response.status}`);
+  }
+
+  return payload;
+}
+
+export function isAcrCloudFileScanningConfigured(): boolean {
+  const config = getConfig();
+  return Boolean(config.consoleToken && config.fsRegion && config.fsContainerId);
+}
+
+export function isAcrCloudIdentifyConfigured(): boolean {
+  const config = getConfig();
+  return Boolean(config.identifyHost && config.identifyAccessKey && config.identifyAccessSecret);
+}
+
+export async function identifyAudioFile(filePath: string, dataType: 'audio' | 'fingerprint' = 'audio'): Promise<AcrCloudIdentifyResult> {
+  const config = getConfig();
+  const host = requireValue(config.identifyHost, 'ACRCLOUD_IDENTIFY_HOST');
+  const accessKey = requireValue(config.identifyAccessKey, 'ACRCLOUD_IDENTIFY_ACCESS_KEY');
+  const accessSecret = requireValue(config.identifyAccessSecret, 'ACRCLOUD_IDENTIFY_ACCESS_SECRET');
+  const stats = await fs.stat(filePath);
+
+  if (stats.size > MAX_IDENTIFY_BYTES) {
+    throw new Error('ACRCloud identify sample must be below 5MB');
+  }
+
+  const timestamp = String(Date.now() / 1000);
+  const signature = signIdentifyRequest(accessSecret, accessKey, dataType, timestamp);
+  console.log('[ACRCloud] Identify request starting', {
+    host,
+    dataType,
+    sampleBytes: stats.size,
+  });
+  const payload = await postMultipart(`https://${host}${IDENTIFY_ENDPOINT}`, filePath, {
+    access_key: accessKey,
+    sample_bytes: stats.size,
+    timestamp,
+    signature,
+    data_type: dataType,
+    signature_version: SIGNATURE_VERSION,
+  }, {}, 'sample');
+
+  const result = {
+    statusCode: payload?.status?.code,
+    statusMessage: payload?.status?.msg,
+    raw: payload,
+    fingerprintMatches: normalizeFingerprintMatches(payload?.metadata || payload?.results || payload),
+  };
+  console.log('[ACRCloud] Identify request completed', {
+    statusCode: result.statusCode,
+    statusMessage: result.statusMessage,
+    fingerprintMatches: result.fingerprintMatches.length,
+  });
+  return result;
+}
+
+export async function uploadFileForScan(filePath: string, name?: string, dataType: AcrCloudDataType = 'audio'): Promise<AcrCloudScanSummary> {
+  const config = getConfig();
+  const token = requireValue(config.consoleToken, 'ACRCLOUD_CONSOLE_TOKEN');
+  const region = requireValue(config.fsRegion, 'ACRCLOUD_FS_REGION');
+  const containerId = requireValue(config.fsContainerId, 'ACRCLOUD_FS_CONTAINER_ID');
+  const url = `${getFsBaseUrl(region)}/fs-containers/${containerId}/files`;
+
+  console.log('[ACRCloud] File scan upload starting', {
+    region,
+    containerId,
+    name,
+    dataType,
+  });
+  const payload = await postMultipart(
+    url,
+    filePath,
+    {
+      data_type: dataType,
+      ...(name ? { name } : {}),
+    },
+    {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    }
+  );
+
+  const scan = normalizeScanPayload(payload);
+  console.log('[ACRCloud] File scan upload completed', {
+    fileId: scan.fileId,
+    state: scan.state,
+    aiDetections: scan.aiDetection.length,
+    fingerprintMatches: scan.fingerprintMatches.length,
+  });
+  return scan;
+}
+
+export async function getScanResult(fileId: string): Promise<AcrCloudScanSummary> {
+  const config = getConfig();
+  const token = requireValue(config.consoleToken, 'ACRCLOUD_CONSOLE_TOKEN');
+  const region = requireValue(config.fsRegion, 'ACRCLOUD_FS_REGION');
+  const containerId = requireValue(config.fsContainerId, 'ACRCLOUD_FS_CONTAINER_ID');
+  const url = `${getFsBaseUrl(region)}/fs-containers/${containerId}/files/${fileId}`;
+
+  console.log('[ACRCloud] Scan result fetch starting', { fileId, region, containerId });
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : {};
+
+  if (!response.ok) {
+    throw new Error(payload?.message || payload?.error || `ACRCloud scan result failed with ${response.status}`);
+  }
+
+  const scan = normalizeScanPayload(payload);
+  console.log('[ACRCloud] Scan result fetch completed', {
+    fileId: scan.fileId || fileId,
+    state: scan.state,
+    aiDetections: scan.aiDetection.length,
+    fingerprintMatches: scan.fingerprintMatches.length,
+  });
+  return scan;
+}
+
+export async function startTrackAcrCloudScan(trackId: string, audioPath: string, name: string): Promise<void> {
+  if (!isAcrCloudFileScanningConfigured()) {
+    console.warn('[ACRCloud] Track scan skipped: file scanning is not configured', {
+      trackId,
+      requiredEnv: ['ACRCLOUD_CONSOLE_TOKEN', 'ACRCLOUD_FS_REGION', 'ACRCLOUD_FS_CONTAINER_ID'],
+    });
+    await Track.findByIdAndUpdate(trackId, {
+      'acrCloud.scanState': 'not_configured',
+      'acrCloud.lastError': 'ACRCloud file scanning is not configured',
+      'acrCloud.checkedAt': new Date(),
+    });
+    return;
+  }
+
+  try {
+    console.log('[ACRCloud] Track scan starting', { trackId, name, audioPath });
+    await Track.findByIdAndUpdate(trackId, {
+      'acrCloud.scanState': 'pending',
+      'acrCloud.lastError': undefined,
+      'acrCloud.checkedAt': new Date(),
+    });
+
+    const scan = await uploadFileForScan(audioPath, name, 'audio');
+    await Track.findByIdAndUpdate(trackId, {
+      'acrCloud.fileId': scan.fileId,
+      'acrCloud.scanState': scan.state,
+      'acrCloud.aiDetection': scan.aiDetection,
+      'acrCloud.fingerprintMatches': scan.fingerprintMatches,
+      'acrCloud.rawResult': scan.rawResult,
+      'acrCloud.checkedAt': new Date(),
+    });
+    console.log('[ACRCloud] Track scan stored', {
+      trackId,
+      fileId: scan.fileId,
+      state: scan.state,
+    });
+  } catch (error) {
+    console.error('[ACRCloud] Track scan failed', {
+      trackId,
+      name,
+      error: error instanceof Error ? error.message : error,
+    });
+    await Track.findByIdAndUpdate(trackId, {
+      'acrCloud.scanState': 'error',
+      'acrCloud.lastError': error instanceof Error ? error.message : 'ACRCloud scan failed',
+      'acrCloud.checkedAt': new Date(),
+    });
+  }
+}
+
+export async function persistScanResult(fileId: string, scan: AcrCloudScanSummary): Promise<void> {
+  console.log('[ACRCloud] Persisting scan result', {
+    fileId,
+    state: scan.state,
+    aiDetections: scan.aiDetection.length,
+    fingerprintMatches: scan.fingerprintMatches.length,
+  });
+  await Track.findOneAndUpdate(
+    { 'acrCloud.fileId': fileId },
+    {
+      'acrCloud.scanState': scan.state,
+      'acrCloud.aiDetection': scan.aiDetection,
+      'acrCloud.fingerprintMatches': scan.fingerprintMatches,
+      'acrCloud.rawResult': scan.rawResult,
+      'acrCloud.lastError': undefined,
+      'acrCloud.checkedAt': new Date(),
+    }
+  );
+
+  const releasesCollection = Track.db.db?.collection('releases');
+  if (releasesCollection) {
+    await releasesCollection.updateMany(
+      { 'tracks.acrCloud.fileId': fileId },
+      {
+        $set: {
+          'tracks.$[track].acrCloud.scanState': scan.state,
+          'tracks.$[track].acrCloud.state': scan.state,
+          'tracks.$[track].acrCloud.aiDetection': scan.aiDetection,
+          'tracks.$[track].acrCloud.fingerprintMatches': scan.fingerprintMatches,
+          'tracks.$[track].acrCloud.rawResult': scan.rawResult,
+          'tracks.$[track].acrCloud.checkedAt': new Date().toISOString(),
+          updatedAt: new Date(),
+        },
+        $unset: {
+          'tracks.$[track].acrCloud.lastError': '',
+        },
+      },
+      {
+        arrayFilters: [{ 'track.acrCloud.fileId': fileId }],
+      }
+    );
+  }
+}

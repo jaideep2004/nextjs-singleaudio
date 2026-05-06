@@ -30,6 +30,7 @@ A full-stack music distribution platform for artists and admins. The project com
 - MongoDB models for users, tracks, royalties, payouts, notifications, settings, rights, territories, and audit logs
 - Audio file upload handling with Multer
 - Audio analysis support via `ffmpeg` / `ffprobe`
+- ACRCloud hooks for AI music detection, fingerprint matching, and identification
 - Pluggable storage provider structure
 - Store integration scaffolding for Spotify, Apple Music, and YouTube Content ID
 
@@ -154,6 +155,15 @@ FFPROBE_PATH=C:\path\to\ffprobe.exe
 
 # Optional if you use generated media URLs
 API_URL=http://localhost:5000
+
+# Optional ACRCloud integration
+ACRCLOUD_CONSOLE_TOKEN=
+ACRCLOUD_FS_REGION=eu-west-1
+ACRCLOUD_FS_CONTAINER_ID=
+ACRCLOUD_IDENTIFY_HOST=
+ACRCLOUD_IDENTIFY_ACCESS_KEY=
+ACRCLOUD_IDENTIFY_ACCESS_SECRET=
+ACRCLOUD_CALLBACK_SECRET=
 
 # Optional storage provider config
 STORAGE_PROVIDER=s3

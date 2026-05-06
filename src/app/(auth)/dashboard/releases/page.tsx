@@ -11,7 +11,8 @@ import {
   ListItemText, 
   Divider,
   Avatar,
-  Tooltip
+  Tooltip,
+  Chip
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -26,7 +27,7 @@ import {
   faFacebook,
   faInstagram
 } from '@fortawesome/free-brands-svg-icons';
-import { Store } from '@mui/icons-material';
+import { PlaylistAddCheck, Store } from '@mui/icons-material';
 
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
@@ -41,6 +42,41 @@ const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = 
   'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
   'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
   'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
+};
+
+const getAcrCloudState = (acrCloud?: any) => acrCloud?.scanState || acrCloud?.state;
+
+const getAcrCloudLabel = (acrCloud?: any) => {
+  switch (getAcrCloudState(acrCloud)) {
+    case 'pending':
+      return 'ACR testing';
+    case 'ready':
+      return 'ACR passed';
+    case 'no_results':
+      return 'ACR no match';
+    case 'error':
+      return 'ACR error';
+    case 'not_configured':
+      return 'ACR off';
+    default:
+      return 'ACR queued';
+  }
+};
+
+const getAcrCloudColor = (acrCloud?: any) => {
+  switch (getAcrCloudState(acrCloud)) {
+    case 'ready':
+    case 'no_results':
+      return 'success';
+    case 'pending':
+      return 'warning';
+    case 'error':
+      return 'error';
+    case 'not_configured':
+      return 'default';
+    default:
+      return 'info';
+  }
 };
 
 export default function ReleasesPage() {
@@ -171,6 +207,21 @@ export default function ReleasesPage() {
                       <>
                         <span>Artist: {release.primaryArtist || 'N/A'} | Type: {release.releaseType} | Date: {release.releaseDate?.slice(0,10) || 'N/A'}</span><br/>
                         <span>Tracks: {release.tracks?.length || 0} | DSPs: {renderDSPChips(release.stores || [])}</span>
+                        {Array.isArray(release.tracks) && release.tracks.some((track: any) => track?.acrCloud) && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mt: 1 }}>
+                            {release.tracks.map((track: any, trackIdx: number) => track?.acrCloud ? (
+                              <Tooltip key={trackIdx} title={track.acrCloud.lastError || `${track.title || `Track ${trackIdx + 1}`} ACRCloud verification`}>
+                                <Chip
+                                  size="small"
+                                  icon={getAcrCloudState(track.acrCloud) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                                  label={`${track.title || `Track ${trackIdx + 1}`}: ${getAcrCloudLabel(track.acrCloud)}`}
+                                  color={getAcrCloudColor(track.acrCloud) as any}
+                                  variant="outlined"
+                                />
+                              </Tooltip>
+                            ) : null)}
+                          </Box>
+                        )}
                       </>
                     }
                   />

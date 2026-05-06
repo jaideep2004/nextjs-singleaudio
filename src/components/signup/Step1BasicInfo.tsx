@@ -18,6 +18,7 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import { SignupFormValues } from '@/app/(public)/signup/types';
+import { fieldSx, formSectionSx, sectionCaptionSx, sectionTitleSx } from './styles';
 
 export interface Step1Props {
   control: Control<SignupFormValues>;
@@ -25,31 +26,17 @@ export interface Step1Props {
   isSubmitting: boolean;
 }
 
-const fieldSx = {
-  '& .MuiOutlinedInput-root': {
-    minHeight: 60,
-    borderRadius: '18px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.12)' },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.25)' },
-    '&.Mui-focused fieldset': { borderColor: '#4a6cf7' },
-  },
-  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#4a6cf7' },
-  '& .MuiInputBase-input': { color: '#f8fafc' },
-};
-
 export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={2.5} sx={formSectionSx}>
       <Box>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: '#f8fafc', mb: 0.5 }}>
+        <Typography variant="h6" sx={sectionTitleSx}>
           Basic Information
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <Typography variant="body2" sx={sectionCaptionSx}>
           Set up your account credentials
         </Typography>
       </Box>
