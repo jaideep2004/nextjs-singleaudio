@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {connectToDatabase} from '@/utils/mongodb';
+import { connectToDatabase } from '@/utils/mongodb';
+import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
+import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 
 function randomDigits(count: number) {
   let out = '';
@@ -18,18 +20,24 @@ function generateUpcA(): string {
   return `${base11}${check}`;
 }
 
-// ISRC: CC + XXX + YY + NNNNN (2 letters, 3 alnum, 2 digits year, 5 digits).
-function generateIsrc(prefixCountry = 'IN', registrant = 'GDS'): string {
-  const yy = String(new Date().getFullYear()).slice(-2);
-  const serial = randomDigits(5);
-  const reg = registrant.toUpperCase().replace(/[^A-Z0-9]/g, '').padEnd(3, '0').slice(0, 3);
-  const cc = prefixCountry.toUpperCase().replace(/[^A-Z]/g, '').padEnd(2, 'X').slice(0, 2);
-  return `${cc}${reg}${yy}${serial}`;
+function getClientKey(req: NextRequest) {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown'
+  );
 }
 
 // POST: Save a new release
 export async function POST(req: NextRequest) { 
   try {
+    const { db } = await connectToDatabase();
+    await enforceMongoRateLimit(db, {
+      key: `POST:/api/releases:${getClientKey(req)}`,
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+
     const body = await req.json();
     const autoGenerateCodes = body?.autoGenerateCodes === true;
 
@@ -37,18 +45,21 @@ export async function POST(req: NextRequest) {
       if (!body.upc || String(body.upc).trim() === '') {
         body.upc = generateUpcA();
       }
-
-      if (Array.isArray(body.tracks)) {
-        body.tracks = body.tracks.map((track: any) => {
-          const next = { ...track };
-          if (!next.upc || String(next.upc).trim() === '') next.upc = body.upc;
-          if (!next.isrc || String(next.isrc).trim() === '') next.isrc = generateIsrc();
-          return next;
-        });
-      }
     }
 
-    const { db } = await connectToDatabase();
+    if (Array.isArray(body.tracks)) {
+      const tracksWithUpc = body.tracks.map((track: any) => {
+        const next = { ...track };
+        if (autoGenerateCodes && (!next.upc || String(next.upc).trim() === '')) next.upc = body.upc;
+        return next;
+      });
+
+      body.tracks = await assignIsrcsToTracks(db, tracksWithUpc, {
+        releaseTitle: body.releaseTitle,
+        source: 'release',
+      });
+    }
+
     // Insert the release into the 'releases' collection
     const result = await db.collection('releases').insertOne({
       ...body,
@@ -56,20 +67,29 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date(),
       status: 'pending',
     });
+    await markIsrcsAssigned(
+      db,
+      Array.isArray(body.tracks) ? body.tracks.map((track: any) => track.isrc).filter(Boolean) : [],
+      result.insertedId.toString()
+    );
+
     return NextResponse.json({ success: true, id: result.insertedId });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to save release';
+    const status = error instanceof RateLimitError ? error.statusCode : 500;
+    return NextResponse.json({ success: false, error: message }, { status });
   }
 }
 
 // GET: Fetch all releases (admin/user dashboard)
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const { db } = await connectToDatabase();
     const releases = await db.collection('releases').find({}).sort({ createdAt: -1 }).toArray();
     return NextResponse.json({ success: true, releases });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch releases';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
 

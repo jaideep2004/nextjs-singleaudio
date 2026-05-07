@@ -10,6 +10,7 @@ import { getFileUrl, deleteFile } from '../utils/fileUpload';
 import { ReleaseStatus, TRACKS_DIR, ARTWORK_DIR, UserRole } from '../config/constants';
 import * as notificationService from '../services/notification.service';
 import { startTrackAcrCloudScan } from '../services/acrCloud.service';
+import { assignTrackIsrc, markTrackIsrcAssigned, normalizeIsrc } from '../services/isrc.service';
 
 /**
  * Upload a new track
@@ -57,6 +58,11 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
       console.error('Audio analysis failed:', err);
     }
 
+    const assignedIsrc = await assignTrackIsrc(isrc, {
+      trackTitle: title,
+      releaseTitle: title,
+    });
+
     // Create track
     const track = await Track.create({
       title,
@@ -64,7 +70,7 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
       artistName: user.artistName || user.name,
       genre,
       releaseDate,
-      isrc,
+      isrc: assignedIsrc,
       audioFile,
       artwork,
       stores: JSON.parse(stores),
@@ -80,6 +86,7 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
         checkedAt: new Date()
       }
     });
+    await markTrackIsrcAssigned(assignedIsrc, track._id.toString());
 
     void startTrackAcrCloudScan(track._id.toString(), audioPath, title);
 
@@ -220,11 +227,28 @@ export const updateTrack = async (req: AuthRequest, res: Response): Promise<void
       throw new ApiError('Cannot update an approved track', 400);
     }
 
+    let assignedIsrc: string | null = null;
+
+    if (typeof isrc === 'string' && isrc.trim()) {
+      const normalizedIsrc = normalizeIsrc(isrc);
+      if (track.isrc !== normalizedIsrc) {
+        assignedIsrc = await assignTrackIsrc(normalizedIsrc, {
+          trackTitle: title || track.title,
+          releaseTitle: title || track.title,
+        });
+      }
+    } else if (!track.isrc) {
+      assignedIsrc = await assignTrackIsrc(undefined, {
+        trackTitle: title || track.title,
+        releaseTitle: title || track.title,
+      });
+    }
+
     // Update track fields
     if (title) track.title = title;
     if (genre) track.genre = genre;
     if (releaseDate) track.releaseDate = new Date(releaseDate);
-    if (isrc) track.isrc = isrc;
+    if (assignedIsrc) track.isrc = assignedIsrc;
     if (stores) track.stores = JSON.parse(stores);
 
     // If track was rejected, set it back to pending when updated
@@ -234,6 +258,7 @@ export const updateTrack = async (req: AuthRequest, res: Response): Promise<void
     }
 
     await track.save();
+    if (assignedIsrc) await markTrackIsrcAssigned(assignedIsrc, track._id.toString());
 
     // Generate file URLs
     const audioUrl = getFileUrl(track.audioFile, 'audio');

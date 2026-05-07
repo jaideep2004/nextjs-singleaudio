@@ -72,6 +72,20 @@ const API_BASE = (
 )
   .replace(/\/+$/, '')
   .replace(/\/api$/, '') + '/api';
+const VERCEL_FUNCTION_UPLOAD_LIMIT_BYTES = 4.5 * 1024 * 1024;
+const VERCEL_FUNCTION_UPLOAD_SAFE_BYTES = 4.3 * 1024 * 1024;
+const isVercelFunctionUploadTarget =
+  typeof window !== 'undefined' && /^https:\/\/[^/]+\.vercel\.app\/api$/.test(API_BASE);
+
+const assertVercelUploadSize = (file: File, type: 'artwork' | 'audio') => {
+  if (!isVercelFunctionUploadTarget || file.size <= VERCEL_FUNCTION_UPLOAD_SAFE_BYTES) return;
+
+  const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+  const limitMb = (VERCEL_FUNCTION_UPLOAD_LIMIT_BYTES / (1024 * 1024)).toFixed(1);
+  throw new Error(
+    `${type === 'audio' ? 'Audio' : 'Artwork'} file is ${sizeMb}MB. Vercel Functions only accept about ${limitMb}MB request bodies. Upload via direct storage or deploy the Express upload server on a non-serverless Node host.`
+  );
+};
 
 type AcrCloudUploadState = AcrCloudStatusLike;
 
@@ -82,6 +96,7 @@ const resizeList = <T,>(items: T[], length: number, fallback: T): T[] => {
 };
 
 async function uploadArtworkToServer(file: File): Promise<{ url: string; filename: string }> {
+  assertVercelUploadSize(file, 'artwork');
   const fd = new FormData();
   fd.append('artwork', file);
   const token = Cookies.get('token');
@@ -102,6 +117,7 @@ async function uploadAudioToServer(
   file: File,
   onProgress?: (percent: number) => void
 ): Promise<{ url: string; filename: string; acrCloud?: AcrCloudUploadState }> {
+  assertVercelUploadSize(file, 'audio');
   const fd = new FormData();
   fd.append('audio', file);
   const token = Cookies.get('token');
@@ -1350,7 +1366,7 @@ export default function UploadPage() {
                         onChange={(e) => setAutoGenerateCodes(e.target.checked)}
                       />
                     }
-                    label="Auto-generate UPC & ISRC by system (recommended)"
+                    label="Auto-generate UPC. Blank ISRCs are always assigned by system."
                   />
                 </Grid>
               </Grid>
@@ -1920,7 +1936,13 @@ export default function UploadPage() {
                       <Box>
                         <Typography variant="overline" sx={{ color: 'text.secondary' }}>Identifiers</Typography>
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
-                          <TextField label="ISRC" fullWidth value={trackInfos[selectedTrackIdx]?.isrc || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)} helperText="Leave blank for auto assign by system" />
+                          <TextField
+                            label="ISRC"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.isrc || ''}
+                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)}
+                            helperText="Leave blank for IN-9SN yearly sequence assignment."
+                          />
                           <TextField label="UPC" fullWidth value={trackInfos[selectedTrackIdx]?.upc || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'upc', e.target.value)} helperText="Leave blank for auto assign by system" />
                         </Box>
                       </Box>

@@ -32,8 +32,8 @@ export const createTrackValidator = [
   body('isrc')
     .optional()
     .trim()
-    .isLength({ max: 15 })
-    .withMessage('ISRC cannot be more than 15 characters'),
+    .isLength({ max: 24 })
+    .withMessage('ISRC cannot be more than 24 characters'),
   body('upc')
     .optional()
     .trim()
@@ -121,8 +121,8 @@ export const updateTrackValidator = [
   body('isrc')
     .optional()
     .trim()
-    .isLength({ max: 15 })
-    .withMessage('ISRC cannot be more than 15 characters'),
+    .isLength({ max: 24 })
+    .withMessage('ISRC cannot be more than 24 characters'),
   body('upc')
     .optional()
     .trim()
@@ -184,8 +184,8 @@ export const updateTrackValidator = [
   body('isrc')
     .optional()
     .trim()
-    .isLength({ max: 15 })
-    .withMessage('ISRC cannot be more than 15 characters'),
+    .isLength({ max: 24 })
+    .withMessage('ISRC cannot be more than 24 characters'),
     
   body('stores')
     .optional()
