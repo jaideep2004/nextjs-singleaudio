@@ -9,7 +9,7 @@ function normalizeRssEmail(email: string): string {
 /**
  * Comma- or semicolon-separated emails that own the RSS.com API key / workspace.
  * Those users bypass per-tenant ownership: list all podcasts, open any podcast’s episodes/uploads.
- * Example: RSS_WORKSPACE_SUPERVISOR_EMAILS=shekhtabrej@karharimedia.com
+ * Example: RSS_WORKSPACE_SUPERVISOR_EMAILS=admin@singleaudio.com
  */
 export function getRssWorkspaceSupervisorEmails(): Set<string> {
   const raw = process.env.RSS_WORKSPACE_SUPERVISOR_EMAILS ?? '';

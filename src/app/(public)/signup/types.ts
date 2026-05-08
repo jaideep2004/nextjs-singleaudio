@@ -40,6 +40,12 @@ export type SignupFormValues = {
     facebook: string;
     youtube: string;
   };
+
+  // Step 4 - Verification routing
+  verificationPhoneNumber: string;
+  mobileVerificationProvider: 'surepass' | 'sandbox' | 'manual';
+  kycProvider: 'surepass' | 'sandbox' | 'manual';
+  kycConsent: boolean;
 };
 
 export const defaultSignupValues: SignupFormValues = {
@@ -77,10 +83,13 @@ export const defaultSignupValues: SignupFormValues = {
     facebook: '',
     youtube: '',
   },
+  verificationPhoneNumber: '',
+  mobileVerificationProvider: 'surepass',
+  kycProvider: 'surepass',
+  kycConsent: false,
 };
 
 export const SIGNUP_STEPS = [
   { label: 'Basic Info' },
   { label: 'Account Type' },
-  { label: 'Details' },
 ];

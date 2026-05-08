@@ -28,6 +28,7 @@ import {
   Snackbar,
   useTheme,
   useMediaQuery,
+  MenuItem,
 } from '@mui/material';
 import { 
   Search, 
@@ -36,12 +37,15 @@ import {
   PersonAdd, 
   Visibility,
   Block,
-  CheckCircle
+  CheckCircle,
+  VerifiedUser,
+  Cancel,
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 interface AdminUser {
   _id: string;
@@ -51,6 +55,10 @@ interface AdminUser {
   artistName?: string;
   isActive: boolean;
   createdAt: string;
+  verification?: {
+    status?: 'pending' | 'submitted' | 'approved' | 'rejected';
+    rejectionReason?: string;
+  };
 }
 
 interface AdminUsersResponseData {
@@ -86,6 +94,8 @@ export default function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'success' });
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [kycFilter, setKycFilter] = useState('');
+  const [reviewingKyc, setReviewingKyc] = useState<string | null>(null);
 
   // Set mounted state to true after component mounts
   useEffect(() => {
@@ -108,6 +118,7 @@ export default function AdminUsersPage() {
         page: page + 1,
         limit: rowsPerPage,
         search: searchTerm,
+        status: kycFilter,
       });
 
       if (response.success && response.data) {
@@ -133,7 +144,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, searchTerm]);
+  }, [page, rowsPerPage, searchTerm, kycFilter]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -170,6 +181,11 @@ export default function AdminUsersPage() {
   const handleDeleteClick = (selectedUser: AdminUser) => {
     setUserToDelete(selectedUser);
     setDeleteDialogOpen(true);
+  };
+
+  const handleKycFilter = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setKycFilter(event.target.value);
+    setPage(0);
   };
 
   const handleDeleteConfirm = async () => {
@@ -219,6 +235,39 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleKycReview = async (selectedUser: AdminUser, status: 'approved' | 'rejected') => {
+    try {
+      setReviewingKyc(selectedUser._id);
+      const response = await adminAPI.reviewUserVerification(selectedUser._id, {
+        status,
+        rejectionReason: status === 'rejected' ? 'KYC details need correction. Please resubmit with valid information.' : undefined,
+      });
+
+      if (response.success) {
+        showSnackbar(`KYC ${status} successfully`, 'success');
+        void fetchUsers();
+      } else {
+        showSnackbar(response.message || 'Failed to update KYC', 'error');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update KYC';
+      showSnackbar(message, 'error');
+    } finally {
+      setReviewingKyc(null);
+    }
+  };
+
+  const getKycChip = (status?: string) => {
+    const normalized = status || 'pending';
+    const color =
+      normalized === 'approved' ? 'success' :
+      normalized === 'rejected' ? 'error' :
+      normalized === 'submitted' ? 'warning' :
+      'info';
+
+    return <Chip label={normalized} color={color as any} size="small" sx={{ height: 22, fontSize: '0.7rem', minWidth: 76 }} />;
+  };
+
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -259,60 +308,68 @@ export default function AdminUsersPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-        <Typography
-          variant={isMobile ? "h5" : "h4"}
-          component="h1"
-          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-        >
-          User Management
-        </Typography>
-        <Button 
+      <PremiumHeader
+        eyebrow="Admin"
+        title="User Management"
+        description="Review artists, labels, KYC state, access rights, and account health from one command surface."
+        action={<Button 
           variant="contained" 
           startIcon={<PersonAdd />} 
           onClick={handleCreateUser}
           size={isMobile ? "small" : "medium"}
         >
           {isMobile ? "Add" : "Add New User"}
-        </Button>
-      </Box>
+        </Button>}
+      />
 
       <Paper 
         sx={{ 
           p: 2, 
           mb: 3,
-          borderRadius: 2,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+          ...premiumSurfaceSx(theme),
         }}
       >
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Search users by name, email, or artist name..."
-          value={searchTerm}
-          onChange={handleSearch}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              '& fieldset': {
-                borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 220px' }, gap: 2 }}>
+          <TextField
+            fullWidth
+            variant="outlined"
+            placeholder="Search users by name, email, or artist name..."
+            value={searchTerm}
+            onChange={handleSearch}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+                },
+                '&:hover fieldset': {
+                  borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+                },
               },
-              '&:hover fieldset': {
-                borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-              },
-              '&.Mui-focused fieldset': {
-                borderColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
-              },
-            },
-          }}
-        />
+            }}
+          />
+          <TextField
+            select
+            label="KYC status"
+            value={kycFilter}
+            onChange={handleKycFilter}
+          >
+            <MenuItem value="">All KYC</MenuItem>
+            <MenuItem value="pending">Pending</MenuItem>
+            <MenuItem value="submitted">Submitted</MenuItem>
+            <MenuItem value="approved">Approved</MenuItem>
+            <MenuItem value="rejected">Rejected</MenuItem>
+          </TextField>
+        </Box>
       </Paper>
 
       <TableContainer 
@@ -329,6 +386,7 @@ export default function AdminUsersPage() {
               <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>KYC</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
               <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
               <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
@@ -337,14 +395,14 @@ export default function AdminUsersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                   <CircularProgress size={24} sx={{ mr: 2 }} />
                   Loading users...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
                   <Typography variant="body2" color="text.secondary">
                     No users found. Try adjusting your search.
                   </Typography>
@@ -404,6 +462,9 @@ export default function AdminUsersPage() {
                         minWidth: 60
                       }}
                     />
+                  </TableCell>
+                  <TableCell>
+                    {getKycChip(user.verification?.status)}
                   </TableCell>
                   <TableCell>
                     <Chip
@@ -468,6 +529,34 @@ export default function AdminUsersPage() {
                         )}
                       </IconButton>
                     </Tooltip>
+                    {user.role !== 'admin' && (
+                      <>
+                        <Tooltip title="Approve KYC">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleKycReview(user, 'approved')}
+                              disabled={reviewingKyc === user._id || user.verification?.status === 'approved'}
+                              sx={{ mr: 0.5, color: mode === 'dark' ? '#4ade80' : '#16a34a' }}
+                            >
+                              {reviewingKyc === user._id ? <CircularProgress size={16} /> : <VerifiedUser fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Reject KYC">
+                          <span>
+                            <IconButton
+                              size="small"
+                              onClick={() => handleKycReview(user, 'rejected')}
+                              disabled={reviewingKyc === user._id || user.verification?.status === 'rejected'}
+                              sx={{ mr: 0.5, color: mode === 'dark' ? '#f87171' : '#dc2626' }}
+                            >
+                              <Cancel fontSize="small" />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      </>
+                    )}
                     <Tooltip title="Delete User">
                       <IconButton 
                         size="small" 

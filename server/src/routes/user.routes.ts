@@ -66,6 +66,18 @@ router.put(
 );
 
 /**
+ * @route   PATCH /api/users/:id/verification
+ * @desc    Review user KYC verification
+ * @access  Private (Admin)
+ */
+router.patch(
+  '/:id/verification',
+  protect,
+  authorize([UserRole.ADMIN]),
+  userController.reviewUserVerification
+);
+
+/**
  * @route   DELETE /api/users/:id
  * @desc    Delete user
  * @access  Private (Admin)

@@ -30,9 +30,10 @@ import {
   DialogContentText,
 } from '@mui/material';
 import { Search, CheckCircle, Cancel, MonetizationOn } from '@mui/icons-material';
-import { payoutAPI } from '@/services/api';
+import { adminAPI, payoutAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 export default function AdminPayoutsPage() {
   const router = useRouter();
@@ -70,11 +71,17 @@ export default function AdminPayoutsPage() {
         params.status = statusFilter;
       }
 
-      const response = await payoutAPI.getPayouts(params);
+      const response = await adminAPI.getPayouts(params);
 
       if (response.success && response.data) {
-        setPayouts(Array.isArray(response.data.payouts) ? response.data.payouts : []);
-        setTotalPayouts(response.data.total || 0);
+        const payoutData = response.data as any;
+        const payoutRows = Array.isArray(payoutData)
+          ? payoutData
+          : Array.isArray(payoutData.payouts)
+            ? payoutData.payouts
+            : [];
+        setPayouts(payoutRows);
+        setTotalPayouts(payoutData.total || payoutRows.length);
       }
     } catch (error) {
       console.error('Error fetching payouts:', error);
@@ -182,20 +189,13 @@ export default function AdminPayoutsPage() {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-        >
-          Payout Management
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Review and process artist payouts
-        </Typography>
-      </Box>
+      <PremiumHeader
+        eyebrow="Finance Ops"
+        title="Payout Management"
+        description="Review payout requests, approve clean payments, reject exceptions, and keep balances auditable."
+      />
 
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2 }}>
+      <Paper sx={{ ...premiumSurfaceSx({ palette: { mode } } as any), p: 2, mb: 3, display: 'flex', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
         <TextField
           fullWidth
           variant="outlined"

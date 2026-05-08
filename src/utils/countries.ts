@@ -276,13 +276,41 @@ const countries: Country[] = [
 
 // Helper: countries grouped by continent for quick-select actions
 export const continents: { key: Continent; name: Continent; countryCodes: string[] }[] = [
-  { key: 'Africa', name: 'Africa', countryCodes: countries.filter(c => c.continent === 'Africa').map(c => c.code) },
-  { key: 'Asia', name: 'Asia', countryCodes: countries.filter(c => c.continent === 'Asia').map(c => c.code) },
-  { key: 'Europe', name: 'Europe', countryCodes: countries.filter(c => c.continent === 'Europe').map(c => c.code) },
-  { key: 'North America', name: 'North America', countryCodes: countries.filter(c => c.continent === 'North America').map(c => c.code) },
-  { key: 'South America', name: 'South America', countryCodes: countries.filter(c => c.continent === 'South America').map(c => c.code) },
-  { key: 'Oceania', name: 'Oceania', countryCodes: countries.filter(c => c.continent === 'Oceania').map(c => c.code) },
-  { key: 'Antarctica', name: 'Antarctica', countryCodes: countries.filter(c => c.continent === 'Antarctica').map(c => c.code) },
+  {
+    key: 'Africa',
+    name: 'Africa',
+    countryCodes: countries.filter(c => c.continent === 'Africa').map(c => c.code),
+  },
+  {
+    key: 'Asia',
+    name: 'Asia',
+    countryCodes: countries.filter(c => c.continent === 'Asia').map(c => c.code),
+  },
+  {
+    key: 'Europe',
+    name: 'Europe',
+    countryCodes: countries.filter(c => c.continent === 'Europe').map(c => c.code),
+  },
+  {
+    key: 'North America',
+    name: 'North America',
+    countryCodes: countries.filter(c => c.continent === 'North America').map(c => c.code),
+  },
+  {
+    key: 'South America',
+    name: 'South America',
+    countryCodes: countries.filter(c => c.continent === 'South America').map(c => c.code),
+  },
+  {
+    key: 'Oceania',
+    name: 'Oceania',
+    countryCodes: countries.filter(c => c.continent === 'Oceania').map(c => c.code),
+  },
+  {
+    key: 'Antarctica',
+    name: 'Antarctica',
+    countryCodes: countries.filter(c => c.continent === 'Antarctica').map(c => c.code),
+  },
 ];
 
 export default countries;

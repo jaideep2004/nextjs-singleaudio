@@ -1,6 +1,6 @@
 # Backend README
 
-This folder contains the standalone Express + TypeScript backend for the Karhari Media music distribution platform.
+This folder contains the standalone Express + TypeScript backend for the Single Audio music distribution platform.
 
 ## What The Backend Handles
 

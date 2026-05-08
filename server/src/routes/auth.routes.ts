@@ -46,6 +46,13 @@ router.post('/login', validate(loginValidator), authController.login);
 router.get('/me', protect, authController.getMe);
 
 /**
+ * @route   PUT /api/auth/me/kyc
+ * @desc    Submit current user's KYC/onboarding data
+ * @access  Private
+ */
+router.put('/me/kyc', protect, authController.submitKyc);
+
+/**
  * @route   PUT /api/auth/me
  * @desc    Update user profile
  * @access  Private

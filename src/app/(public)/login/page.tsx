@@ -192,7 +192,7 @@ export default function LoginPage() {
 
             <Stack spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
               <Chip
-                label="Karhari Media"
+                label="Single Audio"
                 sx={{
                   alignSelf: 'flex-start',
                   height: 34,

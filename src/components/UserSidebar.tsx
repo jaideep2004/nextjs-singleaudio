@@ -16,6 +16,7 @@ import {
   useTheme,
   useMediaQuery,
   IconButton,
+  Avatar,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -29,62 +30,90 @@ import {
   Album,
   TrendingUp,
   CloudUpload as CloudUploadIcon,
-  Podcasts as PodcastsIcon
+  Podcasts as PodcastsIcon,
+  BarChart as AnalyticsIcon,
+  AccountBalanceWallet,
 } from '@mui/icons-material';
+import { useAuth } from '@/context/AppContext';
 
-const drawerWidth = 260;
+const drawerWidth = 264;
 
-const menuItems = [
+const menuSections = [
   {
-    text: 'Dashboard',
-    icon: <DashboardIcon />,
-    path: '/dashboard',
-  },
-  {
-    text: 'Upload',
-    icon: <CloudUploadIcon />,
-    path: '/dashboard/upload',
-  },
-  {
-    text: 'Releases',
-    icon: <Album />,
-    path: '/dashboard/releases',
-    subItems: [
-      { text: 'All Releases', path: '/dashboard/releases' },
-      { text: 'Pending', path: '/dashboard/releases?status=pending' },
-      { text: 'Approved', path: '/dashboard/releases?status=approved' },
-      { text: 'Rejected', path: '/dashboard/releases?status=rejected' },
+    label: 'Music Distribution',
+    items: [
+      {
+        text: 'Dashboard',
+        icon: <DashboardIcon />,
+        path: '/dashboard',
+      },
+      {
+        text: 'Upload Release',
+        icon: <CloudUploadIcon />,
+        path: '/dashboard/upload',
+      },
+      {
+        text: 'Releases',
+        icon: <Album />,
+        path: '/dashboard/releases',
+        subItems: [
+          { text: 'All Releases', path: '/dashboard/releases' },
+          { text: 'Pending', path: '/dashboard/releases?status=pending' },
+          { text: 'Approved', path: '/dashboard/releases?status=approved' },
+          { text: 'Rejected', path: '/dashboard/releases?status=rejected' },
+        ],
+      },
+      {
+        text: 'Tracks',
+        icon: <MusicNoteIcon />,
+        path: '/dashboard/tracks',
+      },
+      {
+        text: 'Analytics',
+        icon: <AnalyticsIcon />,
+        path: '/dashboard/analytics',
+      },
     ],
   },
   {
-    text: 'Tracks',
-    icon: <MusicNoteIcon />,
-    path: '/dashboard/tracks',
-  },
-  {
-    text: 'Royalties',
-    icon: <TrendingUp />,
-    path: '/dashboard/royalties',
-  },
-  {
-    text: 'Payouts',
-    icon: <PaymentIcon />,
-    path: '/dashboard/payouts',
-  },
-  {
-    text: 'Podcasts',
-    icon: <PodcastsIcon />,
-    path: '/dashboard/podcasts',
-    subItems: [
-      { text: 'My Podcast', path: '/dashboard/podcasts' },
-      { text: 'Episodes', path: '/dashboard/podcasts?view=episodes' },
-      { text: 'Analytics', path: '/dashboard/podcasts?view=analytics' },
+    label: 'Earnings',
+    items: [
+      {
+        text: 'Royalties',
+        icon: <TrendingUp />,
+        path: '/dashboard/royalties',
+      },
+      {
+        text: 'Payouts',
+        icon: <AccountBalanceWallet />,
+        path: '/dashboard/payouts',
+      },
     ],
   },
   {
-    text: 'Settings',
-    icon: <SettingsIcon />,
-    path: '/dashboard/settings',
+    label: 'Podcasts',
+    items: [
+      {
+        text: 'Podcasts',
+        icon: <PodcastsIcon />,
+        path: '/dashboard/podcasts',
+        subItems: [
+          { text: 'My Podcast', path: '/dashboard/podcasts' },
+          { text: 'Episodes', path: '/dashboard/podcasts?view=episodes' },
+          { text: 'Analytics', path: '/dashboard/podcasts?view=analytics' },
+        ],
+      },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      {
+        text: 'Settings',
+        icon: <SettingsIcon />,
+        path: '/dashboard/settings',
+      },
+    ],
   },
 ];
 
@@ -96,11 +125,18 @@ export default function UserSidebar() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+  const auth = useAuth();
+  const user = auth?.user;
 
-  // Auto-expand Podcasts submenu when on podcasts route
+  const isDark = theme.palette.mode === 'dark';
+
+  // Auto-expand submenus when on matching routes
   useEffect(() => {
     if (pathname.startsWith('/dashboard/podcasts')) {
       setOpenSubMenu('/dashboard/podcasts');
+    }
+    if (pathname.startsWith('/dashboard/releases')) {
+      setOpenSubMenu('/dashboard/releases');
     }
   }, [pathname]);
 
@@ -123,201 +159,339 @@ export default function UserSidebar() {
   const isSubItemActive = (path: string) => {
     const [subPath, subQuery] = path.split('?');
     if (!subQuery) {
-      // No query param — active only when pathname matches and no view param set
-      return pathname === subPath && !searchParams.get('view');
+      // No query param — active only when pathname matches and no view/status param set
+      return pathname === subPath && !searchParams.get('view') && !searchParams.get('status');
     }
     const subParams = new URLSearchParams(subQuery);
     const subView = subParams.get('view');
-    return pathname === subPath && searchParams.get('view') === subView;
+    const subStatus = subParams.get('status');
+    if (subView) return pathname === subPath && searchParams.get('view') === subView;
+    if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
+    return pathname === subPath;
   };
 
   const drawer = (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         overflow: 'auto',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        bgcolor: theme.palette.mode === 'dark' ? 'rgba(18, 18, 32, 0.94)' : '#ffffff',
+        bgcolor: isDark ? '#0c1120' : '#fafbfd',
         borderRight: '1px solid',
-        borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)',
-        // ultra-thin scrollbar
+        borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(15, 23, 42, 0.08)',
         scrollbarWidth: 'thin',
-        scrollbarColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22) transparent' : 'rgba(15,23,42,0.22) transparent',
-        '&::-webkit-scrollbar': { width: 6 },
+        scrollbarColor: isDark ? 'rgba(255,255,255,0.12) transparent' : 'rgba(15,23,42,0.12) transparent',
+        '&::-webkit-scrollbar': { width: 4 },
         '&::-webkit-scrollbar-thumb': {
-          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(15,23,42,0.22)',
+          backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)',
           borderRadius: 10,
         },
         '&::-webkit-scrollbar-track': { background: 'transparent' },
       }}
     >
-      <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Typography 
-          variant="h6" 
-          component="div" 
-          sx={{ 
-            fontWeight: 700,
-            background: 'linear-gradient(45deg, #4a6cf7 30%, #6b8af8 90%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
-        >
-          Artist Panel
-        </Typography>
-        <IconButton 
-          onClick={handleDrawerToggle} 
-          sx={{ 
-            display: { sm: 'none' },
-            color: theme.palette.mode === 'dark' ? 'white' : 'black'
+      {/* Brand Header */}
+      <Box
+        sx={{
+          px: 2.5,
+          py: 2.5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #4a6cf7 0%, #7b93f9 100%)',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 4px 12px rgba(74, 108, 247, 0.3)',
+            }}
+          >
+            <MusicNoteIcon sx={{ fontSize: 18, color: '#fff' }} />
+          </Box>
+          <Box>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 800,
+                fontSize: '1rem',
+                lineHeight: 1.2,
+                color: isDark ? '#f1f5f9' : '#0f172a',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Single Audio
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.45)',
+                fontSize: '0.7rem',
+                fontWeight: 500,
+              }}
+            >
+              Artist Dashboard
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton
+          onClick={handleDrawerToggle}
+          sx={{
+            display: { md: 'none' },
+            color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
+            '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' },
           }}
         >
           <ChevronLeftIcon />
         </IconButton>
       </Box>
-      <Divider sx={{ borderColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)' }} />
-      <List sx={{ px: 1, py: 2, flex: 1 }}>
-        <Box sx={{ px: 3, pb: 1.25 }}>
+
+      {/* User Profile Mini */}
+      <Box
+        sx={{
+          mx: 2,
+          mb: 2,
+          p: 1.5,
+          borderRadius: '12px',
+          bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)',
+          border: '1px solid',
+          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+        }}
+      >
+        <Avatar
+          sx={{
+            width: 32,
+            height: 32,
+            bgcolor: isDark ? '#1e293b' : '#e2e8f0',
+            fontSize: '0.85rem',
+            fontWeight: 700,
+            color: isDark ? '#94a3b8' : '#475569',
+          }}
+        >
+          {user?.name?.[0]?.toUpperCase() || 'U'}
+        </Avatar>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography
-            variant="overline"
-            sx={{ color: 'text.secondary', letterSpacing: 1.2, fontWeight: 700 }}
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              color: isDark ? '#e2e8f0' : '#1e293b',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
           >
-            Music Distribution
+            {user?.name || 'Artist'}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.4)',
+              fontSize: '0.68rem',
+            }}
+          >
+            {user?.email || 'artist@singleaudio.com'}
           </Typography>
         </Box>
-        {menuItems.map((item) => (
-          <div key={item.path}>
-            {item.text === 'Podcasts' && (
-              <Box sx={{ px: 3, pt: 2, pb: 1.25 }}>
-                <Divider sx={{ mb: 2 }} />
-                <Typography
-                  variant="overline"
-                  sx={{ color: 'text.secondary', letterSpacing: 1.2, fontWeight: 700 }}
-                >
-                  Podcasts
-                </Typography>
-              </Box>
-            )}
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                selected={isActive(item.path)}
-                onClick={() =>
-                  item.subItems
-                    ? handleSubMenuClick(item.path)
-                    : router.push(item.path)
-                }
-                sx={{
-                  borderRadius: 2,
-                  mx: 1,
-                  py: 1.2,
-                  position: 'relative',
-                  '&.Mui-selected': {
-                    backgroundColor: theme.palette.mode === 'dark' 
-                      ? 'rgba(74, 108, 247, 0.15)' 
-                      : 'rgba(74, 108, 247, 0.1)',
-                    color: theme.palette.mode === 'dark' ? '#9bafff' : '#4a6cf7',
-                    '&:hover': {
-                      backgroundColor: theme.palette.mode === 'dark' 
-                        ? 'rgba(74, 108, 247, 0.2)' 
-                        : 'rgba(74, 108, 247, 0.15)',
-                    },
-                    '& .MuiListItemIcon-root': {
-                      color: theme.palette.mode === 'dark' ? '#9bafff' : '#4a6cf7',
-                    },
-                  },
-                  '&:hover': {
-                    backgroundColor: theme.palette.mode === 'dark' 
-                      ? 'rgba(255, 255, 255, 0.08)' 
-                      : 'rgba(0, 0, 0, 0.04)',
-                  },
-                  '&.Mui-selected::before': {
-                    content: '""',
-                    position: 'absolute',
-                    left: 0,
-                    top: 10,
-                    bottom: 10,
-                    width: 3,
-                    borderRadius: 4,
-                    backgroundColor: theme.palette.primary.main,
-                  },
-                }}
-              >
-                <ListItemIcon 
-                  sx={{ 
-                    minWidth: 40,
-                    color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.54)'
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.text} 
-                  primaryTypographyProps={{
-                    fontWeight: 500,
-                    fontSize: '0.95rem'
-                  }}
-                />
-                {item.subItems && (
-                  <>{openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}</>
-                )}
-              </ListItemButton>
-            </ListItem>
-            {item.subItems && (
-              <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ py: 0.5 }}>
-                  {item.subItems.map((subItem) => (
+      </Box>
+
+      {/* Navigation Sections */}
+      <Box sx={{ flex: 1, px: 1, pb: 2 }}>
+        {menuSections.map((section, sectionIdx) => (
+          <Box key={section.label} sx={{ mb: sectionIdx < menuSections.length - 1 ? 0.5 : 0 }}>
+            <Typography
+              variant="overline"
+              sx={{
+                px: 2,
+                pt: sectionIdx > 0 ? 1.5 : 0.5,
+                pb: 0.75,
+                display: 'block',
+                color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(15,23,42,0.4)',
+                letterSpacing: '0.08em',
+                fontWeight: 700,
+                fontSize: '0.65rem',
+              }}
+            >
+              {section.label}
+            </Typography>
+            <List disablePadding>
+              {section.items.map((item: any) => (
+                <div key={item.path}>
+                  <ListItem disablePadding sx={{ mb: 0.25 }}>
                     <ListItemButton
-                      key={subItem.path}
-                      selected={isSubItemActive(subItem.path)}
-                      onClick={() => router.push(subItem.path)}
+                      selected={isActive(item.path)}
+                      onClick={() =>
+                        item.subItems
+                          ? handleSubMenuClick(item.path)
+                          : router.push(item.path)
+                      }
                       sx={{
-                        borderRadius: 2,
-                        mx: 2,
-                        py: 1,
-                        pl: 3,
+                        borderRadius: '10px',
+                        mx: 0.75,
+                        py: 0.85,
+                        px: 1.5,
+                        position: 'relative',
+                        transition: 'all 150ms ease',
                         '&.Mui-selected': {
-                          backgroundColor: theme.palette.mode === 'dark' 
-                            ? 'rgba(74, 108, 247, 0.1)' 
-                            : 'rgba(74, 108, 247, 0.05)',
+                          backgroundColor: isDark
+                            ? 'rgba(74, 108, 247, 0.12)'
+                            : 'rgba(74, 108, 247, 0.08)',
+                          color: isDark ? '#93b4ff' : '#3b5fe5',
                           '&:hover': {
-                            backgroundColor: theme.palette.mode === 'dark' 
-                              ? 'rgba(74, 108, 247, 0.15)' 
-                              : 'rgba(74, 108, 247, 0.1)',
+                            backgroundColor: isDark
+                              ? 'rgba(74, 108, 247, 0.18)'
+                              : 'rgba(74, 108, 247, 0.12)',
+                          },
+                          '& .MuiListItemIcon-root': {
+                            color: isDark ? '#93b4ff' : '#3b5fe5',
                           },
                         },
                         '&:hover': {
-                          backgroundColor: theme.palette.mode === 'dark' 
-                            ? 'rgba(255, 255, 255, 0.04)' 
-                            : 'rgba(0, 0, 0, 0.02)',
+                          backgroundColor: isDark
+                            ? 'rgba(255, 255, 255, 0.04)'
+                            : 'rgba(15, 23, 42, 0.04)',
+                        },
+                        '&.Mui-selected::before': {
+                          content: '""',
+                          position: 'absolute',
+                          left: 0,
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          width: 3,
+                          height: 20,
+                          borderRadius: '0 4px 4px 0',
+                          backgroundColor: '#4a6cf7',
+                          transition: 'height 200ms ease',
                         },
                       }}
                     >
-                      <ListItemText 
-                        primary={subItem.text} 
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 36,
+                          color: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(15, 23, 42, 0.45)',
+                          '& .MuiSvgIcon-root': { fontSize: 20 },
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.text}
                         primaryTypographyProps={{
-                          fontSize: '0.9rem',
-                          color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.7)'
+                          fontWeight: isActive(item.path) ? 600 : 500,
+                          fontSize: '0.875rem',
+                          letterSpacing: '-0.005em',
+                          color: isActive(item.path)
+                            ? (isDark ? '#93b4ff' : '#3b5fe5')
+                            : (isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.74)'),
                         }}
                       />
+                      {item.subItems && (
+                        <Box
+                          sx={{
+                            color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                            display: 'flex',
+                            '& .MuiSvgIcon-root': { fontSize: 18 },
+                          }}
+                        >
+                          {openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}
+                        </Box>
+                      )}
                     </ListItemButton>
-                  ))}
-                </List>
-              </Collapse>
-            )}
-          </div>
+                  </ListItem>
+                  {item.subItems && (
+                    <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
+                      <List component="div" disablePadding sx={{ py: 0.25 }}>
+                        {item.subItems.map((subItem: any) => (
+                          <ListItemButton
+                            key={subItem.path}
+                            selected={isSubItemActive(subItem.path)}
+                            onClick={() => router.push(subItem.path)}
+                            sx={{
+                              borderRadius: '8px',
+                              mx: 1.5,
+                              py: 0.6,
+                              pl: 5.5,
+                              position: 'relative',
+                              '&.Mui-selected': {
+                                backgroundColor: isDark
+                                  ? 'rgba(74, 108, 247, 0.08)'
+                                  : 'rgba(74, 108, 247, 0.06)',
+                                '& .MuiListItemText-primary': {
+                                  color: isDark ? '#93b4ff' : '#3b5fe5',
+                                  fontWeight: 600,
+                                },
+                                '&::before': {
+                                  content: '""',
+                                  position: 'absolute',
+                                  left: 32,
+                                  top: '50%',
+                                  transform: 'translateY(-50%)',
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: '50%',
+                                  backgroundColor: '#4a6cf7',
+                                },
+                                '&:hover': {
+                                  backgroundColor: isDark
+                                    ? 'rgba(74, 108, 247, 0.12)'
+                                    : 'rgba(74, 108, 247, 0.08)',
+                                },
+                              },
+                              '&:hover': {
+                                backgroundColor: isDark
+                                  ? 'rgba(255, 255, 255, 0.03)'
+                                  : 'rgba(0, 0, 0, 0.02)',
+                              },
+                            }}
+                          >
+                            <ListItemText
+                              primary={subItem.text}
+                              primaryTypographyProps={{
+                                fontSize: '0.82rem',
+                                fontWeight: 450,
+                                color: isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(15, 23, 42, 0.6)',
+                              }}
+                            />
+                          </ListItemButton>
+                        ))}
+                      </List>
+                    </Collapse>
+                  )}
+                </div>
+              ))}
+            </List>
+          </Box>
         ))}
-      </List>
-      
+      </Box>
+
       {/* Sidebar Footer */}
-      <Box sx={{ p: 2, textAlign: 'center' }}>
-        <Typography 
-          variant="caption" 
-          sx={{ 
-            color: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-            fontSize: '0.7rem'
+      <Box
+        sx={{
+          p: 2,
+          borderTop: '1px solid',
+          borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.06)',
+          textAlign: 'center',
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            color: isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(15, 23, 42, 0.3)',
+            fontSize: '0.65rem',
+            fontWeight: 500,
+            letterSpacing: '0.02em',
           }}
         >
-          Karhari Media Artist v1.0
+          Single Audio v2.0
         </Typography>
       </Box>
     </Box>
@@ -327,36 +501,33 @@ export default function UserSidebar() {
     <Box sx={{ display: 'flex' }}>
       <Box
         component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        aria-label="navigation sidebar"
       >
         {/* Mobile drawer */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
+          ModalProps={{ keepMounted: true }}
           sx={{
-            display: { xs: 'block', sm: 'none' },
+            display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
               border: 'none',
-              backgroundColor: 'transparent',
-              backdropFilter: 'blur(10px)',
+              backgroundColor: isDark ? '#0c1120' : '#fafbfd',
             },
           }}
         >
           {drawer}
         </Drawer>
-        
+
         {/* Desktop drawer */}
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', sm: 'block' },
+            display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
               width: drawerWidth,
@@ -369,16 +540,16 @@ export default function UserSidebar() {
           {drawer}
         </Drawer>
       </Box>
-      
+
       {/* Mobile menu button */}
       {isMobile && (
         <Box
           sx={{
             position: 'fixed',
-            top: 16,
-            left: 16,
+            top: 14,
+            left: 14,
             zIndex: theme.zIndex.drawer + 1,
-            display: { sm: 'none' },
+            display: { md: 'none' },
           }}
         >
           <IconButton
@@ -386,16 +557,20 @@ export default function UserSidebar() {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ 
-              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-              boxShadow: 2,
-              backdropFilter: 'blur(10px)',
+            sx={{
+              width: 40,
+              height: 40,
+              backgroundColor: isDark ? 'rgba(12, 17, 32, 0.9)' : 'rgba(255, 255, 255, 0.92)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
               '&:hover': {
-                backgroundColor: theme.palette.mode === 'dark' ? 'rgba(26, 26, 46, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                backgroundColor: isDark ? 'rgba(12, 17, 32, 0.95)' : 'rgba(255, 255, 255, 0.98)',
               },
             }}
           >
-            <MenuIcon />
+            <MenuIcon sx={{ fontSize: 20 }} />
           </IconButton>
         </Box>
       )}

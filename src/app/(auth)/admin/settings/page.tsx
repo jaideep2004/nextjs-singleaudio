@@ -20,6 +20,7 @@ import { Save, Security, Notifications, Payment, Person } from '@mui/icons-mater
 import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -183,37 +184,16 @@ export default function AdminSettingsPage() {
 
   return (
     <Box>
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2.5, md: 3 },
-          mb: 3,
-          borderRadius: 3,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
-          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
-        }}
-      >
-        <Typography
-          variant="h4"
-          component="h1"
-          gutterBottom
-          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-        >
-          Settings
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Configure platform settings and preferences
-        </Typography>
-      </Paper>
+      <PremiumHeader
+        eyebrow="System"
+        title="Settings"
+        description="Configure platform behavior, security, notifications, payment policy, and admin preferences."
+      />
 
       <Paper
         sx={{
           mb: 3,
-          borderRadius: 3,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
-          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
+          ...premiumSurfaceSx({ palette: { mode } } as any),
           overflow: 'hidden',
         }}
       >

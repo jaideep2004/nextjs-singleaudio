@@ -52,6 +52,7 @@ import {
 import { trackAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader } from '@/components/premium/PremiumSurface';
 
 interface Track {
   _id: string;
@@ -226,35 +227,20 @@ export default function AdminTracksPage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 0.5 }}>
-            Track Management
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Manage all music tracks and releases
-          </Typography>
-        </Box>
-        <Button 
+    <Box sx={{ p: 0 }}>
+      <PremiumHeader
+        eyebrow="Catalog Ops"
+        title="Track Management"
+        description="Audit track metadata, store state, ISRCs, and review status across the full catalog."
+        action={<Button 
           variant="contained" 
           color="primary"
           startIcon={<Add />}
           onClick={() => router.push('/admin/tracks/new')}
-          sx={{ 
-            borderRadius: 2,
-            px: 3,
-            py: 1.5,
-            boxShadow: 3,
-            '&:hover': {
-              boxShadow: 6,
-            }
-          }}
         >
           Add New Track
-        </Button>
-      </Box>
+        </Button>}
+      />
 
       {/* Stats Cards */}
       <Box 

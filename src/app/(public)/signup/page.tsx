@@ -25,6 +25,7 @@ import Step1BasicInfo from '@/components/signup/Step1BasicInfo';
 import Step2AccountType from '@/components/signup/Step2AccountType';
 import Step3Artist, { ArtistNameStatus } from '@/components/signup/Step3Artist';
 import Step3Label from '@/components/signup/Step3Label';
+import Step4Verification from '@/components/signup/Step4Verification';
 import {
   SignupFormValues,
   defaultSignupValues,
@@ -36,6 +37,7 @@ const STEP_FIELDS: Record<number, (keyof SignupFormValues)[]> = {
   1: ['name', 'email', 'password', 'confirmPassword'],
   2: ['accountType'],
   3: [], // validated dynamically based on accountType
+  4: ['verificationPhoneNumber', 'mobileVerificationProvider', 'kycProvider', 'kycConsent'],
 };
 
 const ARTIST_STEP3_FIELDS: (keyof SignupFormValues)[] = [
@@ -52,7 +54,7 @@ export default function SignupPage() {
   const { signup } = useAuth();
 
   const [mounted, setMounted] = useState(false);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isSignupEnabled, setIsSignupEnabled] = useState(true);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -76,10 +78,17 @@ export default function SignupPage() {
   const accountType = watch('accountType');
   const registrationType = watch('registrationType');
   const companyType = watch('companyType');
+  const artistPhoneNumber = watch('phoneNumber');
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (currentStep === 4 && !getValues('verificationPhoneNumber') && artistPhoneNumber) {
+      resetField('verificationPhoneNumber', { defaultValue: artistPhoneNumber });
+    }
+  }, [artistPhoneNumber, currentStep, getValues, resetField]);
 
   // Check signup enabled
   useEffect(() => {
@@ -162,116 +171,25 @@ export default function SignupPage() {
     const valid = await trigger(fieldsToValidate as any);
     if (!valid) return;
 
-    if (currentStep < 3) {
-      setCurrentStep((s) => (s + 1) as 1 | 2 | 3);
+    if (currentStep < 4) {
+      setCurrentStep((s) => (s + 1) as 1 | 2 | 3 | 4);
     }
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((s) => (s - 1) as 1 | 2 | 3);
+    if (currentStep > 1) setCurrentStep((s) => (s - 1) as 1 | 2 | 3 | 4);
   };
 
   const onSubmit = async (data: SignupFormValues) => {
     setServerError(null);
 
-    // Block if artist name not verified
-    if (data.accountType === 'artist') {
-      await checkArtistName();
-      // Read ref after async check completes
-      const finalStatus: string = artistNameStatusRef.current;
-      if (finalStatus !== 'available') return;
-    }
-
     setIsSubmitting(true);
     try {
-      const idNumber =
-        data.accountType === 'artist'
-          ? data.idType === 'pan'
-            ? data.panId
-            : data.aadhaarId
-          : undefined;
-
       await signup({
         name: data.name,
         email: data.email,
         password: data.password,
         accountType: data.accountType as 'artist' | 'label',
-        // artist
-        artistName: data.accountType === 'artist' ? data.artistName : undefined,
-        legalName: data.accountType === 'artist' ? data.legalName : undefined,
-        idType: data.accountType === 'artist' ? data.idType : undefined,
-        idNumber,
-        legalAddress: data.accountType === 'artist' ? data.legalAddress : undefined,
-        phoneNumber: data.accountType === 'artist' ? data.phoneNumber : undefined,
-        numberOfTracks:
-          data.accountType === 'artist' && data.numberOfTracks !== ''
-            ? Number(data.numberOfTracks)
-            : undefined,
-        numberOfReleases:
-          data.accountType === 'artist' && data.numberOfReleases !== ''
-            ? Number(data.numberOfReleases)
-            : undefined,
-        governmentIdFile: data.accountType === 'artist' ? data.governmentIdFile ?? undefined : undefined,
-        // label
-        labelName: data.accountType === 'label' ? data.labelName : undefined,
-        registrationType:
-          data.accountType === 'label'
-            ? (data.registrationType as 'individual' | 'registered_company')
-            : undefined,
-        labelLegalName:
-          data.accountType === 'label' && data.registrationType === 'individual'
-            ? data.labelLegalName
-            : undefined,
-        legalEntityName:
-          data.accountType === 'label' && data.registrationType === 'registered_company'
-            ? data.legalEntityName
-            : undefined,
-        companyType:
-          data.accountType === 'label' && data.registrationType === 'registered_company'
-            ? (data.companyType as 'private' | 'public')
-            : undefined,
-        incorporationCertFile:
-          data.accountType === 'label' &&
-          data.registrationType === 'registered_company' &&
-          data.companyType === 'private'
-            ? data.incorporationCertFile ?? undefined
-            : undefined,
-        gstCertFile:
-          data.accountType === 'label' &&
-          data.registrationType === 'registered_company' &&
-          data.companyType === 'public'
-            ? data.gstCertFile ?? undefined
-            : undefined,
-        labelGovIdFile:
-          data.accountType === 'label' && data.registrationType === 'individual'
-            ? data.labelGovIdFile ?? undefined
-            : undefined,
-        totalArtists:
-          data.accountType === 'label' && data.totalArtists !== ''
-            ? Number(data.totalArtists)
-            : undefined,
-        totalRevenue:
-          data.accountType === 'label' && data.totalRevenue !== ''
-            ? Number(data.totalRevenue)
-            : undefined,
-        catalogSize:
-          data.accountType === 'label' && data.catalogSize !== ''
-            ? Number(data.catalogSize)
-            : undefined,
-        rightsType:
-          data.accountType === 'label'
-            ? (data.rightsType as 'exclusive' | 'non_exclusive')
-            : undefined,
-        companyWebsite: data.accountType === 'label' ? data.companyWebsite || undefined : undefined,
-        socialLinks:
-          data.accountType === 'label'
-            ? {
-                instagram: data.socialLinks.instagram || '',
-                twitter: data.socialLinks.twitter || '',
-                facebook: data.socialLinks.facebook || '',
-                youtube: data.socialLinks.youtube || '',
-              }
-            : undefined,
       });
     } catch (err: any) {
       setServerError(err.message || 'Registration failed. Please try again.');
@@ -422,7 +340,7 @@ export default function SignupPage() {
 
             <Stack spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
               <Chip
-                label="Karhari Media"
+                label="Single Audio"
                 sx={{
                   alignSelf: 'flex-start',
                   height: 34,
@@ -455,7 +373,7 @@ export default function SignupPage() {
                   }}
                 >
                   Whether you're an independent artist or a label managing a full catalog,
-                  Karhari Media gives you the tools to distribute, track, and grow.
+                  Single Audio gives you the tools to distribute, track, and grow.
                 </Typography>
               </Box>
 
@@ -494,7 +412,7 @@ export default function SignupPage() {
                 variant="body2"
                 sx={{ color: 'rgba(226,232,240,0.65)', fontStyle: 'italic', lineHeight: 1.7 }}
               >
-                "Karhari Media transformed how we manage our catalog. The platform is clean,
+                "Single Audio transformed how we manage our catalog. The platform is clean,
                 fast, and built for professionals."
               </Typography>
               <Typography
@@ -528,7 +446,7 @@ export default function SignupPage() {
             {/* Header */}
             <Box sx={{ mb: 4 }}>
               <Chip
-                label="Karhari Media"
+                label="Single Audio"
                 size="small"
                 sx={{
                   mb: 2,
@@ -571,7 +489,7 @@ export default function SignupPage() {
             <SignupStepper currentStep={currentStep} steps={SIGNUP_STEPS} />
 
             {/* Server error */}
-            {serverError && currentStep === 3 && (
+            {serverError && currentStep >= 3 && (
               <Alert
                 severity="error"
                 sx={{ mb: 3, borderRadius: '14px' }}
@@ -619,6 +537,14 @@ export default function SignupPage() {
                 />
               )}
 
+              {currentStep === 4 && (
+                <Step4Verification
+                  control={control}
+                  errors={errors}
+                  isSubmitting={isSubmitting}
+                />
+              )}
+
               {/* Navigation buttons */}
               <Stack
                 direction={{ xs: 'column-reverse', sm: 'row' }}
@@ -651,7 +577,7 @@ export default function SignupPage() {
                   <Box />
                 )}
 
-                {currentStep < 3 ? (
+                {currentStep < 2 ? (
                   <Button
                     onClick={handleNext}
                     disabled={isSubmitting}

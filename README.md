@@ -1,4 +1,4 @@
-# Karhari Media Music Distribution Platform
+# Single Audio Music Distribution Platform
 
 A full-stack music distribution platform for artists and admins. The project combines a Next.js web app with a standalone Express API and MongoDB database to support artist onboarding, track uploads, release management, royalties, payouts, notifications, and admin operations.
 

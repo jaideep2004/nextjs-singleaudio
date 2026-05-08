@@ -32,6 +32,7 @@ import {
   Cancel,
   MusicNote,
   Store,
+  TrendingUp,
 } from '@mui/icons-material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -49,6 +50,7 @@ import {
 import Link from 'next/link';
 import { releaseAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
@@ -167,6 +169,12 @@ export default function AdminReleasesPage({ searchParams }: any) {
   };
 
   const filteredReleases = getFilteredReleases();
+  const pendingCount = releases.filter(r => r.status === 'pending').length;
+  const approvedCount = releases.filter(r => r.status === 'approved').length;
+  const rejectedCount = releases.filter(r => r.status === 'rejected').length;
+  const totalTracks = releases.reduce((sum, release) => sum + (Array.isArray(release.tracks) ? release.tracks.length : 0), 0);
+  const approvalRate = releases.length ? Math.round((approvedCount / releases.length) * 100) : 0;
+  const maxStatusCount = Math.max(pendingCount, approvedCount, rejectedCount, 1);
 
   // Get status chip with proper styling
   const getStatusChip = (status: string) => {
@@ -265,32 +273,81 @@ export default function AdminReleasesPage({ searchParams }: any) {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography
-          variant={isMobile ? "h5" : "h4"}
-          fontWeight={700}
-          gutterBottom
-          sx={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-        >
-          Release Management
-        </Typography>
-        <Typography
-          variant="subtitle1"
-          color="text.secondary"
-          sx={{ mb: 2 }}
-        >
-          Manage and review music releases across all DSPs
-        </Typography>
+    <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
+      <PremiumHeader
+        eyebrow="Admin Review"
+        title="Release Management"
+        description="Review, approve, reject, and inspect delivery-ready releases across all DSPs."
+      />
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
+        {[
+          { label: 'Pipeline Load', value: `${pendingCount} Pending`, accent: '#f5a524', bars: [pendingCount, approvedCount, rejectedCount] },
+          { label: 'Approval Rate', value: `${approvalRate}%`, accent: '#21c58b', bars: [approvedCount, Math.max(releases.length - approvedCount, 0)] },
+          { label: 'Track Volume', value: `${totalTracks} Tracks`, accent: '#5b5ff7', bars: releases.slice(0, 8).map((release) => Array.isArray(release.tracks) ? release.tracks.length : 0) },
+        ].map((metric) => (
+          <Paper
+            key={metric.label}
+            elevation={0}
+            sx={{
+              ...premiumSurfaceSx(theme),
+              p: 2.25,
+              borderRadius: '24px',
+              minHeight: 126,
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" fontWeight={850}>
+                  {metric.label}
+                </Typography>
+                <Typography variant="h5" fontWeight={950} sx={{ mt: 0.5 }}>
+                  {metric.value}
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '14px',
+                  display: 'grid',
+                  placeItems: 'center',
+                  color: metric.accent,
+                  bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.045)',
+                }}
+              >
+                <TrendingUp fontSize="small" />
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'end', gap: 0.75, height: 34, mt: 2 }}>
+              {(metric.bars.length ? metric.bars : [0]).map((value, index) => (
+                <Box
+                  key={`${metric.label}-${index}`}
+                  sx={{
+                    flex: 1,
+                    height: `${Math.max(18, Math.round((Number(value) / maxStatusCount) * 34))}px`,
+                    borderRadius: '6px 6px 2px 2px',
+                    bgcolor: metric.accent,
+                    opacity: 0.26 + index * 0.09,
+                  }}
+                />
+              ))}
+            </Box>
+          </Paper>
+        ))}
       </Box>
 
       <Paper 
         elevation={0} 
         sx={{ 
-          borderRadius: 3,
-          border: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.14)' : 'rgba(15,23,42,0.14)'}`,
-          backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.03)' : '#ffffff',
-          boxShadow: mode === 'dark' ? '0 16px 42px rgba(0,0,0,0.28)' : '0 14px 38px rgba(15,23,42,0.08)',
+          ...premiumSurfaceSx(theme),
           mb: 4
         }}
       >
@@ -465,7 +522,15 @@ export default function AdminReleasesPage({ searchParams }: any) {
         </Box>
 
         {/* Releases Table */}
-        <TableContainer>
+        <TableContainer
+          sx={{
+            border: '1px solid',
+            borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+            borderRadius: '22px',
+            overflowX: 'auto',
+            bgcolor: mode === 'dark' ? 'rgba(11,16,32,0.32)' : 'rgba(255,255,255,0.72)',
+          }}
+        >
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -505,7 +570,7 @@ export default function AdminReleasesPage({ searchParams }: any) {
                       </Avatar>
                       <Box>
                         <Typography variant="body2" fontWeight={500}>
-                          {release.releaseTitle || 'Untitled Release'}
+                          {release.releaseTitle || release.title || 'Untitled Release'}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {release.upc || 'No UPC'}

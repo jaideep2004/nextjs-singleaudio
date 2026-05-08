@@ -9,8 +9,20 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'artist' | 'admin';
+  role: 'artist' | 'label' | 'admin';
   artistName?: string;
+  accountType?: 'artist' | 'label';
+  verification?: {
+    status?: 'pending' | 'submitted' | 'approved' | 'rejected';
+    mobileProvider?: string;
+    kycProvider?: string;
+    consent?: boolean;
+    phoneNumber?: string;
+    submittedAt?: string;
+    reviewedAt?: string;
+    rejectionReason?: string;
+    notes?: string;
+  };
 }
 
 interface SignupPayload {
@@ -45,6 +57,12 @@ interface SignupPayload {
   companyWebsite?: string;
   socialLinks?: Record<string, string>;
   bio?: string;
+  verification?: {
+    phoneNumber?: string;
+    mobileProvider?: 'surepass' | 'sandbox' | 'manual';
+    kycProvider?: 'surepass' | 'sandbox' | 'manual';
+    consent?: boolean;
+  };
 }
 
 interface AuthResponse {
@@ -56,7 +74,20 @@ interface AuthResponse {
     email: string;
     role: User['role'];
     artistName?: string;
+    accountType?: 'artist' | 'label';
+    verification?: User['verification'];
   };
+}
+
+interface UserPayload {
+  _id?: string;
+  id?: string;
+  name: string;
+  email: string;
+  role: User['role'];
+  artistName?: string;
+  accountType?: 'artist' | 'label';
+  verification?: User['verification'];
 }
 
 interface DecodedToken {
@@ -66,6 +97,8 @@ interface DecodedToken {
   email: string;
   role: User['role'];
   artistName?: string;
+  accountType?: 'artist' | 'label';
+  verification?: User['verification'];
 }
 
 interface AuthContextType {
@@ -111,18 +144,19 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-const toUser = (payload: AuthResponse['data'] | DecodedToken): User => ({
-  id: '_id' in payload && payload._id ? payload._id : payload.id,
+const toUser = (payload: UserPayload): User => ({
+  id: payload._id || payload.id || '',
   name: payload.name,
   email: payload.email,
   role: payload.role,
   artistName: payload.artistName,
+  accountType: payload.accountType,
+  verification: payload.verification,
 });
 
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   const getToken = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
@@ -144,7 +178,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     const token = getToken();
     if (!token) {
       setIsLoading(false);
-      setIsInitialized(true);
       return;
     }
 
@@ -170,7 +203,6 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       logout();
     } finally {
       setIsLoading(false);
-      setIsInitialized(true);
     }
   }, [getToken, logout]);
 
@@ -310,7 +342,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <div style={{ visibility: isInitialized ? 'visible' : 'hidden' }}>{children}</div>
+      {children}
     </AppContext.Provider>
   );
 }

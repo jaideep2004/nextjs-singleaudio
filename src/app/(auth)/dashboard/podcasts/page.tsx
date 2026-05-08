@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -7,14 +7,11 @@ import {
   Autocomplete,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   CircularProgress,
-  Divider,
+  Divider, 
   FormControlLabel,
   MenuItem,
-  Paper,
   Stack,
   Step,
   StepLabel,
@@ -24,8 +21,9 @@ import {
   Typography,
   LinearProgress,
   Avatar,
+  Paper,
+  useTheme,
 } from '@mui/material';
-import Grid from '@mui/material/GridLegacy';
 import MicIcon from '@mui/icons-material/Mic';
 import PodcastIcon from '@mui/icons-material/Podcasts';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -156,6 +154,8 @@ function PodcastsContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
 
   // Derive active view from URL query param
   const viewParam = searchParams.get('view') as ActiveView | null;
@@ -469,10 +469,9 @@ function PodcastsContent() {
     if (createStep === 0) {
       // Step 1: Basics + Cover Art side by side
       return (
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' }, gap: 3 }}>
           {/* Left: text fields */}
-          <Grid item xs={12} md={7}>
-            <Stack spacing={2.5}>
+          <Stack spacing={2.5}>
               <TextField
                 label="Podcast Title"
                 required
@@ -527,11 +526,10 @@ function PodcastsContent() {
                   <TextField {...params} label="Categories" required helperText="Up to 2 categories." />
                 )}
               />
-            </Stack>
-          </Grid>
+          </Stack>
 
           {/* Right: cover art upload */}
-          <Grid item xs={12} md={5}>
+          <Box>
             <Stack spacing={1.5} alignItems="center">
               <Typography variant="subtitle2" fontWeight={600} color="text.secondary" sx={{ alignSelf: 'flex-start' }}>
                 Cover Art
@@ -591,16 +589,15 @@ function PodcastsContent() {
                 </Button>
               )}
             </Stack>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       );
     }
 
     // Step 2: Details
     return (
       <Stack spacing={3}>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             <TextField
               select
               label="Language"
@@ -612,8 +609,6 @@ function PodcastsContent() {
                 <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>
               ))}
             </TextField>
-          </Grid>
-          <Grid item xs={12} sm={6}>
             <TextField
               select
               label="Podcast Type"
@@ -624,18 +619,14 @@ function PodcastsContent() {
               <MenuItem value="episodic">Episodic</MenuItem>
               <MenuItem value="serial">Serial</MenuItem>
             </TextField>
-          </Grid>
-        </Grid>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6}>
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             <TextField
               label="Author Name"
               fullWidth
               value={podcastForm.author_name}
               onChange={(e) => setPodcastForm((cur) => ({ ...cur, author_name: e.target.value }))}
             />
-          </Grid>
-          <Grid item xs={12} sm={6}>
             <TextField
               label="Author Email"
               type="email"
@@ -643,8 +634,7 @@ function PodcastsContent() {
               value={podcastForm.author_email}
               onChange={(e) => setPodcastForm((cur) => ({ ...cur, author_email: e.target.value }))}
             />
-          </Grid>
-        </Grid>
+        </Box>
         <TextField
           label="Copyright Notice"
           fullWidth
@@ -698,8 +688,7 @@ function PodcastsContent() {
             value={episodeForm.description}
             onChange={(e) => setEpisodeForm((cur) => ({ ...cur, description: e.target.value }))}
           />
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
               <TextField
                 select
                 label="Episode Type"
@@ -711,8 +700,6 @@ function PodcastsContent() {
                 <MenuItem value="trailer">Trailer</MenuItem>
                 <MenuItem value="bonus">Bonus</MenuItem>
               </TextField>
-            </Grid>
-            <Grid item xs={12} sm={4}>
               <TextField
                 label="Season #"
                 type="number"
@@ -720,8 +707,6 @@ function PodcastsContent() {
                 value={episodeForm.itunes_season}
                 onChange={(e) => setEpisodeForm((cur) => ({ ...cur, itunes_season: e.target.value }))}
               />
-            </Grid>
-            <Grid item xs={12} sm={4}>
               <TextField
                 label="Episode #"
                 type="number"
@@ -729,8 +714,7 @@ function PodcastsContent() {
                 value={episodeForm.itunes_episode}
                 onChange={(e) => setEpisodeForm((cur) => ({ ...cur, itunes_episode: e.target.value }))}
               />
-            </Grid>
-          </Grid>
+          </Box>
           <FormControlLabel
             control={
               <Switch
@@ -876,13 +860,12 @@ function PodcastsContent() {
   return (
     <Box sx={{ width: '100%' }}>
       {/* Page header */}
-      <Paper
-        elevation={0}
-        sx={{ p: { xs: 2.5, md: 3.5 }, mb: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}
+      <Box
+        sx={{ p: { xs: 2.5, md: 3.5 }, mb: 3, border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', borderRadius: '14px', bgcolor: isDark ? '#111827' : '#ffffff' }}
       >
         <Stack spacing={1}>
-          <Typography variant="h4" fontWeight={700}>Podcasts</Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="h4" sx={{ fontWeight: 800, fontSize: { xs: '1.5rem', sm: '1.85rem' }, color: isDark ? '#f1f5f9' : '#0f172a', letterSpacing: '-0.02em' }}>Podcasts</Typography>
+          <Typography variant="body2" sx={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}>
             {workspaceSupervisor
               ? 'Workspace owner: all podcasts under this API key are listed here.'
               : accessMode === 'owned'
@@ -890,7 +873,7 @@ function PodcastsContent() {
                 : 'Shared workspace — create and manage podcasts without separate subscriptions.'}
           </Typography>
         </Stack>
-      </Paper>
+      </Box>
 
       {feedback && (
         <Alert severity={feedback.type} sx={{ mb: 3 }} onClose={() => setFeedback(null)}>
@@ -899,54 +882,41 @@ function PodcastsContent() {
       )}
 
       {/* Stats row */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
+          <Box sx={{ borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff', p: 2.25 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: 'primary.main', width: 44, height: 44 }}><PodcastIcon /></Avatar>
+                <Avatar sx={{ bgcolor: '#4a6cf7', width: 44, height: 44 }}><PodcastIcon /></Avatar>
                 <Box>
-                  <Typography variant="h5" fontWeight={700}>{podcasts.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Connected Podcasts</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}>{podcasts.length}</Typography>
+                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}>Connected Podcasts</Typography>
                 </Box>
               </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
+          </Box>
+          <Box sx={{ borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff', p: 2.25 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: 'secondary.main', width: 44, height: 44 }}><MicIcon /></Avatar>
+                <Avatar sx={{ bgcolor: '#f59e0b', width: 44, height: 44 }}><MicIcon /></Avatar>
                 <Box>
-                  <Typography variant="h5" fontWeight={700}>{episodes.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Total Episodes</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}>{episodes.length}</Typography>
+                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}>Total Episodes</Typography>
                 </Box>
               </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Card sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-            <CardContent>
+          </Box>
+          <Box sx={{ borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff', p: 2.25 }}>
               <Stack direction="row" spacing={2} alignItems="center">
-                <Avatar sx={{ bgcolor: 'success.main', width: 44, height: 44 }}><UploadFileIcon /></Avatar>
+                <Avatar sx={{ bgcolor: '#10b981', width: 44, height: 44 }}><UploadFileIcon /></Avatar>
                 <Box>
-                  <Typography variant="h5" fontWeight={700}>{publishedEpisodes}</Typography>
-                  <Typography variant="body2" color="text.secondary">Published Episodes</Typography>
+                  <Typography sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}>{publishedEpisodes}</Typography>
+                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}>Published Episodes</Typography>
                 </Box>
               </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+          </Box>
+      </Box>
 
       {/* ── MY PODCAST VIEW ─────────────────────────────────────────────── */}
       {activeView === 'podcast' && (
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
           {/* Left: step form */}
-          <Grid item xs={12} lg={6}>
-            <Paper elevation={0} sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
                 <Box>
                   <Typography variant="h6" fontWeight={700}>
@@ -1038,12 +1008,10 @@ function PodcastsContent() {
                   </Stack>
                 </>
               )}
-            </Paper>
-          </Grid>
+          </Box>
 
           {/* Right: existing podcasts list */}
-          <Grid item xs={12} lg={6}>
-            <Paper elevation={0} sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
               <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
                 {podcasts.length > 0 ? 'Your Podcasts' : 'No Podcasts Yet'}
               </Typography>
@@ -1101,17 +1069,15 @@ function PodcastsContent() {
                   ))}
                 </Stack>
               )}
-            </Paper>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       )}
 
       {/* ── EPISODES VIEW ───────────────────────────────────────────────── */}
       {activeView === 'episodes' && (
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '5fr 7fr' }, gap: 3 }}>
           {/* Left: publish form */}
-          <Grid item xs={12} lg={5}>
-            <Paper elevation={0} sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+          <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
               <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Publish Episode</Typography>
 
               {podcasts.length === 0 ? (
@@ -1212,11 +1178,10 @@ function PodcastsContent() {
                   </Stack>
                 </>
               )}
-            </Paper>
-          </Grid>
+          </Box>
 
           {/* Right: episodes list */}
-          <Grid item xs={12} lg={7}>
+          <Box>
             <Paper elevation={0} sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 2, border: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="h6" fontWeight={700}>Episodes</Typography>
@@ -1267,8 +1232,8 @@ function PodcastsContent() {
                 </Stack>
               )}
             </Paper>
-          </Grid>
-        </Grid>
+          </Box>
+        </Box>
       )}
 
       {/* ── ANALYTICS VIEW ──────────────────────────────────────────────── */}

@@ -46,7 +46,20 @@ export interface IUser extends Document {
   artistName?: string;
   bio?: string;
   accountType?: 'artist' | 'label';
+  isActive?: boolean;
   onboarding?: IArtistOnboarding | ILabelOnboarding;
+  verification?: {
+    status: 'pending' | 'submitted' | 'approved' | 'rejected';
+    mobileProvider?: 'surepass' | 'sandbox' | 'manual';
+    kycProvider?: 'surepass' | 'sandbox' | 'manual';
+    consent?: boolean;
+    phoneNumber?: string;
+    submittedAt?: Date;
+    reviewedAt?: Date;
+    reviewedBy?: mongoose.Types.ObjectId;
+    rejectionReason?: string;
+    notes?: string;
+  };
   socialLinks?: {
     website?: string;
     instagram?: string;
@@ -105,8 +118,40 @@ const UserSchema: Schema = new Schema(
       type: String,
       enum: ['artist', 'label'],
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
     onboarding: {
       type: Schema.Types.Mixed,
+    },
+    verification: {
+      status: {
+        type: String,
+        enum: ['pending', 'submitted', 'approved', 'rejected'],
+        default: 'pending',
+      },
+      mobileProvider: {
+        type: String,
+        enum: ['surepass', 'sandbox', 'manual'],
+      },
+      kycProvider: {
+        type: String,
+        enum: ['surepass', 'sandbox', 'manual'],
+      },
+      consent: {
+        type: Boolean,
+        default: false,
+      },
+      phoneNumber: String,
+      submittedAt: Date,
+      reviewedAt: Date,
+      reviewedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+      },
+      rejectionReason: String,
+      notes: String,
     },
     socialLinks: {
       website: String,

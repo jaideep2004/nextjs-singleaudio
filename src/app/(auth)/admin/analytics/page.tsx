@@ -5,6 +5,7 @@ import { releaseAPI, trackAPI, adminAPI } from '@/services/api';
 import dynamic from 'next/dynamic';
 import { registerChartElements } from './registerChartElements';
 import { useColorMode } from '@/context/ColorModeContext';
+import { PremiumHeader } from '@/components/premium/PremiumSurface';
 
 // Dynamically import react-chartjs-2 components for client-side rendering
 const Bar = dynamic(() => import('react-chartjs-2').then(mod => mod.Bar), { ssr: false });
@@ -83,18 +84,12 @@ export default function AnalyticsPage() {
   const CARD_SIZE = { xs: 320, sm: 380, md: 440 } as const;
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography
-        variant="h4"
-        fontWeight={700}
-        mb={2}
-        style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-      >
-        Analytics Dashboard
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" mb={4}>
-        Beautiful, dynamic, and animated charts visualizing your platform's data
-      </Typography>
+    <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
+      <PremiumHeader
+        eyebrow="Intelligence"
+        title="Analytics Dashboard"
+        description="Premium operating charts for release status, users, monthly volume, and catalog depth."
+      />
       {loading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
           <CircularProgress />

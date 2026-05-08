@@ -74,6 +74,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       companyWebsite,
       socialLinks,
       bio,
+      verification,
     } = req.body;
 
     // Check if user already exists
@@ -148,6 +149,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       artistName: artistName || undefined,
       bio,
       onboarding,
+      verification: {
+        status: 'pending',
+        mobileProvider: verification?.mobileProvider || verification?.mobileVerificationProvider,
+        kycProvider: verification?.kycProvider,
+        consent: verification?.consent === true || verification?.kycConsent === true,
+        phoneNumber: verification?.phoneNumber || verification?.verificationPhoneNumber,
+      },
     });
 
     // Generate token
@@ -162,6 +170,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         artistName: user.artistName,
         accountType: user.accountType,
+        verification: user.verification,
         token,
       },
       'User registered successfully',
@@ -203,6 +212,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       email: user.email,
       role: user.role,
       artistName: user.artistName,
+      accountType: user.accountType,
+      verification: user.verification,
       token
     }, 'Login successful');
   } catch (error) {
@@ -228,6 +239,8 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       email: user.email,
       role: user.role,
       artistName: user.artistName,
+      accountType: user.accountType,
+      verification: user.verification || { status: 'pending' },
       bio: user.bio,
       socialLinks: user.socialLinks,
       profilePicture: user.profilePicture,
@@ -235,6 +248,112 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     }, 'User profile retrieved successfully');
   } catch (error) {
     errorResponse(res, 'Failed to get user profile', error);
+  }
+};
+
+/**
+ * Submit current user's KYC data
+ * @route PUT /api/auth/me/kyc
+ * @access Private
+ */
+export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new ApiError('User not found', 404);
+    }
+
+    const {
+      accountType,
+      artistName,
+      legalName,
+      idType,
+      idNumber,
+      legalAddress,
+      phoneNumber,
+      numberOfTracks,
+      numberOfReleases,
+      labelName,
+      registrationType,
+      labelLegalName,
+      legalEntityName,
+      companyType,
+      totalArtists,
+      totalRevenue,
+      catalogSize,
+      rightsType,
+      companyWebsite,
+      socialLinks,
+      mobileVerificationProvider,
+      kycProvider,
+      kycConsent,
+      notes,
+    } = req.body;
+
+    if (!kycConsent) {
+      throw new ApiError('KYC consent is required', 400);
+    }
+
+    if (accountType === 'artist') {
+      user.accountType = 'artist';
+      user.artistName = artistName || user.artistName;
+      user.onboarding = {
+        legalName,
+        idType,
+        idNumber,
+        legalAddress,
+        phoneNumber,
+        numberOfTracks: Number(numberOfTracks) || 0,
+        numberOfReleases: Number(numberOfReleases) || 0,
+        governmentIdFile: '',
+      } as any;
+    } else if (accountType === 'label') {
+      user.accountType = 'label';
+      user.onboarding = {
+        labelName,
+        registrationType,
+        legalName: registrationType === 'individual' ? labelLegalName : undefined,
+        legalEntityName: registrationType === 'registered_company' ? legalEntityName : undefined,
+        companyType: registrationType === 'registered_company' ? companyType : undefined,
+        totalArtists: Number(totalArtists) || 0,
+        totalRevenue: Number(totalRevenue) || 0,
+        catalogSize: Number(catalogSize) || 0,
+        rightsType,
+        companyWebsite: companyWebsite || undefined,
+        socialLinks: socialLinks || undefined,
+      } as any;
+    }
+
+    user.verification = {
+      ...(user.verification || {}),
+      status: 'submitted',
+      mobileProvider: mobileVerificationProvider || 'sandbox',
+      kycProvider: kycProvider || 'sandbox',
+      consent: true,
+      phoneNumber,
+      submittedAt: new Date(),
+      rejectionReason: undefined,
+      notes,
+    };
+
+    await user.save();
+
+    successResponse(
+      res,
+      {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        accountType: user.accountType,
+        artistName: user.artistName,
+        verification: user.verification,
+        onboarding: user.onboarding,
+      },
+      'KYC submitted successfully'
+    );
+  } catch (error) {
+    errorResponse(res, 'Failed to submit KYC', error);
   }
 };
 

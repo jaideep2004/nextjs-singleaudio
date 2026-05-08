@@ -7,6 +7,8 @@ import {
   Chip,
   Button,
   CircularProgress,
+  Paper,
+  Stack,
 } from '@mui/material';
 import { 
   Edit, 
@@ -15,6 +17,8 @@ import {
   Email,
   Person,
   CalendarToday,
+  VerifiedUser,
+  Cancel,
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
@@ -23,6 +27,7 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
   const { mode } = useColorMode();
   
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [reviewingKyc, setReviewingKyc] = useState(false);
 
   const handleStatusToggle = async () => {
     try {
@@ -42,6 +47,28 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
       setUpdatingStatus(false);
     }
   };
+
+  const handleKycReview = async (status: 'approved' | 'rejected') => {
+    try {
+      setReviewingKyc(true);
+      const response = await adminAPI.reviewUserVerification(user._id, {
+        status,
+        rejectionReason: status === 'rejected' ? 'KYC details need correction. Please resubmit with valid information.' : undefined,
+      });
+      if (response.success) onUserUpdate();
+    } catch (err: any) {
+      console.error('Error updating KYC status:', err);
+    } finally {
+      setReviewingKyc(false);
+    }
+  };
+
+  const verificationStatus = user.verification?.status || 'pending';
+  const verificationColor =
+    verificationStatus === 'approved' ? 'success' :
+    verificationStatus === 'rejected' ? 'error' :
+    verificationStatus === 'submitted' ? 'warning' :
+    'info';
 
   return (
     <Box>
@@ -84,8 +111,52 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
             color={user.isActive ? 'success' : 'default'}
             size="small"
           />
+          <Chip
+            label={`KYC ${verificationStatus}`}
+            color={verificationColor as any}
+            size="small"
+            sx={{ ml: 1 }}
+          />
         </Box>
       </Box>
+
+      {user.role !== 'admin' && (
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 4, borderRadius: 2 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={2}>
+            <Box>
+              <Typography variant="h6" fontWeight={700}>KYC Review</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Provider: {user.verification?.kycProvider || 'Not selected'} | Mobile: {user.verification?.mobileProvider || 'Not selected'}
+              </Typography>
+              {user.verification?.rejectionReason && (
+                <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                  {user.verification.rejectionReason}
+                </Typography>
+              )}
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={reviewingKyc ? <CircularProgress size={18} /> : <VerifiedUser />}
+                disabled={reviewingKyc || verificationStatus === 'approved'}
+                onClick={() => handleKycReview('approved')}
+              >
+                Approve KYC
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<Cancel />}
+                disabled={reviewingKyc || verificationStatus === 'rejected'}
+                onClick={() => handleKycReview('rejected')}
+              >
+                Reject
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      )}
 
       {/* User Details */}
       <Box sx={{ mb: 4 }}>

@@ -16,7 +16,9 @@ const generateToken = (user: IUser): string => {
       : typeof user._id === 'string' ? user._id : String(user._id),
     name: user.name,
     email: user.email,
-    role: user.role
+    role: user.role,
+    accountType: user.accountType,
+    verification: user.verification,
   };
 
   // Use the secret as string with explicit typing

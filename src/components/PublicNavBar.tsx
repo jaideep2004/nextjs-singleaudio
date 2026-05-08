@@ -37,7 +37,7 @@ export default function PublicNavBar() {
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
       <Typography variant="h6" sx={{ my: 2 }}>
-        Karhari Media
+        Single Audio
       </Typography>
       <Divider />
       <List>
@@ -72,7 +72,7 @@ export default function PublicNavBar() {
             component="div"
             sx={{ flexGrow: 1, textAlign: { xs: 'center', md: 'left' } }}
           >
-            Karhari Media
+            Single Audio
           </Typography>
           {!isMobile && (
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>

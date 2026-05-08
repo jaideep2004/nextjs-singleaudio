@@ -67,6 +67,10 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
     if (req.query.role) {
       query.role = req.query.role;
     }
+
+    if (req.query.status) {
+      query['verification.status'] = req.query.status;
+    }
     
     if (req.query.search) {
       const searchRegex = new RegExp(req.query.search as string, 'i');
@@ -134,7 +138,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, role, artistName, bio, socialLinks } = req.body;
+    const { name, email, role, artistName, bio, socialLinks, isActive, verification } = req.body;
 
     const user = await User.findById(id);
 
@@ -151,10 +155,19 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     }
     if (artistName) user.artistName = artistName;
     if (bio !== undefined) user.bio = bio;
+    if (typeof isActive === 'boolean') {
+      (user as any).isActive = isActive;
+    }
     if (socialLinks) {
       user.socialLinks = {
         ...user.socialLinks,
         ...socialLinks
+      };
+    }
+    if (verification) {
+      user.verification = {
+        ...(user.verification || {}),
+        ...verification,
       };
     }
 
@@ -163,6 +176,51 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     successResponse(res, user, 'User updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update user', error);
+  }
+};
+
+/**
+ * Review user KYC verification (admin only)
+ * @route PATCH /api/users/:id/verification
+ * @access Private (Admin)
+ */
+export const reviewUserVerification = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason, notes } = req.body as {
+      status?: 'approved' | 'rejected' | 'submitted' | 'pending';
+      rejectionReason?: string;
+      notes?: string;
+    };
+
+    if (!status || !['approved', 'rejected', 'submitted', 'pending'].includes(status)) {
+      throw new ApiError('Invalid verification status', 400);
+    }
+
+    if (status === 'rejected' && !rejectionReason?.trim()) {
+      throw new ApiError('Rejection reason is required', 400);
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      notFoundResponse(res, 'User not found');
+      return;
+    }
+
+    user.verification = {
+      ...(user.verification || {}),
+      status,
+      reviewedAt: new Date(),
+      reviewedBy: req.user._id,
+      rejectionReason: status === 'rejected' ? rejectionReason : undefined,
+      notes,
+    };
+
+    await user.save();
+
+    successResponse(res, user, 'User verification updated successfully');
+  } catch (error) {
+    errorResponse(res, 'Failed to update user verification', error);
   }
 };
 

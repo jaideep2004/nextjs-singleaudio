@@ -38,6 +38,7 @@ import {
   PlayArrow,
   Pause,
   PlaylistAddCheck,
+  Delete,
 } from "@mui/icons-material";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -117,6 +118,10 @@ export default function AdminReleaseDetailPage() {
 
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [trackDeleteTarget, setTrackDeleteTarget] = useState<{ index: number; title: string } | null>(null);
+  const [trackDeleteReason, setTrackDeleteReason] = useState("");
+  const [deletingTrack, setDeletingTrack] = useState(false);
+  const [showAllTerritories, setShowAllTerritories] = useState(false);
 
   const mergeTrackAcrCloudStatus = (tracks: any[], fileId: string, acrCloud: any) =>
     tracks.map((track: any) =>
@@ -250,6 +255,32 @@ export default function AdminReleaseDetailPage() {
     }
   };
 
+  const handleDeleteReleaseTrack = async () => {
+    if (!trackDeleteTarget) return;
+    try {
+      setDeletingTrack(true);
+      const resp = await releaseAPI.deleteReleaseTrack(releaseId, trackDeleteTarget.index, trackDeleteReason || undefined);
+      if (resp?.success) {
+        setRelease(resp.release || ((prev: any) => {
+          if (!prev || !Array.isArray(prev.tracks)) return prev;
+          return {
+            ...prev,
+            tracks: prev.tracks.filter((_: any, idx: number) => idx !== trackDeleteTarget.index),
+            updatedAt: new Date().toISOString(),
+          };
+        }));
+        setTrackDeleteTarget(null);
+        setTrackDeleteReason("");
+      } else {
+        setError(resp?.message || resp?.error || "Failed to delete track from release");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to delete track from release");
+    } finally {
+      setDeletingTrack(false);
+    }
+  };
+
   const handlePlayTrack = (audioUrl: string, trackId: string) => {
     if (!audioUrl) return;
     
@@ -343,6 +374,51 @@ export default function AdminReleaseDetailPage() {
     );
   };
 
+  const flagFromCountryCode = (code: string) => {
+    const normalized = code.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(normalized)) return '🌐';
+    return normalized
+      .split('')
+      .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+      .join('');
+  };
+
+  const renderTerritories = (territories: string[]) => {
+    const list = Array.isArray(territories) && territories.length > 0 ? territories : ['Worldwide'];
+    const visible = showAllTerritories ? list : list.slice(0, 30);
+    const hiddenCount = Math.max(list.length - visible.length, 0);
+
+    return (
+      <Box sx={{ display: 'grid', gap: 1.25 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          {visible.map((territory) => (
+            <Chip
+              key={territory}
+              size="small"
+              label={`${flagFromCountryCode(territory)} ${territory}`}
+              variant="outlined"
+              sx={{
+                borderRadius: '10px',
+                bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.045)' : 'rgba(255,255,255,0.74)',
+                '& .MuiChip-label': { fontWeight: 750 },
+              }}
+            />
+          ))}
+        </Box>
+        {list.length > 30 ? (
+          <Button
+            size="small"
+            variant="text"
+            onClick={() => setShowAllTerritories((value) => !value)}
+            sx={{ justifySelf: 'flex-start', px: 0.5 }}
+          >
+            {showAllTerritories ? 'Show Less' : `Show ${hiddenCount} More`}
+          </Button>
+        ) : null}
+      </Box>
+    );
+  };
+
   const renderAcrCloudReview = (acrCloud: any) => {
     if (!acrCloud) return null;
 
@@ -356,9 +432,11 @@ export default function AdminReleaseDetailPage() {
         variant="outlined"
         sx={{
           mt: 1.5,
-          p: 2,
-          borderRadius: 2,
-          bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)',
+          p: { xs: 1.5, md: 2 },
+          borderRadius: '18px',
+          width: '100%',
+          bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.035)' : 'rgba(255, 255, 255, 0.72)',
+          boxShadow: mode === 'dark' ? 'none' : '0 18px 44px rgba(15,23,42,0.06)',
         }}
       >
         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'flex-start', flexWrap: 'wrap', mb: 1.5 }}>
@@ -386,8 +464,8 @@ export default function AdminReleaseDetailPage() {
           </Paper>
         ) : null}
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 1.5 }}>
-          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: 'minmax(0, 0.9fr) minmax(0, 1.1fr)' }, gap: 1.5 }}>
+          <Box sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: '14px', overflow: 'hidden' }}>
             <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover' }}>
               <Typography variant="caption" fontWeight={700}>AI detection</Typography>
             </Box>
@@ -425,7 +503,7 @@ export default function AdminReleaseDetailPage() {
             </Box>
           </Box>
 
-          <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden' }}>
+          <Box sx={{ minWidth: 0, border: '1px solid', borderColor: 'divider', borderRadius: '14px', overflow: 'hidden' }}>
             <Box sx={{ px: 1.5, py: 1, bgcolor: 'action.hover' }}>
               <Typography variant="caption" fontWeight={700}>Fingerprint, DSP and rights</Typography>
             </Box>
@@ -435,11 +513,11 @@ export default function AdminReleaseDetailPage() {
                 const rightsClaims = getAcrCloudRightsClaims(match.raw);
                 return (
                   <Box key={`${match.acrid || match.title || 'match'}-${idx}`} sx={{ display: 'grid', gap: 0.75 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="body2" fontWeight={600}>{match.title || 'Untitled match'}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap', minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600} sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>{match.title || 'Untitled match'}</Typography>
                       {typeof match.score === 'number' ? <Chip size="small" label={`Score ${match.score}`} color="info" variant="outlined" /> : null}
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
                       {[match.artist, match.album, match.isrc ? `ISRC ${match.isrc}` : null, match.upc ? `UPC ${match.upc}` : null].filter(Boolean).join(' | ')}
                     </Typography>
 
@@ -448,7 +526,7 @@ export default function AdminReleaseDetailPage() {
                         <Typography variant="caption" color="text.secondary" fontWeight={700}>
                           DSP / provider metadata
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', minWidth: 0 }}>
                           {providerMetadata.map((provider) => (
                             <Tooltip
                               key={`${provider.provider}-${provider.trackId || provider.albumId || idx}`}
@@ -464,6 +542,7 @@ export default function AdminReleaseDetailPage() {
                                 color={provider.isYoutube ? 'error' : 'default'}
                                 label={`${provider.label}${provider.trackId ? `: ${provider.trackId}` : ''}`}
                                 variant="outlined"
+                                sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
                               />
                             </Tooltip>
                           ))}
@@ -559,11 +638,12 @@ export default function AdminReleaseDetailPage() {
         <Paper 
           elevation={0} 
           sx={{ 
-            borderRadius: 2,
+            borderRadius: '22px',
             border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
+            bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.025)' : 'rgba(255, 255, 255, 0.86)',
           }}
         >
-          <Stack spacing={1} sx={{ p: 2 }}>
+          <Stack spacing={1.5} sx={{ p: { xs: 1.25, md: 2 } }}>
             {tracks.map((track: any, index: number) => {
               // Try different possible field names for audio URL
               const audioUrl = track.audioUrl || track.audioFile || track.audio || null;
@@ -576,63 +656,88 @@ export default function AdminReleaseDetailPage() {
                 <Box 
                   key={trackId} 
                   sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    py: 1,
-                    borderBottom: index < tracks.length - 1 ? 
-                      `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}` : 
-                      'none'
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                    gap: 2,
+                    p: { xs: 1.5, md: 2 },
+                    borderRadius: '18px',
+                    border: '1px solid',
+                    borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)',
+                    bgcolor: mode === 'dark' ? 'rgba(11, 16, 32, 0.42)' : 'rgba(248, 250, 252, 0.92)',
                   }}
                 >
-                  <Avatar
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      mr: 2,
-                      bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
-                    }}
-                  >
-                    <MusicNote />
-                  </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight={500}>
-                      {title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {isrc}
-                    </Typography>
-                    {track.acrCloud && (
-                      <Box sx={{ mt: 0.75, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
-                        <Chip
-                          size="small"
-                          icon={getAcrCloudState(track.acrCloud) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
-                          label={getAcrCloudLabel(track.acrCloud)}
-                          color={getAcrCloudColor(track.acrCloud) as any}
-                          variant="outlined"
-                        />
-                        {getAcrCloudSummary(track.acrCloud) && (
-                          <Typography variant="caption" color="text.secondary">
-                            {getAcrCloudSummary(track.acrCloud)}
-                          </Typography>
-                        )}
-                        {renderAcrCloudReview(track.acrCloud)}
-                      </Box>
-                    )}
-                  </Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ mr: 2 }}>
-                    {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}
-                  </Typography>
-                  {audioUrl && (
-                    <IconButton 
-                      size="small"
-                      onClick={() => handlePlayTrack(audioUrl, trackId)}
+                  <Box sx={{ display: 'flex', gap: 1.5, minWidth: 0 }}>
+                    <Avatar
                       sx={{
-                        bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                        width: 44,
+                        height: 44,
+                        flexShrink: 0,
+                        bgcolor: mode === 'dark' ? 'primary.dark' : 'primary.light',
                       }}
                     >
-                      {currentlyPlaying === trackId ? <Pause /> : <PlayArrow />}
-                    </IconButton>
-                  )}
+                      <MusicNote />
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body1" fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>
+                        {title}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {isrc}
+                      </Typography>
+                      {track.acrCloud && getAcrCloudSummary(track.acrCloud) && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                          {getAcrCloudSummary(track.acrCloud)}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}
+                    </Typography>
+                    {track.acrCloud && (
+                      <Chip
+                        size="small"
+                        icon={getAcrCloudState(track.acrCloud) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                        label={getAcrCloudLabel(track.acrCloud)}
+                        color={getAcrCloudColor(track.acrCloud) as any}
+                        variant="outlined"
+                      />
+                    )}
+                    {audioUrl && (
+                      <IconButton
+                        size="small"
+                        aria-label={currentlyPlaying === trackId ? 'Pause track' : 'Play track'}
+                        onClick={() => handlePlayTrack(audioUrl, trackId)}
+                        sx={{
+                          bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                        }}
+                      >
+                        {currentlyPlaying === trackId ? <Pause /> : <PlayArrow />}
+                      </IconButton>
+                    )}
+                    <Tooltip title="Delete track from this release">
+                      <span>
+                        <IconButton
+                          size="small"
+                          color="error"
+                          aria-label="Delete track from release"
+                          onClick={() => setTrackDeleteTarget({ index, title })}
+                          disabled={deletingTrack || release?.status === 'approved'}
+                          sx={{
+                            bgcolor: mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.06)',
+                          }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+                  {track.acrCloud ? (
+                    <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
+                      {renderAcrCloudReview(track.acrCloud)}
+                    </Box>
+                  ) : null}
                 </Box>
               );
             })}
@@ -644,7 +749,7 @@ export default function AdminReleaseDetailPage() {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <Container maxWidth={false} sx={{ py: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
         <CircularProgress />
       </Container>
     );
@@ -652,7 +757,7 @@ export default function AdminReleaseDetailPage() {
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth={false} sx={{ py: 4 }}>
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="error" variant="h6" sx={{ mb: 2 }}>
             Error Loading Release
@@ -674,7 +779,7 @@ export default function AdminReleaseDetailPage() {
 
   if (!release) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth={false} sx={{ py: 4 }}>
         <Paper elevation={0} sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Release Not Found
@@ -696,7 +801,7 @@ export default function AdminReleaseDetailPage() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth={false} sx={{ py: 4 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Button
@@ -914,11 +1019,7 @@ export default function AdminReleaseDetailPage() {
               <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
                 Territories
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {Array.isArray(release.territories) && release.territories.length > 0
-                  ? release.territories.join(', ')
-                  : 'Worldwide'}
-              </Typography>
+              {renderTerritories(release.territories || [])}
             </Box>
             
             <Box>
@@ -979,6 +1080,40 @@ export default function AdminReleaseDetailPage() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Delete Track Dialog */}
+      <Dialog open={!!trackDeleteTarget} onClose={() => !deletingTrack && setTrackDeleteTarget(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Track From Release</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            This removes "{trackDeleteTarget?.title || 'this track'}" from the submitted release for admin review. It does not approve or reject the release.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Admin reason"
+            fullWidth
+            multiline
+            rows={3}
+            value={trackDeleteReason}
+            onChange={(e) => setTrackDeleteReason(e.target.value)}
+            helperText="Stored with release audit data."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTrackDeleteTarget(null)} disabled={deletingTrack}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteReleaseTrack}
+            color="error"
+            variant="contained"
+            disabled={deletingTrack}
+          >
+            {deletingTrack ? <CircularProgress size={20} /> : 'Delete Track'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Reject Dialog */}
       <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)}>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useColorMode } from '@/context/ColorModeContext';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { adminAPI, releaseAPI } from '@/services/api';
+import { PremiumHeader } from '@/components/premium/PremiumSurface';
 import { 
   Container, 
   Box, 
@@ -242,7 +243,7 @@ export default function AdminDashboard() {
   // Render auth error state
   if (authError) {
     return (
-      <Container maxWidth="lg">
+      <Container maxWidth={false}>
         <Alert severity="error" sx={{ mt: 4 }}>
           {authError}
         </Alert>
@@ -267,7 +268,7 @@ export default function AdminDashboard() {
   // Render loading state
   if (isLoading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth={false} sx={{ py: 4 }}>
         <Box sx={{ mb: 4 }}>
           <Skeleton variant="text" width={300} height={40} />
           <Skeleton variant="text" width={200} height={20} />
@@ -294,7 +295,7 @@ export default function AdminDashboard() {
   // Render error state
   if (error) {
     return (
-      <Container maxWidth="lg">
+      <Container maxWidth={false}>
         <Alert severity="error" sx={{ mt: 4 }}>
           {error}
         </Alert>
@@ -303,22 +304,12 @@ export default function AdminDashboard() {
   }
   
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
-      {/* Header */}
-      <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-        <Typography 
-          variant={isMobile ? "h5" : "h4"} 
-          component="h1" 
-          fontWeight={700}
-          sx={{ mb: 1 }}
-          style={{ color: mode === 'dark' ? 'rgba(255, 255, 255, 0.87)' : 'rgba(0, 0, 0, 0.87)' }}
-        >
-          Admin Dashboard
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary">
-          Welcome back! Here's what's happening today.
-        </Typography>
-      </Box>
+    <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
+      <PremiumHeader
+        eyebrow="Admin Command Center"
+        title="Admin Dashboard"
+        description="Monitor users, releases, payouts, and review queues from one premium operations cockpit."
+      />
 
       {/* Stats Overview */}
       <Box sx={statGridStyles}>

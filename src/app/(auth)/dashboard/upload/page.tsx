@@ -31,6 +31,14 @@ import {
   Slide,
   Avatar,
   Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  useTheme,
 } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
 import {
@@ -55,6 +63,7 @@ import { useAuth } from '@/context/AppContext';
 import Cookies from 'js-cookie';
 import countries from '@/utils/countries';
 import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
+import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import {
   AcrCloudStatusLike,
   fetchAcrCloudScanResult,
@@ -253,14 +262,6 @@ const languages = [
   { code: 'zh', name: 'Chinese' },
 ];
 
-const territories = [
-  'Worldwide', 'North America', 'Europe', 'Asia', 'South America', 'Africa', 'Oceania'
-];
-
-const stores = [
-  'Spotify', 'Apple Music', 'Amazon Music', 'YouTube Music', 'Deezer', 'Tidal', 'Pandora', 'SoundCloud', 'Bandcamp'
-];
-
 // Define steps (combined flow)
 const steps = [
   'Select Release Type',
@@ -435,6 +436,7 @@ const defaultTrackInfo: TrackInfo = {
 };
 
 export default function UploadPage() {
+  const theme = useTheme();
   // ...existing state
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
   const [releaseTitle, setReleaseTitle] = useState('');
@@ -442,6 +444,7 @@ export default function UploadPage() {
   const [upc, setUpc] = useState('');
   const [autoGenerateCodes, setAutoGenerateCodes] = useState(true);
   const [allowedDspKeys, setAllowedDspKeys] = useState<DspKey[] | null>(null);
+  const [platformAccessError, setPlatformAccessError] = useState('');
   // ...existing state
 
   // All hooks must be at the top and called unconditionally
@@ -504,7 +507,8 @@ export default function UploadPage() {
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
 
   // Computed values (not state)
-  const allSelected = selectedDSPs.length === visibleDSPs.length;
+  const isPlatformAccessLoading = allowedDspKeys === null;
+  const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
 
   const ensureTrackStateLength = (length: number) => {
     setAnalysisResults((arr) => resizeList(arr, length, null));
@@ -629,6 +633,7 @@ export default function UploadPage() {
     setSelectedDSPs(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
   const handleSelectAll = () => {
+    if (visibleDSPs.length === 0) return;
     setSelectedDSPs(allSelected ? [] : visibleDSPs.map((dsp: DspItem) => dsp.key));
   };
   const handleContinue = () => {
@@ -788,11 +793,14 @@ export default function UploadPage() {
   useEffect(() => {
     const loadAllowed = async () => {
       try {
+        setPlatformAccessError('');
         const res = await fetch('/api/platforms', { cache: 'no-store' });
         const json = await res.json().catch(() => null);
+        if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to load platform access');
         const keys = Array.isArray(json?.data?.dspKeys) ? (json.data.dspKeys as DspKey[]) : ALL_DSP_KEYS;
         setAllowedDspKeys(keys);
-      } catch {
+      } catch (error) {
+        setPlatformAccessError(error instanceof Error ? error.message : 'Failed to load platform access');
         setAllowedDspKeys(ALL_DSP_KEYS);
       }
     };
@@ -1356,17 +1364,25 @@ export default function UploadPage() {
                     value={upc}
                     onChange={e => setUpc(e.target.value)}
                     inputProps={{ 'aria-label': 'UPC' }}
-                  />
-                </Grid>
-                <Grid xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={autoGenerateCodes}
-                        onChange={(e) => setAutoGenerateCodes(e.target.checked)}
-                      />
-                    }
-                    label="Auto-generate UPC. Blank ISRCs are always assigned by system."
+                    disabled={autoGenerateCodes}
+                    helperText={autoGenerateCodes ? 'System assigns release UPC during submit.' : 'Enter an existing release UPC.'}
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <FormControlLabel
+                            sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: 12, whiteSpace: 'nowrap' } }}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={autoGenerateCodes}
+                                onChange={(e) => setAutoGenerateCodes(e.target.checked)}
+                              />
+                            }
+                            label="Auto"
+                          />
+                        </InputAdornment>
+                      ),
+                    }}
                   />
                 </Grid>
               </Grid>
@@ -1396,40 +1412,97 @@ export default function UploadPage() {
               Upload a square JPG/PNG. Exactly 3000x3000px. Max 10MB.
             </Typography>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid xs={12} md={6}>
-                <Card sx={{ height: '100%', bgcolor: 'background.paper', color: 'text.primary' }}>
-                  <CardContent>
+              <Grid xs={12} md={8} lg={7}>
+                <Card
+                  sx={{
+                    height: '100%',
+                    bgcolor: 'background.paper',
+                    color: 'text.primary',
+                    borderRadius: '28px',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: theme => theme.palette.mode === 'dark' ? 'none' : '0 22px 56px rgba(15,23,42,0.08)',
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
                     <Box
                       sx={{
-                        border: '2px dashed', borderColor: 'divider', borderRadius: 2, p: 4,
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 240,
+                        border: '2px dashed',
+                        borderColor: artworkPreview ? 'primary.main' : 'divider',
+                        borderRadius: '22px',
+                        p: { xs: 1.5, sm: 2 },
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', md: 'minmax(260px, 1fr) 220px' },
+                        alignItems: 'center',
+                        gap: { xs: 2, md: 2.5 },
+                        minHeight: 360,
+                        bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.025)' : 'rgba(248,250,252,0.74)',
                       }}
                     >
-                      <Box sx={{ width: 160, height: 160, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2, borderRadius: 1, overflow: 'hidden' }}>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          maxWidth: 460,
+                          aspectRatio: '1 / 1',
+                          justifySelf: 'center',
+                          bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: '18px',
+                          overflow: 'hidden',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          boxShadow: artworkPreview
+                            ? theme => theme.palette.mode === 'dark'
+                              ? '0 18px 44px rgba(0,0,0,0.32)'
+                              : '0 18px 44px rgba(15,23,42,0.12)'
+                            : 'none',
+                        }}
+                      >
                         {artworkPreview ? (
-                          <img src={artworkPreview} alt="Artwork preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Box
+                            component="img"
+                            src={artworkPreview}
+                            alt="Artwork preview"
+                            sx={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+                          />
                         ) : (
                           <Album sx={{ fontSize: 56, color: 'text.secondary' }} />
                         )}
                       </Box>
-                      <input id="artwork-upload" type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
-                        onChange={e => { if (e.target.files && e.target.files[0]) setArtworkFile(e.target.files[0]); }} />
-                      <label htmlFor="artwork-upload">
-                        <Button variant="outlined" component="span">Select Image</Button>
-                      </label>
-                      {artworkUploading && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'center', md: 'flex-start' }, gap: 1.25 }}>
+                        <Typography variant="subtitle1" fontWeight={900}>
+                          {artworkPreview ? 'Artwork Ready' : 'Add Cover Artwork'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 240, textAlign: { xs: 'center', md: 'left' } }}>
+                          Preview uses the same square crop stores will receive.
+                        </Typography>
+                        <input id="artwork-upload" type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
+                          onChange={e => { if (e.target.files && e.target.files[0]) setArtworkFile(e.target.files[0]); }} />
+                        <label htmlFor="artwork-upload">
+                        <Button variant={artworkPreview ? 'contained' : 'outlined'} component="span">
+                          {artworkPreview ? 'Change Image' : 'Select Image'}
+                        </Button>
+                        </label>
+                        {artworkUploading && (
                         <Box sx={{ width: '100%', mt: 2 }}>
                           <LinearProgress />
                           <Typography variant="caption" color="text.secondary">Validating artwork…</Typography>
                         </Box>
-                      )}
-                      {artworkError && <Typography color="error" sx={{ mt: 1 }}>{artworkError}</Typography>}
-                      {!artworkError && artworkPreview && (
-                        <Typography color="success.main" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <CheckCircle fontSize="small" /> Artwork looks good (3000x3000)
+                        )}
+                        {artworkError && <Typography color="error" sx={{ mt: 1 }}>{artworkError}</Typography>}
+                        {!artworkError && artworkPreview && (
+                        <Typography color="success.main" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, fontWeight: 800 }}>
+                          <CheckCircle fontSize="small" /> 3000x3000 verified
                         </Typography>
-                      )}
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>JPG or PNG (exactly 3000x3000px, max 10MB)</Typography>
+                        )}
+                        <Box sx={{ display: 'grid', gap: 0.5, mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary">JPG or PNG</Typography>
+                          <Typography variant="caption" color="text.secondary">Exactly 3000x3000px</Typography>
+                          <Typography variant="caption" color="text.secondary">Max 10MB</Typography>
+                        </Box>
+                      </Box>
                     </Box>
                   </CardContent>
                 </Card>
@@ -1935,7 +2008,7 @@ export default function UploadPage() {
 
                       <Box>
                         <Typography variant="overline" sx={{ color: 'text.secondary' }}>Identifiers</Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mt: 1 }}>
                           <TextField
                             label="ISRC"
                             fullWidth
@@ -1943,7 +2016,6 @@ export default function UploadPage() {
                             onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)}
                             helperText="Leave blank for IN-9SN yearly sequence assignment."
                           />
-                          <TextField label="UPC" fullWidth value={trackInfos[selectedTrackIdx]?.upc || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'upc', e.target.value)} helperText="Leave blank for auto assign by system" />
                         </Box>
                       </Box>
 
@@ -2032,37 +2104,79 @@ export default function UploadPage() {
         // Distribution Providers
         return (
           <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Distribution Providers</Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              Select the DSPs where you want your release to be distributed.
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight="bold">Select Stores</Typography>
-              <Button size="small" onClick={handleSelectAll}>{allSelected ? 'Deselect All' : 'Select All'}</Button>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+              <Box>
+                <Typography variant="h5" gutterBottom fontWeight={800}>Distribution Providers</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720 }}>
+                  Pick every store for this release. Selected providers are shown again in final review.
+                </Typography>
+              </Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chip label={`${selectedDSPs.length}/${visibleDSPs.length} selected`} color={selectedDSPs.length ? 'primary' : 'default'} variant="outlined" />
+                <Button variant="outlined" size="small" onClick={handleSelectAll} disabled={isPlatformAccessLoading || visibleDSPs.length === 0}>{allSelected ? 'Deselect All' : 'Select All'}</Button>
+              </Stack>
             </Box>
-            <Grid container spacing={2}>
-              {visibleDSPs.map((dsp: DspItem) => {
-                const selected = selectedDSPs.includes(dsp.key);
-                return (
-                  <Grid xs={12} sm={6} md={4} key={dsp.key}>
-                    <Card
+            {platformAccessError && (
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: 2 }}>
+                {platformAccessError}. Showing default providers.
+              </Alert>
+            )}
+            {isPlatformAccessLoading ? (
+              <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <CircularProgress size={18} />
+                  <Typography variant="body2" color="text.secondary">Loading platform access...</Typography>
+                </Stack>
+              </Paper>
+            ) : visibleDSPs.length === 0 ? (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 3,
+                  borderRadius: 2,
+                  borderStyle: 'dashed',
+                  bgcolor: 'background.default',
+                }}
+              >
+                <Typography fontWeight={800}>No providers enabled</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+                  Ask an admin to enable platform access before submitting this release.
+                </Typography>
+              </Paper>
+            ) : (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
+                {visibleDSPs.map((dsp: DspItem) => {
+                  const selected = selectedDSPs.includes(dsp.key);
+                  return (
+                    <Paper
+                      key={dsp.key}
+                      variant="outlined"
                       onClick={() => handleDSPToggle(dsp.key)}
                       sx={{
                         cursor: 'pointer',
-                        border: selected ? 2 : 1,
+                        p: 2,
+                        minHeight: 150,
+                        borderRadius: 2,
                         borderColor: selected ? 'primary.main' : 'divider',
-                        transition: 'all 0.2s',
-                        '&:hover': { boxShadow: 3 },
+                        bgcolor: selected ? 'action.selected' : 'background.paper',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1.5,
+                        transition: 'border-color 160ms, transform 160ms, box-shadow 160ms',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: theme => theme.palette.mode === 'dark' ? '0 14px 34px rgba(0,0,0,0.28)' : '0 14px 34px rgba(15,23,42,0.08)',
+                        },
                       }}
                     >
-                      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                         <Avatar
                           src={dsp.logo}
                           alt={dsp.name}
                           variant="rounded"
                           sx={{
-                            width: 64,
-                            height: 64,
+                            width: 52,
+                            height: 52,
                             borderRadius: 2,
                             bgcolor: 'background.default',
                             border: '1px solid',
@@ -2070,20 +2184,24 @@ export default function UploadPage() {
                             p: 0.75,
                           }}
                         />
-                        <Box sx={{ flex: 1 }}>
-                          <Typography fontWeight={600}>{dsp.name}</Typography>
-                        </Box>
                         <Checkbox
                           checked={selected}
                           onClick={(event) => event.stopPropagation()}
                           onChange={() => handleDSPToggle(dsp.key)}
+                          inputProps={{ 'aria-label': `Select ${dsp.name}` }}
                         />
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
+                      </Box>
+                      <Box>
+                        <Typography fontWeight={800}>{dsp.name}</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                          {dsp.info}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            )}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack}>Back</Button>
               <Button variant="contained" color="primary" onClick={handleContinue} disabled={!isDistributionValid}>Continue</Button>
@@ -2129,18 +2247,29 @@ export default function UploadPage() {
             <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 }, mb: 3, borderRadius: 2, bgcolor: 'background.paper', color: 'text.primary', boxShadow: theme => theme.palette.mode === 'dark' ? 'none' : '0 14px 40px rgba(15,23,42,0.06)' }}>
               <Typography variant="subtitle1" fontWeight="bold">Release Overview</Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid xs={12} md={3}>
+                <Grid xs={12} md={4} lg={3}>
                   <Box sx={{
-                    width: 160,
-                    height: 160,
-                    bgcolor: 'grey.200',
-                    borderRadius: 1,
+                    width: '100%',
+                    maxWidth: 240,
+                    aspectRatio: '1 / 1',
+                    bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
+                    borderRadius: '18px',
                     overflow: 'hidden',
                     border: '1px solid',
                     borderColor: 'divider',
+                    boxShadow: artworkPreview
+                      ? theme => theme.palette.mode === 'dark'
+                        ? '0 18px 44px rgba(0,0,0,0.32)'
+                        : '0 18px 44px rgba(15,23,42,0.12)'
+                      : 'none',
                   }}>
                     {artworkPreview ? (
-                      <img src={artworkPreview} alt="Artwork preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Box
+                        component="img"
+                        src={artworkPreview}
+                        alt="Artwork preview"
+                        sx={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+                      />
                     ) : (
                       <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
                         <Album />
@@ -2148,7 +2277,7 @@ export default function UploadPage() {
                     )}
                   </Box>
                 </Grid>
-                <Grid xs={12} md={9}>
+                <Grid xs={12} md={8} lg={9}>
                   <Box>
                     <strong>Release Title:</strong> {releaseTitle || 'N/A'}<br />
                     <strong>Type:</strong> {releaseType}<br />
@@ -2163,8 +2292,107 @@ export default function UploadPage() {
                 </Grid>
               </Grid>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold">Tracklist</Typography>
-              <ol style={{ paddingLeft: 18 }}>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>Tracklist</Typography>
+              <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
+                <Table size="small" aria-label="release review tracklist">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Track</TableCell>
+                      <TableCell>Artists</TableCell>
+                      <TableCell>Metadata</TableCell>
+                      <TableCell>ACR</TableCell>
+                      <TableCell align="right">Preview</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {tracks.map((_file, idx) => {
+                      const track = trackInfos[idx];
+                      if (!track) return null;
+                      const mainArtist = getContributorNames(track, 'artist') || 'Artist TBD';
+                      const featPerf = getContributorNames(track, 'performer');
+                      const remixCredits = getContributorNames(track, 'remixer');
+                      const contributors = track.contributors
+                        .filter(contributor => contributor.name.trim())
+                        .map(contributor => `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`)
+                        .join(' | ');
+
+                      return (
+                        <TableRow key={idx} hover>
+                          <TableCell sx={{ minWidth: 260 }}>
+                            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                              <Avatar
+                                src={artworkPreview || undefined}
+                                alt={releaseTitle || 'Artwork'}
+                                variant="rounded"
+                                sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: 'background.default' }}
+                              >
+                                <Album fontSize="small" />
+                              </Avatar>
+                              <Box>
+                                <Typography variant="body2" fontWeight={800}>
+                                  {idx + 1}. {track.title || `Track ${idx + 1}`}{track.version ? ` (${track.version})` : ''}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {track.duration ? `${track.duration} | ` : ''}{track.isrc ? `ISRC ${track.isrc}` : 'ISRC auto'}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 220 }}>
+                            <Typography variant="body2" fontWeight={700}>{mainArtist}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {[featPerf ? `Feat. ${featPerf}` : '', remixCredits ? `Remix ${remixCredits}` : ''].filter(Boolean).join(' | ') || 'No featured credits'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 260 }}>
+                            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                              <Chip size="small" label={track.genre ? `${track.genre}${track.subgenre ? ` / ${track.subgenre}` : ''}` : 'Genre missing'} variant="outlined" />
+                              <Chip size="small" label={track.audioLanguage || track.language || 'Audio language missing'} variant="outlined" />
+                              <Chip size="small" label={track.explicit ? 'Explicit' : 'Clean'} variant="outlined" />
+                              <Chip size="small" label={track.instrumental ? 'Instrumental' : 'Vocal'} variant="outlined" />
+                            </Stack>
+                            {contributors ? (
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                                {contributors}
+                              </Typography>
+                            ) : null}
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }}>
+                            {audioAcrCloudStatuses[idx] ? (
+                              <Stack spacing={0.5} alignItems="flex-start">
+                                <Chip
+                                  size="small"
+                                  icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                                  label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
+                                  color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
+                                  variant="outlined"
+                                />
+                                {getAcrCloudSummary(audioAcrCloudStatuses[idx]) ? (
+                                  <Typography variant="caption" color="text.secondary">
+                                    {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
+                                  </Typography>
+                                ) : null}
+                              </Stack>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">Pending upload scan</Typography>
+                            )}
+                          </TableCell>
+                          <TableCell align="right">
+                            {trackPreviewUrls[idx] ? (
+                              <IconButton size="small" aria-label={`Play ${track.title || `Track ${idx + 1}`}`}>
+                                <PlayArrow />
+                              </IconButton>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">No preview</Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <ol style={{ paddingLeft: 18, display: 'none' }}>
                 {tracks.map((_file, idx) => {
                   const track = trackInfos[idx];
                   if (!track) return null;
@@ -2345,33 +2573,23 @@ export default function UploadPage() {
 
   return (
     <Box sx={{ width: '100%' }}>
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2.5, md: 3.5 },
-          mb: 3,
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-        }}
-      >
-        <Typography variant="h4" component="h1" gutterBottom fontWeight="bold" color="text.primary">
-          Upload Your Release/Track
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Share your music with the world through our distribution platform.
-        </Typography>
-      </Paper>
+      <PremiumHeader
+        eyebrow="Release Studio"
+        title="Upload Release"
+        description="A guided release room for audio, artwork, metadata, territories, rights, and final checks before distribution."
+      />
 
       <Paper
         variant="outlined"
         sx={{
           p: { xs: 1, sm: 2 },
           mb: 3,
-          borderRadius: 2,
-          bgcolor: 'background.paper',
+          ...premiumSurfaceSx(theme),
           overflowX: 'auto',
+          position: 'sticky',
+          top: 76,
+          zIndex: 3,
+          backdropFilter: 'blur(18px)',
         }}
       >
       <Stepper
@@ -2420,11 +2638,11 @@ export default function UploadPage() {
       <Paper
         variant="outlined"
         sx={{
-          p: { xs: 2, sm: 3, md: 4 },
-          borderRadius: 2,
-          bgcolor: 'background.paper',
-          borderColor: 'divider',
-          boxShadow: theme => theme.palette.mode === 'dark' ? '0 18px 50px rgba(0, 0, 0, 0.24)' : '0 18px 45px rgba(15, 23, 42, 0.08)',
+          p: { xs: 2.25, sm: 3.5, md: 4.5 },
+          ...premiumSurfaceSx(theme),
+          background: theme.palette.mode === 'dark'
+            ? 'linear-gradient(135deg, rgba(18,26,43,0.98), rgba(11,16,32,0.96))'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94))',
         }}
       >
         {renderStepContent()}

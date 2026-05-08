@@ -291,6 +291,17 @@ export const releaseAPI = {
       return handleApiError(error);
     }
   },
+
+  deleteReleaseTrack: async (releaseId: string, trackKey: string | number, reason?: string) => {
+    try {
+      const response = await api.delete(`/releases/${releaseId}/tracks/${trackKey}`, {
+        data: { reason },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 };
 
 // API functions for Royalties
@@ -502,6 +513,18 @@ export const adminAPI = {
   updateUser: async (id: string, userData: any) => {
     try {
       const response = await api.put<ApiResponse<any>>(`/admin/users/${id}`, userData);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  reviewUserVerification: async (
+    id: string,
+    data: { status: 'approved' | 'rejected' | 'submitted' | 'pending'; rejectionReason?: string; notes?: string }
+  ) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/admin/users/${id}/verification`, data);
       return response.data;
     } catch (error) {
       return handleApiError(error);
