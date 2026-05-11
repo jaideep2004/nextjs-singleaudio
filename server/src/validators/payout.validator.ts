@@ -7,8 +7,8 @@ export const createPayoutValidator = [
     .withMessage('Amount must be a number')
     .custom((value) => {
       const amount = parseFloat(value);
-      if (amount < 5) {
-        throw new Error('Minimum payout amount is 5');
+      if (amount < 100) {
+        throw new Error('Minimum payout amount is 100 USD');
       }
       return true;
     }),
@@ -27,10 +27,34 @@ export const createPayoutValidator = [
     .isIn(Object.values(PaymentMethod))
     .withMessage(`Payment method must be one of: ${Object.values(PaymentMethod).join(', ')}`),
     
-  body('paymentDetails.upiId')
+  body('paymentDetails.accountHolderName')
     .custom((value, { req }) => {
-      if (req.body.paymentMethod === PaymentMethod.UPI && (!value || value.trim() === '')) {
-        throw new Error('UPI ID is required when payment method is UPI');
+      if (req.body.paymentMethod === PaymentMethod.BANK_TRANSFER && (!value || value.trim() === '')) {
+        throw new Error('Account holder name is required for bank transfer');
+      }
+      return true;
+    }),
+
+  body('paymentDetails.bankName')
+    .custom((value, { req }) => {
+      if (req.body.paymentMethod === PaymentMethod.BANK_TRANSFER && (!value || value.trim() === '')) {
+        throw new Error('Bank name is required for bank transfer');
+      }
+      return true;
+    }),
+
+  body('paymentDetails.accountNumber')
+    .custom((value, { req }) => {
+      if (req.body.paymentMethod === PaymentMethod.BANK_TRANSFER && (!value || value.trim() === '')) {
+        throw new Error('Account number is required for bank transfer');
+      }
+      return true;
+    }),
+
+  body('paymentDetails.ifscCode')
+    .custom((value, { req }) => {
+      if (req.body.paymentMethod === PaymentMethod.BANK_TRANSFER && (!value || value.trim() === '')) {
+        throw new Error('IFSC code is required for Indian bank transfer');
       }
       return true;
     }),

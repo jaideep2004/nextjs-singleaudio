@@ -306,9 +306,13 @@ export default function AdminDashboard() {
   return (
     <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
       <PremiumHeader
-        eyebrow="Admin Command Center"
         title="Admin Dashboard"
-        description="Monitor users, releases, payouts, and review queues from one premium operations cockpit."
+        description="Live platform health, review queues, payouts, delivery status, and user activity."
+        action={
+          <Button component={Link} href="/admin/users/new" variant="contained" startIcon={<Group />}>
+            Add User/Subadmin
+          </Button>
+        }
       />
 
       {/* Stats Overview */}

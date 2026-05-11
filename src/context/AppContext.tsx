@@ -9,9 +9,11 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'artist' | 'label' | 'admin';
+  role: 'artist' | 'label' | 'admin' | 'subadmin';
   artistName?: string;
   accountType?: 'artist' | 'label';
+  adminPreset?: string;
+  permissions?: string[];
   verification?: {
     status?: 'pending' | 'submitted' | 'approved' | 'rejected';
     mobileProvider?: string;
@@ -75,6 +77,8 @@ interface AuthResponse {
     role: User['role'];
     artistName?: string;
     accountType?: 'artist' | 'label';
+    adminPreset?: string;
+    permissions?: string[];
     verification?: User['verification'];
   };
 }
@@ -87,6 +91,8 @@ interface UserPayload {
   role: User['role'];
   artistName?: string;
   accountType?: 'artist' | 'label';
+  adminPreset?: string;
+  permissions?: string[];
   verification?: User['verification'];
 }
 
@@ -98,6 +104,8 @@ interface DecodedToken {
   role: User['role'];
   artistName?: string;
   accountType?: 'artist' | 'label';
+  adminPreset?: string;
+  permissions?: string[];
   verification?: User['verification'];
 }
 
@@ -107,6 +115,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (userData: SignupPayload) => Promise<void>;
+  startSignup: (userData: SignupPayload) => Promise<void>;
+  verifySignup: (payload: { email: string; emailOtp: string; smsOtp: string }) => Promise<void>;
   logout: () => void;
   getToken: () => string | null;
 }
@@ -126,6 +136,12 @@ const fallbackAuthContext: AuthContextType = {
     throw new Error('Auth provider is not initialized');
   },
   signup: async () => {
+    throw new Error('Auth provider is not initialized');
+  },
+  startSignup: async () => {
+    throw new Error('Auth provider is not initialized');
+  },
+  verifySignup: async () => {
     throw new Error('Auth provider is not initialized');
   },
   logout: () => undefined,
@@ -151,6 +167,8 @@ const toUser = (payload: UserPayload): User => ({
   role: payload.role,
   artistName: payload.artistName,
   accountType: payload.accountType,
+  adminPreset: payload.adminPreset,
+  permissions: payload.permissions || [],
   verification: payload.verification,
 });
 
@@ -249,7 +267,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
 
       setUser(toUser({ ...userData, artistName: userData.artistName || userData.name }));
 
-      const redirectUrl = userData.role === 'admin' ? '/admin/dashboard' : '/dashboard';
+      const redirectUrl = userData.role === 'admin' || userData.role === 'subadmin' ? '/admin/dashboard' : '/dashboard';
       window.location.assign(redirectUrl);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Login failed'));
@@ -258,7 +276,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signup = async (userData: SignupPayload) => {
+  const startSignup = async (userData: SignupPayload) => {
     if (typeof window === 'undefined') return;
 
     setIsLoading(true);
@@ -305,13 +323,27 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         if (userData.incorporationCertFile) formData.append('incorporationCertFile', userData.incorporationCertFile);
         if (userData.gstCertFile) formData.append('gstCertFile', userData.gstCertFile);
 
-        response = await axios.post<AuthResponse>('/auth/register', formData, {
+        response = await axios.post<AuthResponse>('/auth/signup/start', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
       } else {
-        response = await axios.post<AuthResponse>('/auth/register', userData);
+        response = await axios.post<AuthResponse>('/auth/signup/start', userData);
       }
 
+      return response.data as any;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Signup verification failed'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifySignup = async (payload: { email: string; emailOtp: string; smsOtp: string }) => {
+    if (typeof window === 'undefined') return;
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post<AuthResponse>('/auth/signup/verify', payload);
       const { token } = response.data.data;
 
       Cookies.set('token', token, {
@@ -330,12 +362,16 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signup = startSignup;
+
   const contextValue: AuthContextType = {
     user,
     isLoading,
     isAuthenticated: !!user,
     login,
     signup,
+    startSignup,
+    verifySignup,
     logout,
     getToken,
   };

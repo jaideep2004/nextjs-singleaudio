@@ -55,7 +55,8 @@ app.get(`${API_PREFIX}`, (req: Request, res: Response) => {
       `${API_PREFIX}/payouts`,
       `${API_PREFIX}/notifications`,
       `${API_PREFIX}/users`,
-      `${API_PREFIX}/settings`
+      `${API_PREFIX}/settings`,
+      `${API_PREFIX}/dsp`
     ]
   });
 });

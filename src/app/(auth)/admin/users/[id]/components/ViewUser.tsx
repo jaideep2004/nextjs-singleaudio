@@ -19,9 +19,11 @@ import {
   CalendarToday,
   VerifiedUser,
   Cancel,
+  Visibility,
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
+import Link from 'next/link';
 
 export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; onUserUpdate: () => void; onEdit?: () => void }) {
   const { mode } = useColorMode();
@@ -135,6 +137,14 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
               )}
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
+              <Button
+                component={Link}
+                href={`/admin/users/${user._id}/preview`}
+                variant="outlined"
+                startIcon={<Visibility />}
+              >
+                View As User
+              </Button>
               <Button
                 variant="contained"
                 color="success"

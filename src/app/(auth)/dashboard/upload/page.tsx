@@ -2147,6 +2147,7 @@ export default function UploadPage() {
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
                 {visibleDSPs.map((dsp: DspItem) => {
                   const selected = selectedDSPs.includes(dsp.key);
+                  const initials = (dsp.name.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase();
                   return (
                     <Paper
                       key={dsp.key}
@@ -2171,7 +2172,7 @@ export default function UploadPage() {
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                         <Avatar
-                          src={dsp.logo}
+                          src={dsp.logo || undefined}
                           alt={dsp.name}
                           variant="rounded"
                           sx={{
@@ -2182,8 +2183,12 @@ export default function UploadPage() {
                             border: '1px solid',
                             borderColor: 'divider',
                             p: 0.75,
+                            fontSize: 13,
+                            fontWeight: 900,
                           }}
-                        />
+                        >
+                          {initials}
+                        </Avatar>
                         <Checkbox
                           checked={selected}
                           onClick={(event) => event.stopPropagation()}
@@ -2575,7 +2580,7 @@ export default function UploadPage() {
     <Box sx={{ width: '100%' }}>
       <PremiumHeader
         eyebrow="Release Studio"
-        title="Upload Release"
+        title="Create New Release"
         description="A guided release room for audio, artwork, metadata, territories, rights, and final checks before distribution."
       />
 

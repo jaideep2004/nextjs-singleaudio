@@ -1,9 +1,21 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import User from '../models/user.model';
+import AuditLog from '../models/auditLog.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
-import { UserRole } from '../config/constants';
+import { AdminPermission, SUBADMIN_PERMISSION_PRESETS, UserRole } from '../config/constants';
+
+const resolveAdminPermissions = (role: string, preset?: string, overrides?: AdminPermission[]) => {
+  if (role === UserRole.ADMIN) {
+    return Object.values(AdminPermission);
+  }
+  if (role !== UserRole.SUBADMIN) {
+    return undefined;
+  }
+  const presetPermissions = preset ? SUBADMIN_PERMISSION_PRESETS[preset] || [] : [];
+  return Array.from(new Set([...(presetPermissions || []), ...(overrides || [])]));
+};
 
 /**
  * Create a new user (admin only)
@@ -12,7 +24,7 @@ import { UserRole } from '../config/constants';
  */
 export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role, artistName, bio, socialLinks } = req.body;
+    const { name, email, password, role, artistName, bio, socialLinks, accountType, adminPreset, permissions } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
@@ -26,6 +38,9 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       email,
       password,
       role,
+      accountType: role === UserRole.LABEL ? 'label' : role === UserRole.ARTIST ? 'artist' : accountType,
+      adminPreset: role === UserRole.SUBADMIN ? adminPreset : undefined,
+      permissions: resolveAdminPermissions(role, adminPreset, permissions),
       artistName: artistName || name,
       bio,
       socialLinks,
@@ -39,7 +54,10 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
         name: user.name,
         email: user.email,
         role: user.role,
-        artistName: user.artistName
+        artistName: user.artistName,
+        accountType: user.accountType,
+        adminPreset: user.adminPreset,
+        permissions: user.permissions || []
       },
       'User created successfully',
       201
@@ -138,7 +156,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, role, artistName, bio, socialLinks, isActive, verification } = req.body;
+    const { name, email, role, artistName, bio, socialLinks, isActive, verification, accountType, adminPreset, permissions } = req.body;
 
     const user = await User.findById(id);
 
@@ -152,6 +170,11 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     if (email) user.email = email;
     if (role && Object.values(UserRole).includes(role as UserRole)) {
       user.role = role as UserRole;
+    }
+    if (accountType) user.accountType = accountType;
+    if (adminPreset !== undefined) user.adminPreset = adminPreset;
+    if (role || adminPreset !== undefined || permissions) {
+      user.permissions = resolveAdminPermissions(user.role, adminPreset ?? user.adminPreset, permissions) as any;
     }
     if (artistName) user.artistName = artistName;
     if (bio !== undefined) user.bio = bio;
@@ -176,6 +199,23 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     successResponse(res, user, 'User updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update user', error);
+  }
+};
+
+export const logUserPreview = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    await AuditLog.create({
+      user: req.user.email || String(req.user._id),
+      action: 'admin_read_only_user_preview',
+      entity: 'user',
+      entityId: id,
+      details: { targetUserId: id },
+      status: 'success',
+    });
+    successResponse(res, null, 'Preview audit logged');
+  } catch (error) {
+    errorResponse(res, 'Failed to log preview audit', error);
   }
 };
 
@@ -266,7 +306,9 @@ export const getUserStats = async (req: AuthRequest, res: Response): Promise<voi
     // Get total counts
     const totalUsers = await User.countDocuments();
     const artistCount = await User.countDocuments({ role: UserRole.ARTIST });
+    const labelCount = await User.countDocuments({ role: UserRole.LABEL });
     const adminCount = await User.countDocuments({ role: UserRole.ADMIN });
+    const subadminCount = await User.countDocuments({ role: UserRole.SUBADMIN });
 
     // Get recent users
     const recentUsers = await User.find()
@@ -314,7 +356,9 @@ export const getUserStats = async (req: AuthRequest, res: Response): Promise<voi
       {
         totalUsers,
         artistCount,
+        labelCount,
         adminCount,
+        subadminCount,
         recentUsers,
         monthlyStats: formattedMonthlyStats,
         // Include additional stats for the dashboard

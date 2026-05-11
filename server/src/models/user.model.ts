@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { UserRole } from '../config/constants';
+import { AdminPermission, UserRole } from '../config/constants';
 
 export interface IArtistOnboarding {
   legalName: string;
@@ -46,11 +46,15 @@ export interface IUser extends Document {
   artistName?: string;
   bio?: string;
   accountType?: 'artist' | 'label';
+  adminPreset?: string;
+  permissions?: AdminPermission[];
+  resetPasswordToken?: string;
+  resetPasswordExpires?: Date;
   isActive?: boolean;
   onboarding?: IArtistOnboarding | ILabelOnboarding;
   verification?: {
     status: 'pending' | 'submitted' | 'approved' | 'rejected';
-    mobileProvider?: 'surepass' | 'sandbox' | 'manual';
+    mobileProvider?: 'surepass' | 'sandbox' | 'manual' | 'amaze';
     kycProvider?: 'surepass' | 'sandbox' | 'manual';
     consent?: boolean;
     phoneNumber?: string;
@@ -59,6 +63,11 @@ export interface IUser extends Document {
     reviewedBy?: mongoose.Types.ObjectId;
     rejectionReason?: string;
     notes?: string;
+  };
+  payoutMethod?: {
+    method: 'bank_transfer' | 'paypal';
+    details: Record<string, string>;
+    updatedAt?: Date;
   };
   socialLinks?: {
     website?: string;
@@ -118,6 +127,17 @@ const UserSchema: Schema = new Schema(
       type: String,
       enum: ['artist', 'label'],
     },
+    adminPreset: {
+      type: String,
+      trim: true,
+    },
+    permissions: {
+      type: [String],
+      enum: Object.values(AdminPermission),
+      default: undefined,
+    },
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
     isActive: {
       type: Boolean,
       default: true,
@@ -133,7 +153,7 @@ const UserSchema: Schema = new Schema(
       },
       mobileProvider: {
         type: String,
-        enum: ['surepass', 'sandbox', 'manual'],
+        enum: ['surepass', 'sandbox', 'manual', 'amaze'],
       },
       kycProvider: {
         type: String,
@@ -158,6 +178,14 @@ const UserSchema: Schema = new Schema(
       instagram: String,
       twitter: String,
       facebook: String,
+    },
+    payoutMethod: {
+      method: {
+        type: String,
+        enum: ['bank_transfer', 'paypal'],
+      },
+      details: Schema.Types.Mixed,
+      updatedAt: Date,
     },
   },
   {

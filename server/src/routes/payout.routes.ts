@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import * as payoutController from '../controllers/payout.controller';
-import { protect, authorize } from '../middleware/auth.middleware';
+import { protect, authorizeAdminPermission } from '../middleware/auth.middleware';
 import { validate } from '../middleware/validator.middleware';
 import { createPayoutValidator, approveRejectPayoutValidator } from '../validators/payout.validator';
-import { UserRole } from '../config/constants';
+import { AdminPermission } from '../config/constants';
 
 const router = Router();
 
@@ -15,7 +15,6 @@ const router = Router();
 router.post(
   '/',
   protect,
-  authorize([UserRole.ARTIST]),
   validate(createPayoutValidator),
   payoutController.requestPayout
 );
@@ -61,7 +60,7 @@ router.get(
 router.put(
   '/:id/status',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.PAYOUTS),
   validate(approveRejectPayoutValidator),
   payoutController.updatePayoutStatus
 );

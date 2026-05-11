@@ -1,16 +1,9 @@
-import { NextResponse } from 'next/server';
+import { proxyBackend } from '@/app/api/_lib/backend';
 
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
-
-  return NextResponse.json({
-    success: true,
-    message: 'Payout request queued',
-    data: {
-      id: `demo-${Date.now()}`,
-      ...body,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-    },
+  const body = await request.json();
+  return proxyBackend('/api/payouts', {
+    method: 'POST',
+    body: JSON.stringify(body),
   });
 }

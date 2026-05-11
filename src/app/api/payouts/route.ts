@@ -1,9 +1,6 @@
-import { NextResponse } from 'next/server';
+import { proxyBackend } from '@/app/api/_lib/backend';
 
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message: 'Payouts loaded',
-    data: [],
-  });
+export async function GET(request: Request) {
+  const { search } = new URL(request.url);
+  return proxyBackend(`/api/payouts${search}`);
 }

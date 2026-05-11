@@ -14,6 +14,7 @@ import {
   Person,
   Email,
   Lock,
+  PhoneIphone,
   Visibility,
   VisibilityOff,
 } from '@mui/icons-material';
@@ -95,6 +96,38 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
               startAdornment: (
                 <InputAdornment position="start">
                   <Email sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        )}
+      />
+
+      <Controller
+        name="phoneNumber"
+        control={control}
+        rules={{
+          required: 'Mobile number is required',
+          pattern: {
+            value: /^\+?[0-9]{10,15}$/,
+            message: 'Enter 10-15 digits with optional country code',
+          },
+        }}
+        render={({ field }) => (
+          <TextField
+            {...field}
+            fullWidth
+            label="Mobile Number"
+            type="tel"
+            autoComplete="tel"
+            error={!!errors.phoneNumber}
+            helperText={errors.phoneNumber?.message}
+            disabled={isSubmitting}
+            sx={fieldSx}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PhoneIphone sx={{ color: 'rgba(255,255,255,0.35)' }} />
                 </InputAdornment>
               ),
             }}

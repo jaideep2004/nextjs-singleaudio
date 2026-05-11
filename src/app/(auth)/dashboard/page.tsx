@@ -216,7 +216,7 @@ function DashboardPage() {
             variant="contained"
             startIcon={<CloudUploadIcon />}
           >
-            Upload Release
+            Create New Release
           </Button>}
       />
 
@@ -452,7 +452,7 @@ function DashboardPage() {
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               {[
-                { label: 'Upload Release', href: '/dashboard/upload', icon: <CloudUploadIcon />, color: '#4a6cf7' },
+                { label: 'Create New Release', href: '/dashboard/upload', icon: <CloudUploadIcon />, color: '#4a6cf7' },
                 { label: 'View Releases', href: '/dashboard/releases', icon: <AlbumIcon />, color: '#f59e0b' },
                 { label: 'View Analytics', href: '/dashboard/analytics', icon: <TrendingUp />, color: '#10b981' },
               ].map((action) => (
@@ -532,7 +532,7 @@ function DashboardPage() {
                 background: 'linear-gradient(135deg, #4a6cf7 0%, #7b93f9 100%)',
               }}
             >
-              Upload Release
+              Create New Release
             </Button>
           </Box>
         ) : (

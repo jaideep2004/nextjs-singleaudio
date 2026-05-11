@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { jwtDecode } from 'jwt-decode';
 
 // Define public paths that don't require authentication
-const publicPaths = ['/login', '/signup', '/artist', '/'];
+const publicPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/artist', '/'];
 
 // Define paths to exclude from middleware processing
 const excludedPaths = [
@@ -67,13 +67,13 @@ export function middleware(request: NextRequest) {
   if (isAuthenticated) {
     // If trying to access login/signup when already authenticated, redirect to appropriate dashboard
     if (pathname === '/login' || pathname === '/signup') {
-      const redirectUrl = userRole === 'admin' ? '/admin/dashboard' : '/dashboard';
+      const redirectUrl = userRole === 'admin' || userRole === 'subadmin' ? '/admin/dashboard' : '/dashboard';
       console.log('Already authenticated, redirecting to:', redirectUrl);
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
     
     // Check admin access for admin routes
-    if (pathname.startsWith('/admin') && userRole !== 'admin') {
+    if (pathname.startsWith('/admin') && userRole !== 'admin' && userRole !== 'subadmin') {
       console.log('Non-admin user trying to access admin area, redirecting to dashboard');
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }

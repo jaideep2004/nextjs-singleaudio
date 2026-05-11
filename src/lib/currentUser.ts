@@ -4,8 +4,9 @@ export interface CurrentBackendUser {
   _id: string;
   name: string;
   email: string;
-  role: 'artist' | 'admin';
+  role: 'artist' | 'label' | 'admin' | 'subadmin';
   artistName?: string;
+  permissions?: string[];
 }
 
 export async function getCurrentBackendUser(): Promise<CurrentBackendUser> {

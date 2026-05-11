@@ -1,6 +1,8 @@
 export enum UserRole {
   ARTIST = 'artist',
-  ADMIN = 'admin'
+  LABEL = 'label',
+  ADMIN = 'admin',
+  SUBADMIN = 'subadmin'
 }
 
 export interface User {
@@ -8,6 +10,8 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  adminPreset?: string;
+  permissions?: string[];
   artistName?: string;
   bio?: string;
   profilePicture?: string;

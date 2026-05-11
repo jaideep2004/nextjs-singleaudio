@@ -116,7 +116,7 @@ function TracksContent() {
         title="Tracks"
         description="Every submitted track across your releases, ready for review, playback, and distribution checks."
         action={<Button component={Link} href="/dashboard/upload" variant="contained" startIcon={<CloudUpload />}>
-          Upload Release
+          Create New Release
         </Button>}
       />
 

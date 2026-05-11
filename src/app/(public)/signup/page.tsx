@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import {
@@ -11,6 +11,7 @@ import {
   Alert,
   CircularProgress,
   Chip,
+  TextField,
 } from '@mui/material';
 import {
   ArrowForward,
@@ -19,13 +20,8 @@ import {
   CheckCircle,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
-import { authAPI } from '@/services/api';
 import SignupStepper from '@/components/signup/SignupStepper';
 import Step1BasicInfo from '@/components/signup/Step1BasicInfo';
-import Step2AccountType from '@/components/signup/Step2AccountType';
-import Step3Artist, { ArtistNameStatus } from '@/components/signup/Step3Artist';
-import Step3Label from '@/components/signup/Step3Label';
-import Step4Verification from '@/components/signup/Step4Verification';
 import {
   SignupFormValues,
   defaultSignupValues,
@@ -34,40 +30,29 @@ import {
 
 // Fields validated per step
 const STEP_FIELDS: Record<number, (keyof SignupFormValues)[]> = {
-  1: ['name', 'email', 'password', 'confirmPassword'],
-  2: ['accountType'],
-  3: [], // validated dynamically based on accountType
-  4: ['verificationPhoneNumber', 'mobileVerificationProvider', 'kycProvider', 'kycConsent'],
+  1: ['name', 'email', 'phoneNumber', 'password', 'confirmPassword'],
+  2: [],
 };
 
-const ARTIST_STEP3_FIELDS: (keyof SignupFormValues)[] = [
-  'artistName', 'legalName', 'legalAddress', 'phoneNumber',
-  'numberOfTracks', 'numberOfReleases', 'governmentIdFile',
-];
-
-const LABEL_STEP3_FIELDS: (keyof SignupFormValues)[] = [
-  'labelName', 'registrationType', 'totalArtists', 'totalRevenue',
-  'catalogSize', 'rightsType',
-];
-
 export default function SignupPage() {
-  const { signup } = useAuth();
+  const { startSignup, verifySignup } = useAuth();
 
   const [mounted, setMounted] = useState(false);
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [isSignupEnabled, setIsSignupEnabled] = useState(true);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [artistNameStatus, setArtistNameStatus] = useState<ArtistNameStatus>('idle');
-  const artistNameStatusRef = useRef<ArtistNameStatus>('idle');
+  const [otpSent, setOtpSent] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [smsOtp, setSmsOtp] = useState('');
 
   const {
     control,
     handleSubmit,
     trigger,
     watch,
-    resetField,
     getValues,
     formState: { errors },
   } = useForm<SignupFormValues>({
@@ -75,20 +60,11 @@ export default function SignupPage() {
     mode: 'onTouched',
   });
 
-  const accountType = watch('accountType');
-  const registrationType = watch('registrationType');
-  const companyType = watch('companyType');
-  const artistPhoneNumber = watch('phoneNumber');
+  const phoneNumber = watch('phoneNumber');
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (currentStep === 4 && !getValues('verificationPhoneNumber') && artistPhoneNumber) {
-      resetField('verificationPhoneNumber', { defaultValue: artistPhoneNumber });
-    }
-  }, [artistPhoneNumber, currentStep, getValues, resetField]);
 
   // Check signup enabled
   useEffect(() => {
@@ -106,78 +82,14 @@ export default function SignupPage() {
     check();
   }, []);
 
-  const checkArtistName = useCallback(async () => {
-    const name = getValues('artistName');
-    if (!name || name.trim() === '') return;
-    setArtistNameStatus('checking');
-    artistNameStatusRef.current = 'checking';
-    try {
-      const result = await authAPI.checkArtistNameAvailability(name.trim());
-      const status: ArtistNameStatus = result.available ? 'available' : 'taken';
-      setArtistNameStatus(status);
-      artistNameStatusRef.current = status;
-    } catch {
-      setArtistNameStatus('error');
-      artistNameStatusRef.current = 'error';
-    }
-  }, [getValues]);
-
-  const handleAccountTypeChange = (type: 'artist' | 'label') => {
-    // Reset all Step 3 fields of the deselected type
-    if (type === 'artist') {
-      // Clear label fields
-      const labelFields: (keyof SignupFormValues)[] = [
-        'labelName', 'registrationType', 'labelLegalName', 'legalEntityName',
-        'companyType', 'incorporationCertFile', 'gstCertFile', 'labelGovIdFile',
-        'totalArtists', 'totalRevenue', 'catalogSize', 'rightsType',
-        'companyWebsite',
-      ];
-      labelFields.forEach((f) => resetField(f));
-    } else {
-      // Clear artist fields
-      const artistFields: (keyof SignupFormValues)[] = [
-        'artistName', 'legalName', 'idType', 'panId', 'aadhaarId',
-        'legalAddress', 'phoneNumber', 'numberOfTracks', 'numberOfReleases',
-        'governmentIdFile',
-      ];
-      artistFields.forEach((f) => resetField(f));
-      setArtistNameStatus('idle');
-    }
-  };
-
   const handleNext = async () => {
-    let fieldsToValidate = STEP_FIELDS[currentStep];
-
-    if (currentStep === 3) {
-      if (accountType === 'artist') {
-        fieldsToValidate = ARTIST_STEP3_FIELDS;
-        // Also validate the active ID field
-        const idType = getValues('idType');
-        fieldsToValidate = [...fieldsToValidate, idType === 'pan' ? 'panId' : 'aadhaarId'];
-      } else {
-        fieldsToValidate = LABEL_STEP3_FIELDS;
-        const regType = getValues('registrationType');
-        if (regType === 'individual') {
-          fieldsToValidate = [...fieldsToValidate, 'labelLegalName', 'labelGovIdFile'];
-        } else if (regType === 'registered_company') {
-          fieldsToValidate = [...fieldsToValidate, 'legalEntityName', 'companyType'];
-          const ct = getValues('companyType');
-          if (ct === 'private') fieldsToValidate = [...fieldsToValidate, 'incorporationCertFile'];
-          if (ct === 'public') fieldsToValidate = [...fieldsToValidate, 'gstCertFile'];
-        }
-      }
-    }
-
-    const valid = await trigger(fieldsToValidate as any);
+    const valid = await trigger(STEP_FIELDS[1] as any);
     if (!valid) return;
-
-    if (currentStep < 4) {
-      setCurrentStep((s) => (s + 1) as 1 | 2 | 3 | 4);
-    }
+    await onSubmit(getValues());
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((s) => (s - 1) as 1 | 2 | 3 | 4);
+    if (currentStep > 1) setCurrentStep(1);
   };
 
   const onSubmit = async (data: SignupFormValues) => {
@@ -185,12 +97,24 @@ export default function SignupPage() {
 
     setIsSubmitting(true);
     try {
-      await signup({
+      if (otpSent) {
+        await verifySignup({ email: pendingEmail || data.email, emailOtp, smsOtp });
+        return;
+      }
+
+      await startSignup({
         name: data.name,
         email: data.email,
         password: data.password,
-        accountType: data.accountType as 'artist' | 'label',
+        accountType: 'artist',
+        phoneNumber: data.phoneNumber,
+        verification: {
+          phoneNumber: data.phoneNumber,
+        },
       });
+      setPendingEmail(data.email);
+      setOtpSent(true);
+      setCurrentStep(2);
     } catch (err: any) {
       setServerError(err.message || 'Registration failed. Please try again.');
     } finally {
@@ -361,7 +285,7 @@ export default function SignupPage() {
                     letterSpacing: 0,
                   }}
                 >
-                  Join the platform built for serious music operations.
+                  Build your premium distribution workspace.
                 </Typography>
                 <Typography
                   sx={{
@@ -372,8 +296,8 @@ export default function SignupPage() {
                     color: 'rgba(226,232,240,0.72)',
                   }}
                 >
-                  Whether you're an independent artist or a label managing a full catalog,
-                  Single Audio gives you the tools to distribute, track, and grow.
+                  Artists and labels get a focused onboarding flow for releases, verification,
+                  royalties, publishing, and payout readiness.
                 </Typography>
               </Box>
 
@@ -466,7 +390,7 @@ export default function SignupPage() {
                   lineHeight: 1.1,
                 }}
               >
-                Create your account
+                Create Your Account
               </Typography>
               <Typography
                 sx={{
@@ -489,7 +413,7 @@ export default function SignupPage() {
             <SignupStepper currentStep={currentStep} steps={SIGNUP_STEPS} />
 
             {/* Server error */}
-            {serverError && currentStep >= 3 && (
+            {serverError && (
               <Alert
                 severity="error"
                 sx={{ mb: 3, borderRadius: '14px' }}
@@ -510,39 +434,27 @@ export default function SignupPage() {
               )}
 
               {currentStep === 2 && (
-                <Step2AccountType
-                  control={control}
-                  errors={errors}
-                  onAccountTypeChange={handleAccountTypeChange}
-                />
-              )}
-
-              {currentStep === 3 && accountType === 'artist' && (
-                <Step3Artist
-                  control={control}
-                  errors={errors}
-                  isSubmitting={isSubmitting}
-                  artistNameStatus={artistNameStatus}
-                  onArtistNameBlur={checkArtistName}
-                />
-              )}
-
-              {currentStep === 3 && accountType === 'label' && (
-                <Step3Label
-                  control={control}
-                  errors={errors}
-                  isSubmitting={isSubmitting}
-                  registrationType={registrationType}
-                  companyType={companyType}
-                />
-              )}
-
-              {currentStep === 4 && (
-                <Step4Verification
-                  control={control}
-                  errors={errors}
-                  isSubmitting={isSubmitting}
-                />
+                <Stack spacing={2.5}>
+                  <Alert severity="success" sx={{ borderRadius: '14px' }}>
+                    OTP sent to {pendingEmail || getValues('email')} and {phoneNumber}. Enter both codes to finish signup.
+                  </Alert>
+                  <TextField
+                    label="Email OTP"
+                    value={emailOtp}
+                    onChange={(event) => setEmailOtp(event.target.value)}
+                    inputProps={{ inputMode: 'numeric', autoComplete: 'one-time-code' }}
+                    disabled={isSubmitting}
+                    fullWidth
+                  />
+                  <TextField
+                    label="Mobile OTP"
+                    value={smsOtp}
+                    onChange={(event) => setSmsOtp(event.target.value)}
+                    inputProps={{ inputMode: 'numeric', autoComplete: 'one-time-code' }}
+                    disabled={isSubmitting}
+                    fullWidth
+                  />
+                </Stack>
               )}
 
               {/* Navigation buttons */}
@@ -577,7 +489,7 @@ export default function SignupPage() {
                   <Box />
                 )}
 
-                {currentStep < 2 ? (
+                {currentStep === 1 ? (
                   <Button
                     onClick={handleNext}
                     disabled={isSubmitting}
@@ -599,7 +511,7 @@ export default function SignupPage() {
                       },
                     }}
                   >
-                    Continue
+                    {isSubmitting ? 'Sending...' : 'Send OTP'}
                   </Button>
                 ) : (
                   <Button
@@ -633,7 +545,7 @@ export default function SignupPage() {
                       },
                     }}
                   >
-                    {isSubmitting ? 'Creating Account...' : 'Create Account'}
+                    {isSubmitting ? 'Verifying...' : otpSent ? 'Verify & Create Account' : 'Send OTP'}
                   </Button>
                 )}
               </Stack>

@@ -41,7 +41,7 @@ export default function useAdminAuth() {
           return;
         }
 
-        if (user.role === 'admin') {
+        if (user.role === 'admin' || user.role === 'subadmin') {
           console.log('Admin role verified');
           setIsAdmin(true);
         } else {

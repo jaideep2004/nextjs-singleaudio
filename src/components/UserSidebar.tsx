@@ -20,8 +20,6 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  MusicNote as MusicNoteIcon,
-  Payment as PaymentIcon,
   Settings as SettingsIcon,
   ExpandLess,
   ExpandMore,
@@ -33,7 +31,11 @@ import {
   Podcasts as PodcastsIcon,
   BarChart as AnalyticsIcon,
   AccountBalanceWallet,
+  LibraryMusic,
+  VideoLibrary,
+  MusicNote as MusicNoteIcon 
 } from '@mui/icons-material';
+
 import { useAuth } from '@/context/AppContext';
 
 const drawerWidth = 264;
@@ -48,7 +50,7 @@ const menuSections = [
         path: '/dashboard',
       },
       {
-        text: 'Upload Release',
+        text: 'Create New Release',
         icon: <CloudUploadIcon />,
         path: '/dashboard/upload',
       },
@@ -61,12 +63,8 @@ const menuSections = [
           { text: 'Pending', path: '/dashboard/releases?status=pending' },
           { text: 'Approved', path: '/dashboard/releases?status=approved' },
           { text: 'Rejected', path: '/dashboard/releases?status=rejected' },
+          { text: 'Tracks', path: '/dashboard/tracks' },
         ],
-      },
-      {
-        text: 'Tracks',
-        icon: <MusicNoteIcon />,
-        path: '/dashboard/tracks',
       },
       {
         text: 'Analytics',
@@ -82,11 +80,20 @@ const menuSections = [
         text: 'Royalties',
         icon: <TrendingUp />,
         path: '/dashboard/royalties',
+        subItems: [
+          { text: 'Statement', path: '/dashboard/royalties?tab=statement' },
+          { text: 'Report', path: '/dashboard/royalties?tab=report' },
+        ],
       },
       {
         text: 'Payouts',
         icon: <AccountBalanceWallet />,
         path: '/dashboard/payouts',
+        subItems: [
+          { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
+          { text: 'Request Payout', path: '/dashboard/payouts?view=request' },
+          { text: 'History', path: '/dashboard/payouts?view=history' },
+        ],
       },
     ],
   },
@@ -108,6 +115,16 @@ const menuSections = [
   {
     label: 'Account',
     items: [
+      {
+        text: 'Music Publishing',
+        icon: <LibraryMusic />,
+        path: '/dashboard/music-publishing',
+      },
+      {
+        text: 'Vevo Video Distribution',
+        icon: <VideoLibrary />,
+        path: '/dashboard/vevo-video-distribution',
+      },
       {
         text: 'Settings',
         icon: <SettingsIcon />,
@@ -138,6 +155,12 @@ export default function UserSidebar() {
     if (pathname.startsWith('/dashboard/releases')) {
       setOpenSubMenu('/dashboard/releases');
     }
+    if (pathname.startsWith('/dashboard/royalties')) {
+      setOpenSubMenu('/dashboard/royalties');
+    }
+    if (pathname.startsWith('/dashboard/payouts')) {
+      setOpenSubMenu('/dashboard/payouts');
+    }
   }, [pathname]);
 
   const handleDrawerToggle = () => {
@@ -165,8 +188,10 @@ export default function UserSidebar() {
     const subParams = new URLSearchParams(subQuery);
     const subView = subParams.get('view');
     const subStatus = subParams.get('status');
+    const subTab = subParams.get('tab');
     if (subView) return pathname === subPath && searchParams.get('view') === subView;
     if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
+    if (subTab) return pathname === subPath && searchParams.get('tab') === subTab;
     return pathname === subPath;
   };
 
@@ -386,12 +411,12 @@ export default function UserSidebar() {
                       <ListItemText
                         primary={item.text}
                         primaryTypographyProps={{
-                          fontWeight: isActive(item.path) ? 600 : 500,
+                          fontWeight: isActive(item.path) ? 800 : 700,
                           fontSize: '0.875rem',
                           letterSpacing: '-0.005em',
                           color: isActive(item.path)
                             ? (isDark ? '#93b4ff' : '#3b5fe5')
-                            : (isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.74)'),
+                            : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
                       {item.subItems && (
@@ -457,8 +482,8 @@ export default function UserSidebar() {
                               primary={subItem.text}
                               primaryTypographyProps={{
                                 fontSize: '0.82rem',
-                                fontWeight: 450,
-                                color: isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(15, 23, 42, 0.6)',
+                                fontWeight: 650,
+                                color: isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.76)',
                               }}
                             />
                           </ListItemButton>

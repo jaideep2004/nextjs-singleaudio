@@ -11,6 +11,7 @@ import { API_PREFIX } from '../config/constants';
 import territoryRoutes from './territory.routes';
 import rightsRoutes from './rights.routes';
 import uploadRoutes from './upload.routes';
+import dspRoutes from './dsp.routes';
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use(`${API_PREFIX}/settings`, settingsRoutes);
 router.use(`${API_PREFIX}/territory`, territoryRoutes);
 router.use(`${API_PREFIX}/rights`, rightsRoutes);
 router.use(`${API_PREFIX}/uploads`, uploadRoutes);
+router.use(`${API_PREFIX}/dsp`, dspRoutes);
 
 export default router;

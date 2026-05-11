@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JWT_SECRET, UserRole } from '../config/constants';
+import { AdminPermission, JWT_SECRET, UserRole } from '../config/constants';
 import { ApiError } from './errorHandler.middleware';
 import User from '../models/user.model';
 
@@ -59,6 +59,33 @@ export const authorize = (roles: UserRole[]) => {
 
     if (!roles.includes(req.user.role as UserRole)) {
       next(new ApiError(`Role ${req.user.role} is not authorized to access this route`, 403));
+      return;
+    }
+
+    next();
+  };
+};
+
+export const authorizeAdminPermission = (permission: AdminPermission) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(new ApiError('User not authenticated', 401));
+      return;
+    }
+
+    if (req.user.role === UserRole.ADMIN) {
+      next();
+      return;
+    }
+
+    if (req.user.role !== UserRole.SUBADMIN) {
+      next(new ApiError(`Role ${req.user.role} is not authorized to access this route`, 403));
+      return;
+    }
+
+    const permissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    if (!permissions.includes(permission)) {
+      next(new ApiError(`Permission ${permission} is required`, 403));
       return;
     }
 

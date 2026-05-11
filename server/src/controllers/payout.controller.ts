@@ -4,7 +4,7 @@ import Payout from '../models/payout.model';
 import Royalty from '../models/royalty.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
-import { UserRole, PayoutStatus } from '../config/constants';
+import { UserRole, PayoutStatus, MINIMUM_PAYOUT_USD } from '../config/constants';
 import * as notificationService from '../services/notification.service';
 
 /**
@@ -16,6 +16,10 @@ export const requestPayout = async (req: AuthRequest, res: Response): Promise<vo
   try {
     const { amount, currency, paymentMethod, paymentDetails } = req.body;
     const user = req.user;
+
+    if (Number(amount) < MINIMUM_PAYOUT_USD) {
+      throw new ApiError(`Minimum payout amount is ${MINIMUM_PAYOUT_USD} USD`, 400);
+    }
 
     // Calculate available balance
     const totalEarnings = await Royalty.aggregate([
@@ -64,7 +68,7 @@ export const getPayouts = async (req: AuthRequest, res: Response): Promise<void>
     let query: any = {};
 
     // If not admin, restrict to user's payouts
-    if (user.role !== UserRole.ADMIN) {
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUBADMIN) {
       query.artistId = user._id;
     } else if (req.query.artistId) {
       // Admin can filter by artistId

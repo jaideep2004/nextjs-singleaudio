@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { signOut } from 'next-auth/react';
+import Cookies from 'js-cookie';
 import {
   AppBar,
   Toolbar,
@@ -50,8 +50,8 @@ export default function AdminHeader() {
   };
 
   const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.push('/login');
+    Cookies.remove('token', { path: '/' });
+    window.location.assign('/login');
   };
 
   // Generate breadcrumb from pathname

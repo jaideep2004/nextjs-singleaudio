@@ -17,8 +17,29 @@ export const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 export enum UserRole {
   ARTIST = 'artist',
   LABEL = 'label',
-  ADMIN = 'admin'
+  ADMIN = 'admin',
+  SUBADMIN = 'subadmin'
 }
+
+export enum AdminPermission {
+  USERS = 'users',
+  REVIEW = 'review',
+  PAYOUTS = 'payouts',
+  DSP_DELIVERY = 'dsp_delivery',
+  PODCASTS = 'podcasts',
+  SETTINGS = 'settings',
+  ANALYTICS = 'analytics'
+}
+
+export const SUBADMIN_PERMISSION_PRESETS: Record<string, AdminPermission[]> = {
+  users: [AdminPermission.USERS],
+  review: [AdminPermission.REVIEW],
+  payouts: [AdminPermission.PAYOUTS],
+  delivery: [AdminPermission.DSP_DELIVERY],
+  podcasts: [AdminPermission.PODCASTS],
+  settings: [AdminPermission.SETTINGS],
+  analytics: [AdminPermission.ANALYTICS],
+};
 
 // File Upload
 export const IS_SERVERLESS_RUNTIME = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -63,18 +84,52 @@ export enum NotificationType {
 
 // Payment methods
 export enum PaymentMethod {
-  UPI = 'upi',
+  BANK_TRANSFER = 'bank_transfer',
   PAYPAL = 'paypal'
 }
 
+export const MINIMUM_PAYOUT_USD = 100;
+
 // Stores
 export const STORES = [
+  '7digital',
+  'ACRCloud',
+  'Amazon Music',
+  'Anghami',
   'Spotify',
   'Apple Music',
-  'Amazon Music',
+  'Audiomack',
+  'AWA',
+  'Boomplay',
   'YouTube Music',
+  'YouTube Content ID',
+  'YouTube Music Video',
+  'YouTube Art Track',
+  'Facebook Audio Library',
+  'Facebook Rights Manager',
+  'Instagram',
+  'WhatsApp',
+  'Snapchat',
+  'TikTok',
+  'Resso',
+  'Audible Magic',
+  'Jaxsta',
+  'Audio Fingerprinting',
   'Deezer',
+  'iHeartRadio',
+  'iMusica',
+  'JioSaavn',
+  'KKBox',
+  'Mixcloud',
+  'NetEase Cloud Music',
   'Tidal',
   'Pandora',
-  'SoundCloud'
+  'Qobuz',
+  'SoundCloud',
+  'TouchTunes',
+  'Trebel',
+  'Tuned Global',
+  'Hungama Music',
+  'Wynk Music',
+  'Gaana'
 ]; 

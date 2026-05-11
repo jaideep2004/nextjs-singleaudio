@@ -51,6 +51,7 @@ import Link from 'next/link';
 import { releaseAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import { useRouter } from 'next/navigation';
 
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
@@ -96,7 +97,8 @@ function a11yProps(index: number) {
   };
 }
 
-export default function AdminReleasesPage({ searchParams }: any) {
+export default function AdminReleasesPage() {
+  const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [releases, setReleases] = useState<any[]>([]);
@@ -105,9 +107,15 @@ export default function AdminReleasesPage({ searchParams }: any) {
   const [tabValue, setTabValue] = useState(0);
   const { mode } = useColorMode();
 
-  const statusFilter = searchParams?.status;
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
 
   // Set initial tab based on status filter
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setStatusFilter(new URLSearchParams(window.location.search).get('status'));
+    }
+  }, []);
+
   useEffect(() => {
     if (statusFilter === 'pending') {
       setTabValue(1);
@@ -144,6 +152,9 @@ export default function AdminReleasesPage({ searchParams }: any) {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    const nextStatus = ['', 'pending', 'approved', 'rejected'][newValue];
+    setStatusFilter(nextStatus || null);
+    router.push(nextStatus ? `/admin/releases?status=${nextStatus}` : '/admin/releases');
   };
 
   const formatDate = (dateString: string) => {

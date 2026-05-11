@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as userController from '../controllers/user.controller';
-import { protect, authorize } from '../middleware/auth.middleware';
-import { UserRole } from '../config/constants';
+import { protect, authorize, authorizeAdminPermission } from '../middleware/auth.middleware';
+import { AdminPermission, UserRole } from '../config/constants';
 
 const router = Router();
 
@@ -13,7 +13,7 @@ const router = Router();
 router.get(
   '/',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.USERS),
   userController.getUsers
 );
 
@@ -37,7 +37,7 @@ router.post(
 router.get(
   '/stats',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.ANALYTICS),
   userController.getUserStats
 );
 
@@ -49,8 +49,15 @@ router.get(
 router.get(
   '/:id',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.USERS),
   userController.getUserById
+);
+
+router.post(
+  '/:id/preview-audit',
+  protect,
+  authorizeAdminPermission(AdminPermission.USERS),
+  userController.logUserPreview
 );
 
 /**
@@ -61,7 +68,7 @@ router.get(
 router.put(
   '/:id',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.USERS),
   userController.updateUser
 );
 
@@ -73,7 +80,7 @@ router.put(
 router.patch(
   '/:id/verification',
   protect,
-  authorize([UserRole.ADMIN]),
+  authorizeAdminPermission(AdminPermission.REVIEW),
   userController.reviewUserVerification
 );
 

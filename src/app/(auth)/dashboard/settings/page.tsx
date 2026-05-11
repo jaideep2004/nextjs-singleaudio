@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import {
   Alert,
   Box,
@@ -17,18 +18,36 @@ import {
 } from "@mui/material";
 import { Notifications, Palette, Person, Save, Security } from "@mui/icons-material";
 import { PremiumHeader, premiumSurfaceSx } from "@/components/premium/PremiumSurface";
+import { useAuth } from "@/context/AppContext";
+import { useColorMode } from "@/context/ColorModeContext";
 
 export default function SettingsPage() {
   const theme = useTheme();
+  const { user } = useAuth();
+  const { mode, toggleColorMode } = useColorMode();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const handleSave = () => {
-    setSuccess("Settings saved. Demo mode only.");
-    setError("");
+  useEffect(() => {
+    setDisplayName(user?.name || "");
+    setEmail(user?.email || "");
+  }, [user]);
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setSuccess("");
+      setError("");
+      await axios.put("/auth/me", { name: displayName });
+      setSuccess("Settings saved.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const settingCards = [
@@ -113,9 +132,10 @@ export default function SettingsPage() {
               name="email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
               fullWidth
               autoComplete="email"
+              disabled
+              helperText="Email changes require admin support."
             />
             <Paper
               variant="outlined"
@@ -126,19 +146,19 @@ export default function SettingsPage() {
               }}
             >
               <FormControlLabel
-                control={<Switch checked={darkMode} onChange={(e) => setDarkMode(e.target.checked)} />}
-                label="Enable Dark Mode (demo toggle)"
+                control={<Switch checked={mode === "dark"} onChange={toggleColorMode} />}
+                label="Enable Dark Mode"
               />
               <Typography variant="caption" color="text.secondary" sx={{ display: "block", ml: 6 }}>
-                Theme toggle in top navigation remains the live app control.
+                Updates the live dashboard theme.
               </Typography>
             </Paper>
 
             {success && <Alert severity="success">{success}</Alert>}
             {error && <Alert severity="error">{error}</Alert>}
 
-            <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave}>
-              Save Changes
+            <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave} disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </Stack>
         </Paper>

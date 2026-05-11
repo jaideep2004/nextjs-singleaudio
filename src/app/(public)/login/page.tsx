@@ -214,7 +214,7 @@ export default function LoginPage() {
                     letterSpacing: '-0.04em',
                   }}
                 >
-                  Sign in to the platform built for polished music operations.
+                  Enter your private music operations suite.
                 </Typography>
                 <Typography
                   sx={{
@@ -225,8 +225,8 @@ export default function LoginPage() {
                     color: 'rgba(226, 232, 240, 0.76)',
                   }}
                 >
-                  Manage releases, artist workflows, royalties, and admin operations from a
-                  workspace that feels structured, trustworthy, and ready for scale.
+                  Manage releases, artist workflows, royalties, and approvals inside a
+                  refined command space built for serious catalog teams.
                 </Typography>
               </Box>
 
@@ -344,7 +344,7 @@ export default function LoginPage() {
                         letterSpacing: '-0.03em',
                       }}
                     >
-                      Welcome back
+                      Welcome Back
                     </Typography>
                     <Typography
                       sx={{
@@ -356,7 +356,7 @@ export default function LoginPage() {
                         lineHeight: 1.7,
                       }}
                     >
-                      Sign in to continue managing your catalog, payouts, and release pipeline.
+                      Sign in to continue managing catalog, payouts, and release pipeline with a secure premium workspace.
                     </Typography>
                   </Box>
 

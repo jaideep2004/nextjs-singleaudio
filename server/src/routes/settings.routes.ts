@@ -1,15 +1,16 @@
 import express from 'express';
-import { verifyToken, isAdmin } from '../middleware/auth';
 import settingsController from '../controllers/settings.controller';
+import { protect, authorizeAdminPermission } from '../middleware/auth.middleware';
+import { AdminPermission } from '../config/constants';
 
 const router = express.Router();
 
 // Public route - no auth required
 router.get('/signupEnabled', settingsController.getSignupEnabled);
 
-// Admin routes - require admin authentication
-router.use(verifyToken);
-router.use(isAdmin);
+// Admin routes - require admin or settings subadmin authentication
+router.use(protect);
+router.use(authorizeAdminPermission(AdminPermission.SETTINGS));
 
 // Get all settings 
 router.get('/', settingsController.getSettings);

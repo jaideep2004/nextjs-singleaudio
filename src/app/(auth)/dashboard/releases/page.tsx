@@ -304,7 +304,7 @@ function ReleasesContent() {
               background: 'linear-gradient(135deg, #4a6cf7 0%, #7b93f9 100%)',
             }}
           >
-            Upload Release
+            Create New Release
           </Button>
         </Box>
       ) : (

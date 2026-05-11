@@ -1,13 +1,37 @@
 import { Request, Response } from 'express';
+import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.middleware';
 import User from '../models/user.model';
+import PendingSignup from '../models/pendingSignup.model';
 import SettingsModel from '../models/settings.model';
 import generateToken from '../utils/generateToken';
 import { successResponse, errorResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
+import {
+  generateOtp,
+  getOtpExpiry,
+  hashOtp,
+  sendAmazeSmsOtp,
+  sendEmailMessage,
+  sendEmailOtp,
+  verifyOtpHash,
+} from '../services/otp.service';
 
 // Escape special regex characters in a string
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const authPayload = (user: any) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  artistName: user.artistName,
+  accountType: user.accountType,
+  adminPreset: user.adminPreset,
+  permissions: user.permissions || [],
+  verification: user.verification,
+  token: generateToken(user),
+});
 
 /**
  * Check artist name availability
@@ -181,6 +205,109 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const startSignup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const signupSetting = await SettingsModel.findOne({ key: 'signupEnabled' });
+    const signupsEnabled = signupSetting ? signupSetting.value === true : true;
+
+    if (!signupsEnabled) {
+      throw new ApiError('New user registration is currently disabled', 403);
+    }
+
+    const { email, password, name, accountType, phoneNumber, verification } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const mobile = String(verification?.phoneNumber || phoneNumber || '').trim();
+
+    if (!normalizedEmail || !password || !name) {
+      throw new ApiError('Name, email, and password are required', 400);
+    }
+
+    if (!/^\+?[0-9]{10,15}$/.test(mobile)) {
+      throw new ApiError('Valid mobile number is required for OTP verification', 400);
+    }
+
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) {
+      throw new ApiError('User already exists with this email', 400);
+    }
+
+    const emailOtp = generateOtp();
+    const smsOtp = generateOtp();
+    await PendingSignup.findOneAndUpdate(
+      { email: normalizedEmail },
+      {
+        email: normalizedEmail,
+        phoneNumber: mobile,
+        payload: { ...req.body, email: normalizedEmail, accountType: accountType || 'artist' },
+        emailOtpHash: hashOtp(emailOtp),
+        smsOtpHash: hashOtp(smsOtp),
+        emailVerified: false,
+        smsVerified: false,
+        attempts: 0,
+        expiresAt: getOtpExpiry(),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    await Promise.all([sendEmailOtp(normalizedEmail, emailOtp), sendAmazeSmsOtp(mobile, smsOtp)]);
+
+    successResponse(res, { email: normalizedEmail, phoneNumber: mobile }, 'OTP sent successfully');
+  } catch (error) {
+    errorResponse(res, 'Failed to start signup verification', error);
+  }
+};
+
+export const verifySignup = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, emailOtp, smsOtp } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const pending = await PendingSignup.findOne({ email: normalizedEmail });
+
+    if (!pending || pending.expiresAt.getTime() < Date.now()) {
+      throw new ApiError('OTP session expired. Please restart signup.', 400);
+    }
+
+    if (pending.attempts >= 5) {
+      throw new ApiError('Too many OTP attempts. Please restart signup.', 429);
+    }
+
+    pending.attempts += 1;
+    if (emailOtp && verifyOtpHash(String(emailOtp), pending.emailOtpHash)) {
+      pending.emailVerified = true;
+    }
+    if (smsOtp && verifyOtpHash(String(smsOtp), pending.smsOtpHash)) {
+      pending.smsVerified = true;
+    }
+
+    if (!pending.emailVerified || !pending.smsVerified) {
+      await pending.save();
+      throw new ApiError('Both email and mobile OTP must be verified', 400);
+    }
+
+    const payload = pending.payload as any;
+    const user = await User.create({
+      name: payload.name,
+      email: normalizedEmail,
+      password: payload.password,
+      role: payload.accountType === 'label' ? 'label' : 'artist',
+      accountType: payload.accountType,
+      artistName: payload.artistName || payload.name,
+      bio: payload.bio,
+      verification: {
+        status: 'pending',
+        mobileProvider: 'amaze',
+        consent: false,
+        phoneNumber: pending.phoneNumber,
+      },
+    });
+
+    await pending.deleteOne();
+    successResponse(res, authPayload(user), 'User registered successfully', 201);
+  } catch (error) {
+    errorResponse(res, 'Signup verification failed', error);
+  }
+};
+
 /**
  * Login user
  * @route POST /api/auth/login
@@ -221,6 +348,60 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const user = await User.findOne({ email });
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      user.resetPasswordToken = hashOtp(token);
+      user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
+      await user.save();
+
+      const origin = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const resetUrl = `${origin.replace(/\/$/, '')}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+      await sendEmailMessage(
+        email,
+        'Reset Your Single Audio Password',
+        `Use this secure link to reset your Single Audio password: ${resetUrl}\n\nThis link expires in 30 minutes.`
+      );
+    }
+
+    successResponse(res, null, 'If an account exists, reset instructions have been sent');
+  } catch (error) {
+    errorResponse(res, 'Failed to request password reset', error);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, token, password } = req.body;
+    if (!password || String(password).length < 8) {
+      throw new ApiError('Password must be at least 8 characters', 400);
+    }
+
+    const user = await User.findOne({
+      email: String(email || '').trim().toLowerCase(),
+      resetPasswordToken: hashOtp(String(token || '')),
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+password');
+
+    if (!user) {
+      throw new ApiError('Reset link is invalid or expired', 400);
+    }
+
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    successResponse(res, null, 'Password reset successfully');
+  } catch (error) {
+    errorResponse(res, 'Failed to reset password', error);
+  }
+};
+
 /**
  * Get current user profile
  * @route GET /api/auth/me
@@ -240,10 +421,13 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       role: user.role,
       artistName: user.artistName,
       accountType: user.accountType,
+      adminPreset: user.adminPreset,
+      permissions: user.permissions || [],
       verification: user.verification || { status: 'pending' },
       bio: user.bio,
       socialLinks: user.socialLinks,
       profilePicture: user.profilePicture,
+      payoutMethod: user.payoutMethod,
       createdAt: user.createdAt 
     }, 'User profile retrieved successfully');
   } catch (error) {
@@ -295,6 +479,7 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
     }
 
     if (accountType === 'artist') {
+      user.role = 'artist' as any;
       user.accountType = 'artist';
       user.artistName = artistName || user.artistName;
       user.onboarding = {
@@ -308,6 +493,7 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
         governmentIdFile: '',
       } as any;
     } else if (accountType === 'label') {
+      user.role = 'label' as any;
       user.accountType = 'label';
       user.onboarding = {
         labelName,
@@ -364,7 +550,7 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
  */
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, artistName, bio, socialLinks } = req.body;
+    const { name, artistName, bio, socialLinks, payoutMethod } = req.body;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -381,6 +567,13 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
         ...socialLinks
       };
     }
+    if (payoutMethod?.method) {
+      user.payoutMethod = {
+        method: payoutMethod.method,
+        details: payoutMethod.details || {},
+        updatedAt: new Date(),
+      };
+    }
 
     await user.save();
 
@@ -392,7 +585,8 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       artistName: user.artistName,
       bio: user.bio,
       socialLinks: user.socialLinks,
-      profilePicture: user.profilePicture
+      profilePicture: user.profilePicture,
+      payoutMethod: user.payoutMethod,
     }, 'Profile updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update profile', error);

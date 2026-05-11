@@ -18,6 +18,8 @@ const generateToken = (user: IUser): string => {
     email: user.email,
     role: user.role,
     accountType: user.accountType,
+    adminPreset: user.adminPreset,
+    permissions: user.permissions || [],
     verification: user.verification,
   };
 

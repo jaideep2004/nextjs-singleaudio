@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
 import { ObjectId } from 'mongodb';
+import { getCurrentBackendUser } from '@/lib/currentUser';
 
 export async function PATCH(
   req: NextRequest,
@@ -8,6 +9,12 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const user = await getCurrentBackendUser();
+    const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+    if (user.role !== 'admin' && !(user.role === 'subadmin' && permissions.includes('review'))) {
+      return NextResponse.json({ success: false, error: 'Review permission is required' }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { status, reason } = body as { status?: string; reason?: string };
 

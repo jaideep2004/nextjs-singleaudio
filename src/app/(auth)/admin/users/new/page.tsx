@@ -16,8 +16,13 @@ import {
   CircularProgress,
   Breadcrumbs,
   Link as MuiLink,
+  Checkbox,
+  FormGroup,
+  MenuItem,
+  InputAdornment,
+  IconButton,
 } from '@mui/material';
-import { Save, ArrowBack } from '@mui/icons-material';
+import { Save, ArrowBack, Visibility, VisibilityOff } from '@mui/icons-material';
 import Link from 'next/link';
 import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
@@ -32,17 +37,22 @@ export default function NewUserPage() {
     password: '',
     role: 'artist',
     artistName: '',
+    accountType: 'artist',
+    adminPreset: 'users',
+    permissions: [] as string[],
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value,
+      ...(name === 'role' && (value === 'artist' || value === 'label') ? { accountType: value } : {}),
     }));
     
     // Auto-fill artist name if empty when name changes
@@ -52,6 +62,15 @@ export default function NewUserPage() {
         artistName: value
       }));
     }
+  };
+
+  const handlePermissionChange = (permission: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: prev.permissions.includes(permission)
+        ? prev.permissions.filter((item) => item !== permission)
+        : [...prev.permissions, permission],
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,6 +100,9 @@ export default function NewUserPage() {
           password: '',
           role: 'artist',
           artistName: '',
+          accountType: 'artist',
+          adminPreset: 'users',
+          permissions: [],
         });
         
         // Redirect after a short delay
@@ -176,12 +198,25 @@ export default function NewUserPage() {
             fullWidth
             label="Password"
             name="password"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             value={formData.password}
             onChange={handleChange}
             margin="normal"
             required
             disabled={loading}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    edge="end"
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
           
           <FormControl component="fieldset" margin="normal">
@@ -193,9 +228,48 @@ export default function NewUserPage() {
               onChange={handleChange}
             >
               <FormControlLabel value="artist" control={<Radio />} label="Artist" />
+              <FormControlLabel value="label" control={<Radio />} label="Label" />
+              <FormControlLabel value="subadmin" control={<Radio />} label="Subadmin" />
               <FormControlLabel value="admin" control={<Radio />} label="Admin" />
             </RadioGroup>
           </FormControl>
+
+          {formData.role === 'subadmin' && (
+            <Box sx={{ my: 2 }}>
+              <TextField
+                select
+                fullWidth
+                label="Subadmin Preset"
+                name="adminPreset"
+                value={formData.adminPreset}
+                onChange={handleChange}
+                disabled={loading}
+              >
+                {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics'].map((preset) => (
+                  <MenuItem key={preset} value={preset}>
+                    {preset.replace('-', ' ')}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <FormControl component="fieldset" sx={{ mt: 2 }}>
+                <FormLabel component="legend">Extra Permissions</FormLabel>
+                <FormGroup row>
+                  {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics'].map((permission) => (
+                    <FormControlLabel
+                      key={permission}
+                      control={
+                        <Checkbox
+                          checked={formData.permissions.includes(permission)}
+                          onChange={() => handlePermissionChange(permission)}
+                        />
+                      }
+                      label={permission.replace('_', ' ')}
+                    />
+                  ))}
+                </FormGroup>
+              </FormControl>
+            </Box>
+          )}
           
           <TextField
             fullWidth

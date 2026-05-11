@@ -20,7 +20,6 @@ import {
 import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
-  MusicNote as MusicNoteIcon,
   Payment as PaymentIcon,
   Settings as SettingsIcon,
   ExpandLess,
@@ -30,7 +29,12 @@ import {
   Album,
   TrendingUp,
   Shield as ShieldIcon,
+  CloudUpload as CloudUploadIcon,
+  Podcasts as PodcastsIcon,
+  LibraryMusic,
+  VideoLibrary,
 } from '@mui/icons-material';
+import { useAuth } from '@/context/AppContext';
 
 const drawerWidth = 264;
 
@@ -52,11 +56,13 @@ const menuSections = [
         text: 'Users',
         icon: <PeopleIcon />,
         path: '/admin/users',
+        permission: 'users',
       },
       {
         text: 'Releases',
         icon: <Album />,
         path: '/admin/releases',
+        permission: 'review',
         subItems: [
           { text: 'All Releases', path: '/admin/releases' },
           { text: 'Pending', path: '/admin/releases?status=pending' },
@@ -65,9 +71,16 @@ const menuSections = [
         ],
       },
       {
-        text: 'Tracks',
-        icon: <MusicNoteIcon />,
-        path: '/admin/tracks',
+        text: 'DSP Deliveries',
+        icon: <CloudUploadIcon />,
+        path: '/admin/dsp-deliveries',
+        permission: 'dsp_delivery',
+      },
+      {
+        text: 'Analytics',
+        icon: <TrendingUp />,
+        path: '/admin/analytics',
+        permission: 'analytics',
       },
     ],
   },
@@ -78,11 +91,18 @@ const menuSections = [
         text: 'Payouts',
         icon: <PaymentIcon />,
         path: '/admin/payouts',
+        permission: 'payouts',
       },
+    ],
+  },
+  {
+    label: 'Podcasts',
+    items: [
       {
-        text: 'Analytics',
-        icon: <TrendingUp />,
-        path: '/admin/analytics',
+        text: 'Podcasts',
+        icon: <PodcastsIcon />,
+        path: '/admin/podcasts',
+        permission: 'podcasts',
       },
     ],
   },
@@ -90,9 +110,22 @@ const menuSections = [
     label: 'System',
     items: [
       {
+        text: 'Music Publishing',
+        icon: <LibraryMusic />,
+        path: '/admin/music-publishing',
+        permission: 'settings',
+      },
+      {
+        text: 'Vevo Video Distribution',
+        icon: <VideoLibrary />,
+        path: '/admin/vevo-video-distribution',
+        permission: 'settings',
+      },
+      {
         text: 'Settings',
         icon: <SettingsIcon />,
         path: '/admin/settings',
+        permission: 'settings',
       },
     ],
   },
@@ -105,13 +138,20 @@ export default function AdminSidebar() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+  const { user } = useAuth();
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   const isDark = theme.palette.mode === 'dark';
+  const permissions = user?.role === 'admin' ? null : new Set(user?.permissions || []);
+  const canSee = (item: any) => !item.permission || permissions === null || permissions.has(item.permission);
 
   // Auto-expand releases submenu when on releases route
   useEffect(() => {
     if (pathname.startsWith('/admin/releases')) {
       setOpenSubMenu('/admin/releases');
+    }
+    if (typeof window !== 'undefined') {
+      setCurrentStatus(new URLSearchParams(window.location.search).get('status'));
     }
   }, [pathname]);
 
@@ -214,7 +254,7 @@ export default function AdminSidebar() {
       <Box sx={{ mx: 2, mb: 2 }}>
         <Chip
           icon={<ShieldIcon sx={{ fontSize: 14 }} />}
-          label="Administrator"
+          label={user?.role === 'subadmin' ? 'Subadmin Access' : 'Administrator'}
           size="small"
           sx={{
             width: '100%',
@@ -253,7 +293,7 @@ export default function AdminSidebar() {
               {section.label}
             </Typography>
             <List disablePadding>
-              {section.items.map((item: any) => (
+              {section.items.filter(canSee).map((item: any) => (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
                     <ListItemButton
@@ -314,12 +354,12 @@ export default function AdminSidebar() {
                       <ListItemText
                         primary={item.text}
                         primaryTypographyProps={{
-                          fontWeight: isActive(item.path) ? 600 : 500,
+                          fontWeight: isActive(item.path) ? 800 : 700,
                           fontSize: '0.875rem',
                           letterSpacing: '-0.005em',
                           color: isActive(item.path)
                             ? (isDark ? '#93b4ff' : '#3b5fe5')
-                            : (isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.74)'),
+                            : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
                       {item.subItems && (
@@ -344,9 +384,12 @@ export default function AdminSidebar() {
                             selected={pathname === subItem.path.split('?')[0] &&
                               (subItem.path.includes('?')
                                 ? new URLSearchParams(subItem.path.split('?')[1]).get('status') ===
-                                  new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('status')
-                                : !new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('status'))}
-                            onClick={() => router.push(subItem.path)}
+                                  currentStatus
+                                : !currentStatus)}
+                            onClick={() => {
+                              setCurrentStatus(subItem.path.includes('?') ? new URLSearchParams(subItem.path.split('?')[1]).get('status') : null);
+                              router.push(subItem.path);
+                            }}
                             sx={{
                               borderRadius: '8px',
                               mx: 1.5,
@@ -389,8 +432,8 @@ export default function AdminSidebar() {
                               primary={subItem.text}
                               primaryTypographyProps={{
                                 fontSize: '0.82rem',
-                                fontWeight: 450,
-                                color: isDark ? 'rgba(255, 255, 255, 0.55)' : 'rgba(15, 23, 42, 0.6)',
+                                fontWeight: 650,
+                                color: isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.76)',
                               }}
                             />
                           </ListItemButton>

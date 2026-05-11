@@ -11,7 +11,11 @@ type Params = { params: Promise<{ userId: string }> };
 async function requireAdmin() {
   const user = await getCurrentBackendUser();
   // Project currently has admin role in JWT; keep check simple + allow workspace supervisor emails too.
-  const isAdmin = (user as any)?.role === 'admin' || isRssWorkspaceSupervisor(user.email);
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const isAdmin =
+    (user as any)?.role === 'admin' ||
+    ((user as any)?.role === 'subadmin' && permissions.includes('users')) ||
+    isRssWorkspaceSupervisor(user.email);
   if (!isAdmin) {
     return { ok: false as const };
   }
@@ -52,4 +56,3 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export const dynamic = 'force-dynamic';
-

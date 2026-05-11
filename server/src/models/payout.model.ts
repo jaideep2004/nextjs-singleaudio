@@ -8,7 +8,12 @@ export interface IPayout extends Document {
   status: PayoutStatus;
   paymentMethod: PaymentMethod;
   paymentDetails: {
-    upiId?: string;
+    country?: string;
+    accountHolderName?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    branchName?: string;
     paypalEmail?: string;
   };
   requestDate: Date;
@@ -28,7 +33,7 @@ const PayoutSchema: Schema = new Schema(
     amount: {
       type: Number,
       required: [true, 'Amount is required'],
-      min: [5, 'Minimum payout amount is 5']
+      min: [100, 'Minimum payout amount is 100 USD']
     },
     currency: {
       type: String,
@@ -46,15 +51,20 @@ const PayoutSchema: Schema = new Schema(
       required: [true, 'Payment method is required']
     },
     paymentDetails: {
-      upiId: {
+      country: String,
+      accountHolderName: {
         type: String,
         validate: {
-          validator: function(this: any, upiId: string) {
-            return this.paymentMethod !== PaymentMethod.UPI || (upiId && upiId.length > 0);
+          validator: function(this: any, value: string) {
+            return this.paymentMethod !== PaymentMethod.BANK_TRANSFER || (value && value.length > 0);
           },
-          message: 'UPI ID is required when payment method is UPI'
+          message: 'Account holder name is required for bank transfer'
         }
       },
+      bankName: String,
+      accountNumber: String,
+      ifscCode: String,
+      branchName: String,
       paypalEmail: {
         type: String,
         validate: {

@@ -31,12 +31,17 @@ router.post(
   authController.register
 );
 
+router.post('/signup/start', validate(registerValidator), authController.startSignup);
+router.post('/signup/verify', authController.verifySignup);
+
 /**
  * @route   POST /api/auth/login
  * @desc    Login user
  * @access  Public
  */
 router.post('/login', validate(loginValidator), authController.login);
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password', authController.resetPassword);
 
 /**
  * @route   GET /api/auth/me

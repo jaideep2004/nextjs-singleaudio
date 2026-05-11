@@ -91,5 +91,5 @@ export const defaultSignupValues: SignupFormValues = {
 
 export const SIGNUP_STEPS = [
   { label: 'Basic Info' },
-  { label: 'Account Type' },
+  { label: 'Verify OTP' },
 ];

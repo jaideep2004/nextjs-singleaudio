@@ -15,6 +15,7 @@ import {
   Tabs,
   Tab,
   CircularProgress,
+  useTheme,
 } from '@mui/material';
 import { Save, Security, Notifications, Payment, Person } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
@@ -54,6 +55,7 @@ function a11yProps(index: number) {
 export default function AdminSettingsPage() {
   const router = useRouter();
   const { isAdmin } = useAdminAuth();
+  const theme = useTheme();
 
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState({
@@ -64,7 +66,7 @@ export default function AdminSettingsPage() {
     enableEmailNotifications: true,
     currency: 'USD',
     paymentGateway: 'stripe',
-    minPayoutAmount: 50,
+    minPayoutAmount: 100,
     maxUploadSize: 50, // MB
     allowedFileTypes: ['mp3', 'wav', 'aac', 'flac'],
   });
@@ -86,18 +88,25 @@ export default function AdminSettingsPage() {
     try {
       setLoading(true);
 
-      // Fetch signup setting
-      const signupResponse = await adminAPI.getSetting('signupEnabled');
-      console.log('Signup setting response:', signupResponse);
+      const settingsResponse = await adminAPI.getSettings();
+      const rows = Array.isArray(settingsResponse.data) ? settingsResponse.data : [];
+      const byKey = new Map(rows.map((setting: any) => [setting.key, setting.value]));
 
-      if (signupResponse.success && signupResponse.data) {
-        const signupValue = signupResponse.data.value;
-        console.log('Signup value:', signupValue);
-        setSignupEnabled(signupValue === true || signupValue === 'true');
-      } else {
-        // Default to true if setting not found
-        setSignupEnabled(true);
-      }
+      setSignupEnabled(byKey.has('signupEnabled') ? byKey.get('signupEnabled') === true : true);
+      setSettings((prev) => ({
+        ...prev,
+        siteName: String(byKey.get('siteName') || prev.siteName),
+        siteDescription: String(byKey.get('siteDescription') || prev.siteDescription),
+        maintenanceMode: byKey.get('maintenanceMode') === true,
+        allowRegistrations: byKey.has('signupEnabled') ? byKey.get('signupEnabled') === true : true,
+        enableEmailNotifications: byKey.has('enableEmailNotifications')
+          ? byKey.get('enableEmailNotifications') === true
+          : prev.enableEmailNotifications,
+        currency: String(byKey.get('currency') || prev.currency),
+        paymentGateway: String(byKey.get('paymentGateway') || prev.paymentGateway),
+        minPayoutAmount: Number(byKey.get('minPayoutAmount') || 100),
+        maxUploadSize: Number(byKey.get('maxUploadSize') || prev.maxUploadSize),
+      }));
     } catch (error) {
       console.error('Error fetching settings:', error);
       setError('Failed to load settings');
@@ -133,13 +142,21 @@ export default function AdminSettingsPage() {
       setSaving(true);
       setError('');
 
-      // Save signup setting
-      console.log('Saving signup setting:', signupEnabled);
-      const signupResponse = await adminAPI.updateSetting('signupEnabled', signupEnabled);
-      console.log('Signup setting save response:', signupResponse);
+      const writes = [
+        ['signupEnabled', signupEnabled],
+        ['siteName', settings.siteName],
+        ['siteDescription', settings.siteDescription],
+        ['maintenanceMode', settings.maintenanceMode],
+        ['enableEmailNotifications', settings.enableEmailNotifications],
+        ['currency', settings.currency],
+        ['paymentGateway', settings.paymentGateway],
+        ['minPayoutAmount', settings.minPayoutAmount],
+        ['maxUploadSize', settings.maxUploadSize],
+      ] as const;
+      const responses = await Promise.all(writes.map(([key, value]) => adminAPI.updateSetting(key, value)));
 
-      if (!signupResponse.success) {
-        throw new Error(signupResponse.message || 'Failed to update signup setting');
+      if (responses.some((response) => !response.success)) {
+        throw new Error('Failed to update one or more settings');
       }
 
       setSaveSuccess(true);
@@ -193,7 +210,7 @@ export default function AdminSettingsPage() {
       <Paper
         sx={{
           mb: 3,
-          ...premiumSurfaceSx({ palette: { mode } } as any),
+          ...premiumSurfaceSx(theme),
           overflow: 'hidden',
         }}
       >

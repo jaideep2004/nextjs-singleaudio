@@ -27,6 +27,7 @@ import {
   Stack,
   Avatar,
   useMediaQuery,
+  MenuItem,
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
 import Link from 'next/link';
@@ -82,6 +83,9 @@ export default function EditUserPage() {
     email: '',
     role: 'artist',
     artistName: '',
+    accountType: 'artist',
+    adminPreset: 'users',
+    permissions: [] as string[],
     isActive: true,
   });
   
@@ -133,6 +137,9 @@ export default function EditUserPage() {
           email: userData.email || '',
           role: userData.role || 'artist',
           artistName: userData.artistName || '',
+          accountType: userData.accountType || (userData.role === 'label' ? 'label' : 'artist'),
+          adminPreset: userData.adminPreset || 'users',
+          permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
           isActive: userData.isActive !== undefined ? userData.isActive : true,
         });
       } else {
@@ -152,12 +159,22 @@ export default function EditUserPage() {
     
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === 'checkbox' ? checked : value,
+      ...(name === 'role' && (value === 'artist' || value === 'label') ? { accountType: value } : {}),
     }));
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+
+  const handlePermissionChange = (permission: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: prev.permissions.includes(permission)
+        ? prev.permissions.filter((item) => item !== permission)
+        : [...prev.permissions, permission],
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -359,9 +376,50 @@ export default function EditUserPage() {
                 onChange={handleChange}
               >
                 <FormControlLabel value="artist" control={<Radio />} label="Artist" />
+                <FormControlLabel value="label" control={<Radio />} label="Label" />
+                <FormControlLabel value="subadmin" control={<Radio />} label="Subadmin" />
                 <FormControlLabel value="admin" control={<Radio />} label="Admin" />
               </RadioGroup>
             </FormControl>
+
+            {formData.role === 'subadmin' && (
+              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2 }}>
+                <Stack spacing={2}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Subadmin Preset"
+                    name="adminPreset"
+                    value={formData.adminPreset}
+                    onChange={handleChange}
+                    disabled={loading}
+                  >
+                    {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics'].map((preset) => (
+                      <MenuItem key={preset} value={preset}>
+                        {preset.replace('_', ' ')}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <FormControl component="fieldset">
+                    <FormLabel component="legend">Permissions</FormLabel>
+                    <FormGroup row>
+                      {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics'].map((permission) => (
+                        <FormControlLabel
+                          key={permission}
+                          control={
+                            <Checkbox
+                              checked={formData.permissions.includes(permission)}
+                              onChange={() => handlePermissionChange(permission)}
+                            />
+                          }
+                          label={permission.replace('_', ' ')}
+                        />
+                      ))}
+                    </FormGroup>
+                  </FormControl>
+                </Stack>
+              </Paper>
+            )}
             
             <FormControl component="fieldset" margin="normal" sx={{ mb: 3 }}>
               <FormGroup>
@@ -439,6 +497,7 @@ export default function EditUserPage() {
                 {ALL_DSP_KEYS.map((key) => {
                   const checked = platformKeys.includes(key);
                   const meta = DSP_META_BY_KEY[key];
+                  const initials = (meta.name.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase();
                   return (
                     <FormControlLabel
                       key={key}
@@ -455,7 +514,7 @@ export default function EditUserPage() {
                       label={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                           <Avatar
-                            src={meta.logo}
+                            src={meta.logo || undefined}
                             alt={meta.name}
                             variant="rounded"
                             sx={{
@@ -466,8 +525,12 @@ export default function EditUserPage() {
                               borderColor: 'divider',
                               bgcolor: 'background.default',
                               p: 0.6,
+                              fontSize: 13,
+                              fontWeight: 900,
                             }}
-                          />
+                          >
+                            {initials}
+                          </Avatar>
                           <Box>
                             <Typography variant="body2" fontWeight={500}>
                               {meta.name}

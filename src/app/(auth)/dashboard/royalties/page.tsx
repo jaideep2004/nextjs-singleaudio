@@ -63,12 +63,17 @@ import AuthGuard from '@/components/AuthGuard';
 import { payoutAPI, royaltyAPI } from '@/services/api';
 import { PremiumHeader } from '@/components/premium/PremiumSurface';
 
-type PaymentMethod = 'upi' | 'paypal';
+type PaymentMethod = 'bank_transfer' | 'paypal';
 
 interface PayoutFormData {
   amount: number;
   paymentMethod: PaymentMethod;
   paymentDetails: string;
+  accountHolderName: string;
+  bankName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string;
 }
 
 interface RoyaltyItem {
@@ -213,6 +218,11 @@ function RoyaltiesContent() {
       amount: 0,
       paymentMethod: 'paypal',
       paymentDetails: '',
+      accountHolderName: '',
+      bankName: '',
+      accountNumber: '',
+      ifscCode: '',
+      branchName: '',
     },
   });
 
@@ -323,8 +333,19 @@ function RoyaltiesContent() {
 
       const response = await payoutAPI.requestPayout({
         amount: data.amount,
+        currency: 'USD',
         paymentMethod: data.paymentMethod,
-        paymentDetails: data.paymentDetails,
+        paymentDetails:
+          data.paymentMethod === 'paypal'
+            ? { paypalEmail: data.paymentDetails }
+            : {
+                country: 'IN',
+                accountHolderName: data.accountHolderName,
+                bankName: data.bankName,
+                accountNumber: data.accountNumber,
+                ifscCode: data.ifscCode,
+                branchName: data.branchName,
+              },
       });
 
       if (response.success) {
@@ -681,7 +702,7 @@ function RoyaltiesContent() {
                   control={control}
                   rules={{
                     required: 'Amount is required',
-                    min: { value: 1, message: 'Amount must be at least $1' },
+                    min: { value: 100, message: 'Minimum payout is $100' },
                     max: {
                       value: balance,
                       message: `Amount cannot exceed ${formatCurrency(balance)}`,
@@ -718,9 +739,9 @@ function RoyaltiesContent() {
                           disabled={isSubmittingPayout}
                         />
                         <FormControlLabel
-                          value="upi"
+                          value="bank_transfer"
                           control={<Radio size="small" />}
-                          label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><AccountBalance fontSize="small" /> UPI</Box>}
+                          label={<Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><AccountBalance fontSize="small" /> India Bank</Box>}
                           disabled={isSubmittingPayout}
                         />
                       </RadioGroup>
@@ -728,15 +749,16 @@ function RoyaltiesContent() {
                     </FormControl>
                   )}
                 />
+                {selectedPaymentMethod === 'paypal' ? (
                 <Box sx={{ gridColumn: '1 / -1' }}>
                   <Controller
                     name="paymentDetails"
                     control={control}
-                    rules={{ required: 'Payment details are required' }}
+                    rules={{ required: 'PayPal email is required' }}
                     render={({ field }) => (
                       <TextField
                         {...field}
-                        label={selectedPaymentMethod === 'paypal' ? 'PayPal Email' : 'UPI ID'}
+                        label="PayPal Email"
                         fullWidth
                         size="small"
                         error={!!errors.paymentDetails}
@@ -746,6 +768,35 @@ function RoyaltiesContent() {
                     )}
                   />
                 </Box>
+                ) : (
+                  <>
+                    {[
+                      ['accountHolderName', 'Account Holder Name'],
+                      ['bankName', 'Bank Name'],
+                      ['accountNumber', 'Account Number'],
+                      ['ifscCode', 'IFSC Code'],
+                      ['branchName', 'Branch Name'],
+                    ].map(([name, label]) => (
+                      <Controller
+                        key={name}
+                        name={name as keyof PayoutFormData}
+                        control={control}
+                        rules={{ required: `${label} is required` }}
+                        render={({ field }) => (
+                          <TextField
+                            {...field}
+                            label={label}
+                            fullWidth
+                            size="small"
+                            error={!!errors[name as keyof PayoutFormData]}
+                            helperText={errors[name as keyof PayoutFormData]?.message as string}
+                            disabled={isSubmittingPayout}
+                          />
+                        )}
+                      />
+                    ))}
+                  </>
+                )}
                 <Box sx={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                   <Button
                     variant="outlined"
@@ -806,8 +857,8 @@ function RoyaltiesContent() {
               },
             }}
           >
-            <Tab label="Overview" id="royalty-tab-0" />
-            <Tab label="Detailed Reports" id="royalty-tab-1" />
+            <Tab label="Statement" id="royalty-tab-0" />
+            <Tab label="Report" id="royalty-tab-1" />
             <Tab label="Payout History" id="royalty-tab-2" />
           </Tabs>
         </Box>

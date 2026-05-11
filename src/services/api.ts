@@ -646,4 +646,49 @@ export const adminAPI = {
       return { success: false, message: `Failed to update setting: ${key}`, data: null };
     }
   },
+
+  listDspProviders: async () => {
+    try {
+      const response = await api.get<ApiResponse<any>>('/admin/dsp/providers');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  bootstrapPhase1DspProviders: async () => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/dsp/providers/bootstrap-phase1');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  listDspDeliveries: async (params: Record<string, string | number> = {}) => {
+    try {
+      const response = await api.get<ApiResponse<any>>('/admin/dsp/deliveries', { params });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  dispatchDspDelivery: async (payload: { trackId: string; providerKey: string; operation?: 'deliver' | 'update' | 'takedown' }) => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/dsp/deliveries/dispatch', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  retryDspDelivery: async (jobId: string) => {
+    try {
+      const response = await api.post<ApiResponse<any>>(`/admin/dsp/deliveries/${jobId}/retry`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 };
