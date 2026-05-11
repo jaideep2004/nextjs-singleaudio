@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Alert, Snackbar } from '@mui/material';
 import { notificationAPI } from '@/services/api';
 
 // Define types
@@ -9,7 +8,8 @@ interface Notification {
   _id: string;
   message: string;
   type: string;
-  read: boolean;
+  read?: boolean;
+  isRead?: boolean;
   createdAt: string;
 }
 
@@ -22,34 +22,59 @@ interface NotificationsContextType {
   markAllAsRead: () => Promise<void>;
 }
 
-// Create context
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
-// Provider component
+const PUBLIC_AUTH_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/admin-login'];
+
+const isPublicAuthPath = (pathname: string) =>
+  PUBLIC_AUTH_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+
+const hasAuthToken = () =>
+  typeof document !== 'undefined' &&
+  document.cookie.split('; ').some((row) => row.startsWith('token='));
+
+const canFetchNotifications = () => {
+  if (typeof window === 'undefined') return false;
+  return !isPublicAuthPath(window.location.pathname) && hasAuthToken();
+};
+
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [isClient, setIsClient] = useState(false);
 
-  // Initialize on client side only
   useEffect(() => {
-    setIsClient(true);
+    if (!canFetchNotifications()) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
+
     fetchNotifications();
   }, []);
 
   // Calculate unread count
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !(n.read ?? n.isRead)).length;
 
   // Fetch notifications
   const fetchNotifications = async () => {
-    if (typeof window === 'undefined') return; // Skip during SSR
+    if (!canFetchNotifications()) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
       const response = await notificationAPI.getNotifications();
       
       if (response.success && response.data) {
-        setNotifications(Array.isArray(response.data) ? response.data : []);
+        const normalized = Array.isArray(response.data)
+          ? response.data.map((notification) => ({
+              ...notification,
+              read: notification.read ?? notification.isRead ?? false,
+            }))
+          : [];
+        setNotifications(normalized);
       } else {
         setNotifications([]);
       }
@@ -63,13 +88,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // Mark notification as read
   const markAsRead = async (id: string) => {
-    if (typeof window === 'undefined') return; // Skip during SSR
+    if (!canFetchNotifications()) return;
     
     try {
       await notificationAPI.markAsRead(id);
       // Update local state
       setNotifications(prev => 
-        prev.map(n => n._id === id ? { ...n, read: true } : n)
+        prev.map(n => n._id === id ? { ...n, read: true, isRead: true } : n)
       );
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
@@ -78,13 +103,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
-    if (typeof window === 'undefined') return; // Skip during SSR
+    if (!canFetchNotifications()) return;
     
     try {
       await notificationAPI.markAllAsRead();
       // Update local state
       setNotifications(prev => 
-        prev.map(n => ({ ...n, read: true }))
+        prev.map(n => ({ ...n, read: true, isRead: true }))
       );
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
@@ -101,13 +126,9 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     markAllAsRead,
   };
 
-  // Always render children to prevent hydration mismatch
-  // Use a wrapper div with visibility control during initial load
   return (
     <NotificationsContext.Provider value={contextValue}>
-      <div style={{ visibility: !isClient || loading ? 'hidden' : 'visible' }}>
-        {children}
-      </div>
+      {children}
     </NotificationsContext.Provider>
   );
 }

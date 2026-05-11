@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -69,6 +69,7 @@ const menuSections = [
           { text: 'Pending', path: '/admin/releases?status=pending' },
           { text: 'Approved', path: '/admin/releases?status=approved' },
           { text: 'Rejected', path: '/admin/releases?status=rejected' },
+          { text: 'Tracks', path: '/admin/tracks' },
         ],
       },
       {
@@ -104,6 +105,11 @@ const menuSections = [
         icon: <PodcastsIcon />,
         path: '/admin/podcasts',
         permission: 'podcasts' as AdminPermission,
+        subItems: [
+          { text: 'My Podcast', path: '/admin/podcasts' },
+          { text: 'Episodes', path: '/admin/podcasts?view=episodes' },
+          { text: 'Analytics', path: '/admin/podcasts?view=analytics' },
+        ],
       },
     ],
   },
@@ -135,12 +141,12 @@ const menuSections = [
 export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const { user } = useAuth();
-  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   const isDark = theme.palette.mode === 'dark';
   const canSee = (item: any) => {
@@ -150,13 +156,13 @@ export default function AdminSidebar() {
     return hasAdminPermission(user, item.permission);
   };
 
-  // Auto-expand releases submenu when on releases route
+  // Auto-expand submenus when on matching routes
   useEffect(() => {
     if (pathname.startsWith('/admin/releases')) {
       setOpenSubMenu('/admin/releases');
     }
-    if (typeof window !== 'undefined') {
-      setCurrentStatus(new URLSearchParams(window.location.search).get('status'));
+    if (pathname.startsWith('/admin/podcasts')) {
+      setOpenSubMenu('/admin/podcasts');
     }
   }, [pathname]);
 
@@ -173,6 +179,20 @@ export default function AdminSidebar() {
       return pathname === path;
     }
     return pathname.startsWith(path);
+  };
+
+  const isSubItemActive = (path: string) => {
+    const [subPath, subQuery] = path.split('?');
+    if (!subQuery) {
+      return pathname === subPath && !searchParams.get('view') && !searchParams.get('status');
+    }
+
+    const subParams = new URLSearchParams(subQuery);
+    const subView = subParams.get('view');
+    const subStatus = subParams.get('status');
+    if (subView) return pathname === subPath && searchParams.get('view') === subView;
+    if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
+    return pathname === subPath;
   };
 
   const drawer = (
@@ -389,15 +409,8 @@ export default function AdminSidebar() {
                         {item.subItems.map((subItem: any) => (
                           <ListItemButton
                             key={subItem.path}
-                            selected={pathname === subItem.path.split('?')[0] &&
-                              (subItem.path.includes('?')
-                                ? new URLSearchParams(subItem.path.split('?')[1]).get('status') ===
-                                  currentStatus
-                                : !currentStatus)}
-                            onClick={() => {
-                              setCurrentStatus(subItem.path.includes('?') ? new URLSearchParams(subItem.path.split('?')[1]).get('status') : null);
-                              router.push(subItem.path);
-                            }}
+                            selected={isSubItemActive(subItem.path)}
+                            onClick={() => router.push(subItem.path)}
                             sx={{
                               borderRadius: '8px',
                               mx: 1.5,

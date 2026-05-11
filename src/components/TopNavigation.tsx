@@ -15,6 +15,7 @@ import {
   useTheme,
   Tooltip,
   Badge,
+  Button,
 } from '@mui/material';
 import {
   NotificationsOutlined,
@@ -25,6 +26,7 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
+import { useNotifications } from '@/context/NotificationsContext';
 
 interface TopNavigationProps {
   title?: string;
@@ -42,6 +44,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
   const colorMode = useColorMode();
   const { user, logout } = auth;
   const { toggleColorMode } = colorMode;
+  const { notifications, unreadCount, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications();
 
   // Menu states
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
@@ -68,6 +71,28 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
 
   const handleNotificationsClose = () => {
     setNotificationsAnchor(null);
+  };
+
+  const getNotificationTitle = (type?: string) => {
+    const normalized = (type || 'system').replace(/_/g, ' ').toLowerCase();
+    if (normalized.includes('approved')) return 'Approved';
+    if (normalized.includes('rejected')) return 'Rejected';
+    if (normalized.includes('payout')) return 'Payout Update';
+    if (normalized.includes('email')) return 'Email Update';
+    if (normalized.includes('release')) return 'Release Update';
+    return 'Notification';
+  };
+
+  const formatNotificationDate = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    await markAsRead(id);
+    handleNotificationsClose();
   };
 
   // Generate breadcrumb from pathname
@@ -167,7 +192,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
               }}
             >
               <Badge
-                badgeContent={3}
+                badgeContent={unreadCount}
                 color="error"
                 sx={{
                   '& .MuiBadge-badge': {
@@ -202,25 +227,53 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
             }}
           >
             <Box sx={{ px: 2.5, py: 1.5 }}>
-              <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
+                {unreadCount > 0 && (
+                  <Button size="small" onClick={() => markAllAsRead()} sx={{ minWidth: 0, fontSize: '0.72rem', fontWeight: 700 }}>
+                    Mark All Read
+                  </Button>
+                )}
+              </Box>
             </Box>
             <Divider sx={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
-            <MenuItem onClick={handleNotificationsClose} sx={{ px: 2.5, py: 1.5 }}>
-              <Box>
-                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.25 }}>New track approved</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Your track &quot;Summer Vibes&quot; has been approved
-                </Typography>
+            {notificationsLoading ? (
+              <Box sx={{ px: 2.5, py: 2 }}>
+                <Typography variant="body2" color="text.secondary">Loading notifications…</Typography>
               </Box>
-            </MenuItem>
-            <MenuItem onClick={handleNotificationsClose} sx={{ px: 2.5, py: 1.5 }}>
-              <Box>
-                <Typography variant="body2" fontWeight={600} sx={{ mb: 0.25 }}>Royalty payment received</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  You received $24.50 in royalties
-                </Typography>
+            ) : notifications.length === 0 ? (
+              <Box sx={{ px: 2.5, py: 3 }}>
+                <Typography variant="body2" color="text.secondary">No notifications yet.</Typography>
               </Box>
-            </MenuItem>
+            ) : (
+              notifications.slice(0, 8).map((notification) => {
+                const isUnread = !(notification.read ?? notification.isRead);
+                return (
+                  <MenuItem
+                    key={notification._id}
+                    onClick={() => handleNotificationClick(notification._id)}
+                    sx={{
+                      px: 2.5,
+                      py: 1.5,
+                      alignItems: 'flex-start',
+                      bgcolor: isUnread ? (isDarkMode ? 'rgba(74,108,247,0.1)' : 'rgba(74,108,247,0.06)') : 'transparent',
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+                        {getNotificationTitle(notification.type)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'normal' }}>
+                        {notification.message}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">
+                        {formatNotificationDate(notification.createdAt)}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                );
+              })
+            )}
           </Menu>
 
           {/* Separator */}

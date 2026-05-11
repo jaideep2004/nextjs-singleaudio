@@ -17,6 +17,7 @@ import {
   ListItemIcon,
   useTheme,
   Tooltip,
+  Button,
 } from '@mui/material';
 import {
   Notifications as NotificationsIcon,
@@ -34,10 +35,12 @@ export default function AdminHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
-  const { unreadCount } = useNotifications();
+  const { notifications, unreadCount, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications();
   const { mode, toggleColorMode } = useColorMode();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
+  const notificationsOpen = Boolean(notificationsAnchor);
 
   const isDark = mode === 'dark';
 
@@ -47,6 +50,36 @@ export default function AdminHeader() {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleNotificationsOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationsAnchor(event.currentTarget);
+  };
+
+  const handleNotificationsClose = () => {
+    setNotificationsAnchor(null);
+  };
+
+  const getNotificationTitle = (type?: string) => {
+    const normalized = (type || 'system').replace(/_/g, ' ').toLowerCase();
+    if (normalized.includes('approved')) return 'Approved';
+    if (normalized.includes('rejected')) return 'Rejected';
+    if (normalized.includes('payout')) return 'Payout Update';
+    if (normalized.includes('email')) return 'Email Update';
+    if (normalized.includes('release')) return 'Release Update';
+    return 'Notification';
+  };
+
+  const formatNotificationDate = (value?: string) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+  };
+
+  const handleNotificationClick = async (id: string) => {
+    await markAsRead(id);
+    handleNotificationsClose();
   };
 
   const handleLogout = async () => {
@@ -130,6 +163,7 @@ export default function AdminHeader() {
           <Tooltip title="Notifications">
             <IconButton
               size="small"
+              onClick={handleNotificationsOpen}
               sx={{
                 width: 36,
                 height: 36,
@@ -152,6 +186,73 @@ export default function AdminHeader() {
               </Badge>
             </IconButton>
           </Tooltip>
+
+          <Menu
+            anchorEl={notificationsAnchor}
+            open={notificationsOpen}
+            onClose={handleNotificationsClose}
+            PaperProps={{
+              sx: {
+                width: 340,
+                maxHeight: 420,
+                mt: 1,
+                borderRadius: '14px',
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+                bgcolor: isDark ? '#111827' : '#ffffff',
+                boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.4)' : '0 12px 40px rgba(15,23,42,0.1)',
+              },
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <Box sx={{ px: 2.5, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+              <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
+              {unreadCount > 0 && (
+                <Button size="small" onClick={() => markAllAsRead()} sx={{ minWidth: 0, fontSize: '0.72rem', fontWeight: 700 }}>
+                  Mark All Read
+                </Button>
+              )}
+            </Box>
+            <Divider sx={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
+            {notificationsLoading ? (
+              <Box sx={{ px: 2.5, py: 2 }}>
+                <Typography variant="body2" color="text.secondary">Loading notifications…</Typography>
+              </Box>
+            ) : notifications.length === 0 ? (
+              <Box sx={{ px: 2.5, py: 3 }}>
+                <Typography variant="body2" color="text.secondary">No notifications yet.</Typography>
+              </Box>
+            ) : (
+              notifications.slice(0, 8).map((notification) => {
+                const isUnread = !(notification.read ?? notification.isRead);
+                return (
+                  <MenuItem
+                    key={notification._id}
+                    onClick={() => handleNotificationClick(notification._id)}
+                    sx={{
+                      px: 2.5,
+                      py: 1.5,
+                      alignItems: 'flex-start',
+                      bgcolor: isUnread ? (isDark ? 'rgba(74,108,247,0.1)' : 'rgba(74,108,247,0.06)') : 'transparent',
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+                        {getNotificationTitle(notification.type)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'normal' }}>
+                        {notification.message}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled">
+                        {formatNotificationDate(notification.createdAt)}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                );
+              })
+            )}
+          </Menu>
 
           {/* Separator */}
           <Divider

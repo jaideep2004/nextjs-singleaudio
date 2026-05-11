@@ -1,26 +1,48 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import {
   Alert,
   Box,
   Button,
+  Chip,
+  CircularProgress,
+  Divider,
   FormControlLabel,
   Radio,
   RadioGroup,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import { AccountBalance, AccountBalanceWallet, ArrowForward, Payment } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, PremiumPanel } from '@/components/premium/PremiumSurface';
+import { payoutAPI, royaltyAPI } from '@/services/api';
 
 type Method = 'bank_transfer' | 'paypal';
 
 export default function PayoutsPage() {
+  return (
+    <AuthGuard>
+      <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>}>
+        <PayoutsContent />
+      </Suspense>
+    </AuthGuard>
+  );
+}
+
+function PayoutsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeView = searchParams.get('view') === 'statement' || searchParams.get('view') === 'report'
+    ? searchParams.get('view')!
+    : 'method';
   const [method, setMethod] = useState<Method>('bank_transfer');
   const [form, setForm] = useState({
     paypalEmail: '',
@@ -32,6 +54,9 @@ export default function PayoutsPage() {
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [royalties, setRoyalties] = useState<any[]>([]);
+  const [payouts, setPayouts] = useState<any[]>([]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem('singleaudio-payment-method');
@@ -44,6 +69,39 @@ export default function PayoutsPage() {
       // Ignore malformed local state.
     }
   }, []);
+
+  useEffect(() => {
+    if (activeView === 'method') return;
+    let mounted = true;
+    const loadFinance = async () => {
+      try {
+        setFinanceLoading(true);
+        const [royaltyResponse, payoutResponse] = await Promise.all([
+          royaltyAPI.getRoyalties(),
+          payoutAPI.getPayouts(),
+        ]);
+        if (!mounted) return;
+        setRoyalties(Array.isArray(royaltyResponse?.data) ? royaltyResponse.data : []);
+        setPayouts(Array.isArray(payoutResponse?.data) ? payoutResponse.data : []);
+      } catch (err) {
+        if (mounted) setError(err instanceof Error ? err.message : 'Failed to load payout reports');
+      } finally {
+        if (mounted) setFinanceLoading(false);
+      }
+    };
+    void loadFinance();
+    return () => {
+      mounted = false;
+    };
+  }, [activeView]);
+
+  const totalEarnings = useMemo(
+    () => royalties.reduce((sum, item) => sum + Number(item.amount || item.earnings || 0), 0),
+    [royalties]
+  );
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 
   const saveMethod = async () => {
     try {
@@ -60,9 +118,12 @@ export default function PayoutsPage() {
     }
   };
 
+  const handleViewChange = (_event: React.SyntheticEvent, nextView: string) => {
+    router.push(`/dashboard/payouts${nextView === 'method' ? '' : `?view=${nextView}`}`);
+  };
+
   return (
-    <AuthGuard>
-      <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
         <PremiumHeader
           eyebrow="Finance"
           title="Payouts"
@@ -77,6 +138,25 @@ export default function PayoutsPage() {
         {saved && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSaved(false)}>Payment method saved.</Alert>}
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
+        <PremiumPanel sx={{ mb: 2.5, overflow: 'hidden' }}>
+          <Tabs
+            value={activeView}
+            onChange={handleViewChange}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            aria-label="payout sections"
+            sx={{
+              px: 1,
+              '& .MuiTab-root': { textTransform: 'none', fontWeight: 800 },
+            }}
+          >
+            <Tab value="method" label="Payment Method" />
+            <Tab value="statement" label="Statement" />
+            <Tab value="report" label="Report" />
+          </Tabs>
+        </PremiumPanel>
+
+        {activeView === 'method' && (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.15fr 0.85fr' }, gap: 2.5 }}>
           <PremiumPanel sx={{ p: { xs: 3, md: 4 } }}>
             <Stack spacing={2.5}>
@@ -139,7 +219,71 @@ export default function PayoutsPage() {
             </Stack>
           </PremiumPanel>
         </Box>
-      </Box>
-    </AuthGuard>
+        )}
+
+        {activeView !== 'method' && (
+          <PremiumPanel sx={{ p: { xs: 3, md: 4 } }}>
+            {financeLoading ? (
+              <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 220 }}>
+                <CircularProgress />
+              </Box>
+            ) : activeView === 'statement' ? (
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900 }}>Royalty Statement</Typography>
+                  <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
+                    Current earnings snapshot used for payout planning.
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Total Earnings</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{formatCurrency(totalEarnings)}</Typography>
+                  </Box>
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Statement Rows</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{royalties.length}</Typography>
+                  </Box>
+                  <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+                    <Typography variant="caption" color="text.secondary">Payout Requests</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900 }}>{payouts.length}</Typography>
+                  </Box>
+                </Box>
+                <Divider />
+                <Stack spacing={1.25}>
+                  {royalties.slice(0, 8).map((item, index) => (
+                    <Box key={item._id || index} sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                      <Typography sx={{ fontWeight: 700 }}>{item.trackTitle || item.title || 'Untitled Track'}</Typography>
+                      <Typography sx={{ color: 'success.main', fontWeight: 900 }}>{formatCurrency(Number(item.amount || item.earnings || 0))}</Typography>
+                    </Box>
+                  ))}
+                  {royalties.length === 0 && <Typography color="text.secondary">No statement rows yet.</Typography>}
+                </Stack>
+              </Stack>
+            ) : (
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="h5" sx={{ fontWeight: 900 }}>Payout Report</Typography>
+                  <Typography sx={{ color: 'text.secondary', mt: 0.5 }}>
+                    Recent payout request status and payment trail.
+                  </Typography>
+                </Box>
+                <Stack spacing={1.5}>
+                  {payouts.slice(0, 8).map((payout, index) => (
+                    <Box key={payout._id || index} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+                      <Box>
+                        <Typography sx={{ fontWeight: 800 }}>{formatCurrency(Number(payout.amount || 0))}</Typography>
+                        <Typography variant="caption" color="text.secondary">{payout.paymentMethod || 'Payment method pending'}</Typography>
+                      </Box>
+                      <Chip size="small" label={payout.status || 'pending'} color={payout.status === 'approved' ? 'success' : payout.status === 'rejected' ? 'error' : 'warning'} />
+                    </Box>
+                  ))}
+                  {payouts.length === 0 && <Typography color="text.secondary">No payout reports yet.</Typography>}
+                </Stack>
+              </Stack>
+            )}
+          </PremiumPanel>
+        )}
+    </Box>
   );
 }

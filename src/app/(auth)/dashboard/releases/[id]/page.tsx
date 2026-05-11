@@ -55,6 +55,7 @@ import {
   getAcrCloudState,
   getAcrCloudSummary,
 } from '@/lib/acrCloud';
+import { DSP_META, DSP_META_BY_KEY } from '@/lib/platforms';
 
 type DspMeta = { icon: any; color: string; name: string };
 
@@ -111,6 +112,15 @@ const DSP_MAPPING: Record<string, DspMeta> = {
   default: { icon: Store, color: '#4a6cf7', name: 'Other' },
 };
 
+const normalizeDspName = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, '');
+
+const humanizeDspKey = (value: string) =>
+  value
+    .replace(/[-_]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const panelSx = (isDark: boolean) => ({
   borderRadius: '14px',
   bgcolor: isDark ? '#101722' : '#ffffff',
@@ -136,12 +146,35 @@ const formatDuration = (value?: string | number) => {
 
 const matchDsp = (store: string): DspMeta => {
   if (DSP_MAPPING[store]) return DSP_MAPPING[store];
+  const trimmed = store.trim();
+  const platform =
+    DSP_META_BY_KEY[trimmed] ||
+    DSP_META.find(
+      (meta) =>
+        normalizeDspName(meta.key) === normalizeDspName(trimmed) ||
+        normalizeDspName(meta.name) === normalizeDspName(trimmed)
+    );
+
+  if (platform) {
+    const iconMeta = DSP_MAPPING[platform.name] || DSP_MAPPING[humanizeDspKey(platform.key)];
+    return {
+      icon: iconMeta?.icon || Store,
+      color: iconMeta?.color || '#4a6cf7',
+      name: platform.name,
+    };
+  }
+
   const matchedKey = Object.keys(DSP_MAPPING).find(
     (key) =>
       store.toLowerCase().includes(key.toLowerCase()) ||
       key.toLowerCase().includes(store.toLowerCase())
   );
-  return DSP_MAPPING[matchedKey || 'default'];
+  if (matchedKey) return DSP_MAPPING[matchedKey];
+
+  return {
+    ...DSP_MAPPING.default,
+    name: trimmed ? humanizeDspKey(trimmed) : DSP_MAPPING.default.name,
+  };
 };
 
 const getStatusStyle = (status?: string, isDark = false) => {

@@ -1337,7 +1337,7 @@ export default function UploadPage() {
                   {releaseTypes.find(t => t.value === releaseType)?.minTracks} - {releaseTypes.find(t => t.value === releaseType)?.maxTracks}
                 </Typography>
               </Box>
-              <Grid container spacing={2} sx={{ mt: 2 }}>
+              <Grid container spacing={3} sx={{ mt: 2.5 }}>
                 <Grid xs={12} md={6}>
                   <TextField
                     label="Release Title"

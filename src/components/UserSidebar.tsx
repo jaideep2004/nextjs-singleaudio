@@ -80,10 +80,6 @@ const menuSections = [
         text: 'Royalties',
         icon: <TrendingUp />,
         path: '/dashboard/royalties',
-        subItems: [
-          { text: 'Statement', path: '/dashboard/royalties?tab=statement' },
-          { text: 'Report', path: '/dashboard/royalties?tab=report' },
-        ],
       },
       {
         text: 'Payouts',
@@ -91,8 +87,8 @@ const menuSections = [
         path: '/dashboard/payouts',
         subItems: [
           { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
-          { text: 'Request Payout', path: '/dashboard/payouts?view=request' },
-          { text: 'History', path: '/dashboard/payouts?view=history' },
+          { text: 'Statement', path: '/dashboard/payouts?view=statement' },
+          { text: 'Report', path: '/dashboard/payouts?view=report' },
         ],
       },
     ],

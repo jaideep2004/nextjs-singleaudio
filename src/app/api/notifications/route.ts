@@ -1,9 +1,8 @@
-import { NextResponse } from 'next/server';
+import { proxyBackend } from '@/app/api/_lib/backend';
 
-export async function GET() {
-  // Return empty array for now since we don't have a real notifications API
-  return NextResponse.json({
-    success: true,
-    data: []
-  });
+export async function GET(request: Request) {
+  const { search } = new URL(request.url);
+  return proxyBackend(`/api/notifications${search}`);
 }
+
+export const dynamic = 'force-dynamic';

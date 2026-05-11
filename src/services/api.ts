@@ -38,8 +38,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (typeof window !== 'undefined' && error.response?.status === 401) {
-      // Handle unauthorized access
-      window.location.href = '/login';
+      const publicAuthPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/admin-login'];
+      const pathname = window.location.pathname;
+      const alreadyOnAuthPage = publicAuthPaths.some(
+        (path) => pathname === path || pathname.startsWith(`${path}/`)
+      );
+
+      if (!alreadyOnAuthPage) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -383,9 +390,16 @@ export const notificationAPI = {
   getNotifications: async () => {
     try {
       const response = await api.get('/notifications');
+      const payload = response.data;
+      const notifications =
+        payload?.data?.notifications ||
+        payload?.notifications ||
+        payload?.data ||
+        payload ||
+        [];
       return {
         success: true,
-        data: response.data || []
+        data: Array.isArray(notifications) ? notifications : []
       };
     } catch (error) {
       console.error('Error fetching notifications:', error);

@@ -67,6 +67,7 @@ import {
   getAcrCloudSummary,
   stringifyAcrCloudRawResult,
 } from '@/lib/acrCloud';
+import { DSP_META, DSP_META_BY_KEY } from '@/lib/platforms';
 
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
@@ -81,6 +82,47 @@ const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = 
   'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
   'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
   'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
+};
+
+const normalizeDspName = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, '');
+
+const humanizeDspKey = (value: string) =>
+  value
+    .replace(/[-_]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+const matchDsp = (store: string) => {
+  if (DSP_MAPPING[store]) return DSP_MAPPING[store];
+  const trimmed = store.trim();
+  const platform =
+    DSP_META_BY_KEY[trimmed] ||
+    DSP_META.find(
+      (meta) =>
+        normalizeDspName(meta.key) === normalizeDspName(trimmed) ||
+        normalizeDspName(meta.name) === normalizeDspName(trimmed)
+    );
+
+  if (platform) {
+    const iconMeta = DSP_MAPPING[platform.name] || DSP_MAPPING[humanizeDspKey(platform.key)];
+    return {
+      icon: iconMeta?.icon || Store,
+      color: iconMeta?.color || '#4a6cf7',
+      name: platform.name,
+    };
+  }
+
+  const matchedKey = Object.keys(DSP_MAPPING).find((key) =>
+    normalizeDspName(trimmed).includes(normalizeDspName(key)) ||
+    normalizeDspName(key).includes(normalizeDspName(trimmed))
+  );
+  if (matchedKey) return DSP_MAPPING[matchedKey];
+
+  return {
+    ...DSP_MAPPING.default,
+    name: trimmed ? humanizeDspKey(trimmed) : DSP_MAPPING.default.name,
+  };
 };
 
 const formatAcrProbability = (value?: number) => {
@@ -329,18 +371,7 @@ export default function AdminReleaseDetailPage() {
     return (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {stores.map((store, index) => {
-          // Try to match store name with our mapping
-          let dspKey = store;
-          if (!DSP_MAPPING[store]) {
-            // Try to find a partial match
-            const matchedKey = Object.keys(DSP_MAPPING).find(key => 
-              store.toLowerCase().includes(key.toLowerCase()) || 
-              key.toLowerCase().includes(store.toLowerCase())
-            );
-            dspKey = matchedKey || 'default';
-          }
-          
-          const dsp = DSP_MAPPING[dspKey] || DSP_MAPPING.default;
+          const dsp = matchDsp(store);
           
           // Check if it's a Font Awesome icon or MUI icon
           const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');

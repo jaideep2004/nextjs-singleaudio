@@ -131,6 +131,9 @@ function DashboardPage() {
   const rejectedTracks = safeTracks.filter(t => t?.status === 'rejected').length;
   const approvedReleases = safeReleases.filter(r => r?.status === 'approved').length;
   const pendingReleases = safeReleases.filter(r => r?.status === 'pending').length;
+  const rejectedReleases = safeReleases.filter(r => r?.status === 'rejected').length;
+  const liveCatalogRate = safeReleases.length > 0 ? Math.round((approvedReleases / safeReleases.length) * 100) : 0;
+  const latestRelease = safeReleases[0];
 
   const recentReleases = safeReleases.slice(0, 5);
   const recentTracks = safeTracks.slice(0, 6);
@@ -221,6 +224,98 @@ function DashboardPage() {
       />
 
       {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>{error}</Alert>}
+
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '1.35fr 0.65fr' },
+          gap: 2.5,
+          mb: 3,
+        }}
+      >
+        <Box
+          sx={{
+            ...premiumSurfaceSx(theme),
+            p: { xs: 2.5, md: 3 },
+            borderRadius: '14px',
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2, alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, mb: 2 }}>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: isDark ? '#f8fafc' : '#0f172a' }}>
+                Catalog Health
+              </Typography>
+              <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.52)' : 'rgba(15,23,42,0.55)', mt: 0.5 }}>
+                Live catalog, review queue, and issues that need attention.
+              </Typography>
+            </Box>
+            <Chip
+              label={`${liveCatalogRate}% Live`}
+              color={liveCatalogRate >= 70 ? 'success' : pendingReleases > 0 ? 'warning' : 'default'}
+              sx={{ fontWeight: 900 }}
+            />
+          </Box>
+          <LinearProgress
+            variant="determinate"
+            value={liveCatalogRate}
+            sx={{
+              height: 8,
+              borderRadius: 4,
+              bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+              '& .MuiLinearProgress-bar': { borderRadius: 4, bgcolor: liveCatalogRate >= 70 ? '#10b981' : '#f59e0b' },
+            }}
+          />
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, 1fr)' }, gap: 1.5, mt: 2 }}>
+            {[
+              { label: 'Live Releases', value: approvedReleases, color: '#10b981' },
+              { label: 'In Review', value: pendingReleases, color: '#f59e0b' },
+              { label: 'Needs Fix', value: rejectedReleases, color: '#ef4444' },
+              { label: 'Tracks Pending', value: pendingTracks, color: '#4a6cf7' },
+            ].map((item) => (
+              <Box key={item.label} sx={{ border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)', borderRadius: '10px', p: 1.5 }}>
+                <Typography sx={{ fontWeight: 900, fontSize: '1.35rem', color: item.color }}>{item.value}</Typography>
+                <Typography sx={{ fontSize: '0.74rem', color: isDark ? 'rgba(255,255,255,0.48)' : 'rgba(15,23,42,0.48)', fontWeight: 700 }}>
+                  {item.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        <Box
+          sx={{
+            ...premiumSurfaceSx(theme),
+            p: { xs: 2.5, md: 3 },
+            borderRadius: '14px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 2,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontWeight: 900, color: isDark ? '#f8fafc' : '#0f172a' }}>Next Best Action</Typography>
+            <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.52)' : 'rgba(15,23,42,0.55)', mt: 0.75 }}>
+              {rejectedReleases > 0
+                ? 'Fix rejected release feedback first.'
+                : pendingReleases > 0
+                  ? 'Review queue is active. Watch approval status.'
+                  : latestRelease
+                    ? `Latest: ${latestRelease.releaseTitle || latestRelease.title || 'Untitled Release'}`
+                    : 'Create your first release to start distribution.'}
+            </Typography>
+          </Box>
+          <Button
+            component={Link}
+            href={rejectedReleases > 0 ? '/dashboard/releases?status=rejected' : pendingReleases > 0 ? '/dashboard/releases?status=pending' : '/dashboard/upload'}
+            variant="contained"
+            endIcon={<ArrowForward />}
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            {rejectedReleases > 0 ? 'Fix Releases' : pendingReleases > 0 ? 'View Review Queue' : 'Create Release'}
+          </Button>
+        </Box>
+      </Box>
 
       {/* KPI Metrics */}
       <Box

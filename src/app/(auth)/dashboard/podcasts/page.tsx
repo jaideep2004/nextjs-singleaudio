@@ -150,7 +150,7 @@ function episodeStep1Valid(form: EpisodeFormState) {
   return form.title.trim().length > 0 && form.description.trim().length > 0;
 }
 
-function PodcastsContent() {
+export function PodcastsContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -919,7 +919,7 @@ function PodcastsContent() {
           <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }}>
                 <Box>
-                  <Typography variant="h6" fontWeight={700}>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: isDark ? '#f1f5f9' : '#0f172a' }}>
                     {hasPodcast ? 'Your Podcast' : 'Create Podcast'}
                   </Typography>
                   {!hasPodcast && (
@@ -1012,14 +1012,13 @@ function PodcastsContent() {
 
           {/* Right: existing podcasts list */}
           <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                {podcasts.length > 0 ? 'Your Podcasts' : 'No Podcasts Yet'}
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: isDark ? '#f1f5f9' : '#0f172a' }}>
+                {podcasts.length > 0 ? 'Your Podcasts' : 'Podcast Preview'}
               </Typography>
               {podcasts.length === 0 ? (
-                <Stack alignItems="center" spacing={2} sx={{ py: 6 }}>
-                  <PodcastIcon sx={{ fontSize: 64, color: 'text.disabled' }} />
-                  <Typography color="text.secondary">Complete the form to create your first podcast.</Typography>
-                </Stack>
+                <Typography variant="body2" sx={{ color: isDark ? 'rgba(255,255,255,0.56)' : 'rgba(15,23,42,0.58)' }}>
+                  Podcast card appears here after creation. Use the form without losing space to an empty state.
+                </Typography>
               ) : (
                 <Stack spacing={2}>
                   {podcasts.map((podcast) => (
@@ -1051,7 +1050,7 @@ function PodcastsContent() {
                           </Avatar>
                         )}
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="subtitle1" fontWeight={600} noWrap>{podcast.title}</Typography>
+                          <Typography sx={{color: isDark ? '#f1f5f9' : '#0f172a'}} variant="subtitle1" fontWeight={600} noWrap>{podcast.title}</Typography>
                           <Typography variant="body2" color="text.secondary">
                             {podcast.language.toUpperCase()} • {podcast.role}
                           </Typography>
@@ -1075,10 +1074,10 @@ function PodcastsContent() {
 
       {/* ── EPISODES VIEW ───────────────────────────────────────────────── */}
       {activeView === 'episodes' && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '5fr 7fr' }, gap: 3 }}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3 }}>
           {/* Left: publish form */}
           <Box sx={{ p: { xs: 2.5, md: 3 }, borderRadius: '14px', border: '1px solid', borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', bgcolor: isDark ? '#111827' : '#ffffff' }}>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Publish Episode</Typography>
+              <Typography variant="h6" fontWeight={700} sx={{ mb: 2, color: isDark ? '#f1f5f9' : '#0f172a' }}>Publish Episode</Typography>
 
               {podcasts.length === 0 ? (
                 <Alert severity="warning">
