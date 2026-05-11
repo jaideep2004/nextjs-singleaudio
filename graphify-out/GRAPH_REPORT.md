@@ -1,7 +1,7 @@
-# Graph Report - nextjs-singleaudio  (2026-05-09)
+# Graph Report - nextjs-singleaudio  (2026-05-11)
 
 ## Corpus Check
-- 247 files · ~435,180 words
+- 247 files · ~444,628 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
