@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import axios from 'axios';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
+import { getFirstAllowedAdminPath } from '@/lib/adminAccess';
 
 interface User {
   id: string;
@@ -265,9 +266,12 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         path: '/',
       });
 
-      setUser(toUser({ ...userData, artistName: userData.artistName || userData.name }));
+      const currentUser = toUser({ ...userData, artistName: userData.artistName || userData.name });
+      setUser(currentUser);
 
-      const redirectUrl = userData.role === 'admin' || userData.role === 'subadmin' ? '/admin/dashboard' : '/dashboard';
+      const redirectUrl = userData.role === 'admin' || userData.role === 'subadmin'
+        ? getFirstAllowedAdminPath(currentUser)
+        : '/dashboard';
       window.location.assign(redirectUrl);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Login failed'));

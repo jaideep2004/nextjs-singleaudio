@@ -46,6 +46,7 @@ import useAdminAuth from '@/hooks/useAdminAuth';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import { isFullAdmin } from '@/lib/adminAccess';
 
 interface AdminUser {
   _id: string;
@@ -82,6 +83,7 @@ export default function AdminUsersPage() {
   const { isAdmin } = useAdminAuth();
   const { mode } = useColorMode();
   const { user } = useAuth();
+  const canCreateUsers = isFullAdmin(user);
   const [mounted, setMounted] = useState(false);
 
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -101,15 +103,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  // Redirect if not authenticated or not admin
-  useEffect(() => {
-    if (mounted && user) {
-      if (user.role !== 'admin') {
-        router.push('/dashboard');
-      }
-    }
-  }, [user, router, mounted]);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -312,14 +305,16 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="User Management"
         description="Review artists, labels, KYC state, access rights, and account health from one command surface."
-        action={<Button 
-          variant="contained" 
-          startIcon={<PersonAdd />} 
-          onClick={handleCreateUser}
-          size={isMobile ? "small" : "medium"}
-        >
-          {isMobile ? "Add" : "Add New User"}
-        </Button>}
+        action={canCreateUsers ? (
+          <Button
+            variant="contained"
+            startIcon={<PersonAdd />}
+            onClick={handleCreateUser}
+            size={isMobile ? 'small' : 'medium'}
+          >
+            {isMobile ? 'Add' : 'Add New User'}
+          </Button>
+        ) : undefined}
       />
 
       <Paper 
@@ -557,21 +552,23 @@ export default function AdminUsersPage() {
                         </Tooltip>
                       </>
                     )}
-                    <Tooltip title="Delete User">
-                      <IconButton 
-                        size="small" 
-                        onClick={() => handleDeleteClick(user)}
-                        disabled={user.role === 'admin' && totalUsers <= 1}
-                        sx={{
-                          color: mode === 'dark' ? '#f44336' : '#d32f2f',
-                          '&:disabled': {
-                            color: mode === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
-                          }
-                        }}
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
+                    {canCreateUsers && (
+                      <Tooltip title="Delete User">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteClick(user)}
+                          disabled={user.role === 'admin' && totalUsers <= 1}
+                          sx={{
+                            color: mode === 'dark' ? '#f44336' : '#d32f2f',
+                            '&:disabled': {
+                              color: mode === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)',
+                            }
+                          }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

@@ -35,6 +35,7 @@ import {
   VideoLibrary,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
+import { hasAdminPermission, isFullAdmin, isSubadmin, type AdminPermission } from '@/lib/adminAccess';
 
 const drawerWidth = 264;
 
@@ -56,13 +57,13 @@ const menuSections = [
         text: 'Users',
         icon: <PeopleIcon />,
         path: '/admin/users',
-        permission: 'users',
+        permission: 'users' as AdminPermission,
       },
       {
         text: 'Releases',
         icon: <Album />,
         path: '/admin/releases',
-        permission: 'review',
+        permission: 'review' as AdminPermission,
         subItems: [
           { text: 'All Releases', path: '/admin/releases' },
           { text: 'Pending', path: '/admin/releases?status=pending' },
@@ -74,13 +75,13 @@ const menuSections = [
         text: 'DSP Deliveries',
         icon: <CloudUploadIcon />,
         path: '/admin/dsp-deliveries',
-        permission: 'dsp_delivery',
+        permission: 'dsp_delivery' as AdminPermission,
       },
       {
         text: 'Analytics',
         icon: <TrendingUp />,
         path: '/admin/analytics',
-        permission: 'analytics',
+        permission: 'analytics' as AdminPermission,
       },
     ],
   },
@@ -91,7 +92,7 @@ const menuSections = [
         text: 'Payouts',
         icon: <PaymentIcon />,
         path: '/admin/payouts',
-        permission: 'payouts',
+        permission: 'payouts' as AdminPermission,
       },
     ],
   },
@@ -102,7 +103,7 @@ const menuSections = [
         text: 'Podcasts',
         icon: <PodcastsIcon />,
         path: '/admin/podcasts',
-        permission: 'podcasts',
+        permission: 'podcasts' as AdminPermission,
       },
     ],
   },
@@ -113,19 +114,19 @@ const menuSections = [
         text: 'Music Publishing',
         icon: <LibraryMusic />,
         path: '/admin/music-publishing',
-        permission: 'settings',
+        permission: 'settings' as AdminPermission,
       },
       {
         text: 'Vevo Video Distribution',
         icon: <VideoLibrary />,
         path: '/admin/vevo-video-distribution',
-        permission: 'settings',
+        permission: 'settings' as AdminPermission,
       },
       {
         text: 'Settings',
         icon: <SettingsIcon />,
         path: '/admin/settings',
-        permission: 'settings',
+        permission: 'settings' as AdminPermission,
       },
     ],
   },
@@ -142,8 +143,12 @@ export default function AdminSidebar() {
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   const isDark = theme.palette.mode === 'dark';
-  const permissions = user?.role === 'admin' ? null : new Set(user?.permissions || []);
-  const canSee = (item: any) => !item.permission || permissions === null || permissions.has(item.permission);
+  const canSee = (item: any) => {
+    if (isFullAdmin(user)) return true;
+    if (!item.permission) return false;
+
+    return hasAdminPermission(user, item.permission);
+  };
 
   // Auto-expand releases submenu when on releases route
   useEffect(() => {
@@ -254,7 +259,7 @@ export default function AdminSidebar() {
       <Box sx={{ mx: 2, mb: 2 }}>
         <Chip
           icon={<ShieldIcon sx={{ fontSize: 14 }} />}
-          label={user?.role === 'subadmin' ? 'Subadmin Access' : 'Administrator'}
+          label={isSubadmin(user) ? 'Subadmin Access' : 'Administrator'}
           size="small"
           sx={{
             width: '100%',
@@ -275,8 +280,11 @@ export default function AdminSidebar() {
 
       {/* Navigation Sections */}
       <Box sx={{ flex: 1, px: 1, pb: 2 }}>
-        {menuSections.map((section, sectionIdx) => (
-          <Box key={section.label} sx={{ mb: sectionIdx < menuSections.length - 1 ? 0.5 : 0 }}>
+        {menuSections
+          .map((section) => ({ ...section, items: section.items.filter(canSee) }))
+          .filter((section) => section.items.length > 0)
+          .map((section, sectionIdx, sections) => (
+          <Box key={section.label} sx={{ mb: sectionIdx < sections.length - 1 ? 0.5 : 0 }}>
             <Typography
               variant="overline"
               sx={{
@@ -293,7 +301,7 @@ export default function AdminSidebar() {
               {section.label}
             </Typography>
             <List disablePadding>
-              {section.items.filter(canSee).map((item: any) => (
+              {section.items.map((item: any) => (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
                     <ListItemButton

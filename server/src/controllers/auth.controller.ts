@@ -340,6 +340,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       artistName: user.artistName,
       accountType: user.accountType,
+      adminPreset: user.adminPreset,
+      permissions: user.permissions || [],
       verification: user.verification,
       token
     }, 'Login successful');

@@ -1,12 +1,54 @@
 'use client';
 
-import { Box } from '@mui/material';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Box, CircularProgress } from '@mui/material';
 import AdminHeader from '@/components/admin/AdminHeader';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { useTheme } from '@mui/material/styles';
+import { useAuth } from '@/context/AppContext';
+import { canAccessAdminPath, getFirstAllowedAdminPath, isAdminLike } from '@/lib/adminAccess';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, isLoading } = useAuth();
+  const canAccessPath = !!user && canAccessAdminPath(user, pathname);
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (!isAdminLike(user)) {
+      router.replace('/dashboard');
+      return;
+    }
+
+    if (!canAccessPath) {
+      router.replace(getFirstAllowedAdminPath(user));
+    }
+  }, [canAccessPath, isLoading, pathname, router, user]);
+
+  if (isLoading || !user || !canAccessPath) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          minHeight: '100vh',
+          alignItems: 'center',
+          justifyContent: 'center',
+          bgcolor: theme.palette.mode === 'dark' ? '#0b1020' : '#eef3f8',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
   
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
