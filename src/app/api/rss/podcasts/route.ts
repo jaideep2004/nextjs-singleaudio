@@ -4,7 +4,9 @@ import { getCurrentBackendUser } from '@/lib/currentUser';
 import { rssApi, RssApiError } from '@/lib/rssApi';
 import {
   deleteUserPodcastOwnership,
+  deleteUserPodcastOwnershipForPodcast,
   getUserPodcastOwnership,
+  getUserPodcastOwnerships,
   upsertUserPodcastOwnership,
 } from '@/lib/rssOwnership';
 import { CreateRssPodcastPayload } from '@/types/rss';
@@ -24,9 +26,9 @@ export async function GET() {
       });
     }
 
-    const ownership = await getUserPodcastOwnership(user._id);
+    const ownerships = await getUserPodcastOwnerships(user._id);
 
-    if (!ownership) {
+    if (ownerships.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -34,25 +36,25 @@ export async function GET() {
       });
     }
 
-    try {
-      const podcast = await rssApi.getPodcast(ownership.rssPodcastId);
-      return NextResponse.json({
-        success: true,
-        data: [podcast],
-        meta: { accessMode, workspaceSupervisor: false },
-      });
-    } catch (error) {
-      if (error instanceof RssApiError && error.status === 404) {
-        // Podcast was deleted on RSS.com side; clear local ownership so user can create a new one.
-        await deleteUserPodcastOwnership(user._id);
-        return NextResponse.json({
-          success: true,
-          data: [],
-          meta: { accessMode, workspaceSupervisor: false },
-        });
+    const podcasts = [];
+    for (const ownership of ownerships) {
+      try {
+        podcasts.push(await rssApi.getPodcast(ownership.rssPodcastId));
+      } catch (error) {
+        if (error instanceof RssApiError && error.status === 404) {
+          // Podcast was deleted on RSS.com side; clear stale local assignment.
+          await deleteUserPodcastOwnershipForPodcast(user._id, ownership.rssPodcastId);
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
+
+    return NextResponse.json({
+      success: true,
+      data: podcasts,
+      meta: { accessMode, workspaceSupervisor: false },
+    });
   } catch (error) {
     if (error instanceof RssApiError) {
       return NextResponse.json(

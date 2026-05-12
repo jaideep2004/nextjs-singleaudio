@@ -125,7 +125,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
       <Toolbar sx={{ display: 'flex', justifyContent: 'space-between', px: { xs: 2, sm: 3 }, minHeight: '60px !important' }}>
         {/* Left: Breadcrumb */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {getBreadcrumb() && (
+          {(getBreadcrumb() || title) && (
             <Typography
               variant="body2"
               sx={{
@@ -135,7 +135,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                 display: { xs: 'none', sm: 'block' },
               }}
             >
-              {getBreadcrumb()}
+              {getBreadcrumb() || title}
             </Typography>
           )}
         </Box>
@@ -352,7 +352,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
           >
             <MenuItem
               component={Link}
-              href={isAdmin ? '/admin/settings' : '/settings/profile'}
+              href={isAdmin ? '/admin/profile' : '/dashboard/profile'}
               onClick={handleUserMenuClose}
               sx={{ py: 1.25, fontSize: '0.875rem' }}
             >

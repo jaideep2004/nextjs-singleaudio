@@ -45,6 +45,11 @@ export interface RssEpisode {
   guid: string;
 }
 
+export interface RssEpisodeMidroll {
+  id: number;
+  start_time_ms: number;
+}
+
 export interface RssPresignedUpload {
   id: string;
   url: string;

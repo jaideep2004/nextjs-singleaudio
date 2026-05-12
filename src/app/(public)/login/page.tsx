@@ -156,7 +156,7 @@ export default function LoginPage() {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', lg: '1.15fr minmax(420px, 500px)' },
+            gridTemplateColumns: { xs: '1fr', lg: '1.15fr minmax(420px, 530px)' },
             gap: { xs: 3, md: 4, lg: 5 },
             alignItems: 'stretch',
           }}

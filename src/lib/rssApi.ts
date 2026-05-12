@@ -3,6 +3,7 @@ import {
   CreateRssPodcastPayload,
   RssCategory,
   RssEpisode,
+  RssEpisodeMidroll,
   RssPodcast,
   RssPresignedUpload,
 } from '@/types/rss';
@@ -156,6 +157,39 @@ export const rssApi = {
     return rssFetch<RssEpisode>(`/v4/podcasts/${podcastId}/episodes`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  getEpisodeMidrolls(podcastId: number | string, episodeId: number | string) {
+    return rssFetch<RssEpisodeMidroll[]>(`/v4/podcasts/${podcastId}/episodes/${episodeId}/midrolls`);
+  },
+
+  createEpisodeMidroll(
+    podcastId: number | string,
+    episodeId: number | string,
+    payload: { start_time_ms: number }
+  ) {
+    return rssFetch<RssEpisodeMidroll>(`/v4/podcasts/${podcastId}/episodes/${episodeId}/midrolls`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  updateEpisodeMidroll(
+    podcastId: number | string,
+    episodeId: number | string,
+    midrollId: number | string,
+    payload: { start_time_ms: number }
+  ) {
+    return rssFetch<RssEpisodeMidroll>(`/v4/podcasts/${podcastId}/episodes/${episodeId}/midrolls/${midrollId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  deleteEpisodeMidroll(podcastId: number | string, episodeId: number | string, midrollId: number | string) {
+    return rssFetch<void>(`/v4/podcasts/${podcastId}/episodes/${episodeId}/midrolls/${midrollId}`, {
+      method: 'DELETE',
     });
   },
 

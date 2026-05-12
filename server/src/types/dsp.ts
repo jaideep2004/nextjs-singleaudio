@@ -15,6 +15,16 @@ export type DspCapability =
   | 'takedown';
 
 export type DspDeliveryOperation = 'deliver' | 'update' | 'takedown';
+export type DspIntegrationMode = 'shell' | 'sandbox' | 'live';
+export type DspReadinessState =
+  | 'shell_ready'
+  | 'missing_contract'
+  | 'missing_credentials'
+  | 'sandbox_ready'
+  | 'live_ready'
+  | 'paused';
+export type DspDocsStatus = 'official_public' | 'partner_only' | 'no_public_docs' | 'unknown';
+export type DspPayloadStandard = 'ddex_ern' | 'platform_api' | 'manual_partner_feed' | 'rights_feed' | 'unknown';
 
 export interface DspTrackPayload {
   trackId: string;
@@ -42,6 +52,7 @@ export interface DspConnectorContext {
   credentials: Record<string, unknown>;
   region?: string;
   config?: Record<string, unknown>;
+  operation?: DspDeliveryOperation;
 }
 
 export interface DspDeliveryResult {
@@ -56,6 +67,25 @@ export interface MetadataRuleResult {
   errors: string[];
   warnings: string[];
   normalized: DspTrackPayload;
+}
+
+export interface DspProviderRequirement {
+  key: string;
+  displayName: string;
+  docsStatus: DspDocsStatus;
+  docsUrl?: string;
+  payloadStandard: DspPayloadStandard;
+  requiredCredentialKeys: string[];
+  requiredConfigKeys: string[];
+  readinessChecks: string[];
+  notes?: string;
+}
+
+export interface DspReadinessReport {
+  state: DspReadinessState;
+  missing: string[];
+  warnings: string[];
+  canDispatch: boolean;
 }
 
 export interface DspConnector {

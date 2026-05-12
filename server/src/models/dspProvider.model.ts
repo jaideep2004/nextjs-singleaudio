@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { DspCapability } from '../types/dsp';
+import { DspCapability, DspIntegrationMode, DspReadinessState } from '../types/dsp';
 
 export interface IDspProvider extends Document {
   key: string;
@@ -9,6 +9,8 @@ export interface IDspProvider extends Document {
   region?: string;
   rateLimitPerMinute?: number;
   maintenanceMode: boolean;
+  integrationMode: DspIntegrationMode;
+  readiness: DspReadinessState;
   credentials: Record<string, unknown>;
   config: Record<string, unknown>;
   createdAt: Date;
@@ -51,9 +53,22 @@ const DspProviderSchema = new Schema<IDspProvider>(
       default: false,
       index: true,
     },
+    integrationMode: {
+      type: String,
+      enum: ['shell', 'sandbox', 'live'],
+      default: 'shell',
+      index: true,
+    },
+    readiness: {
+      type: String,
+      enum: ['shell_ready', 'missing_contract', 'missing_credentials', 'sandbox_ready', 'live_ready', 'paused'],
+      default: 'shell_ready',
+      index: true,
+    },
     credentials: {
       type: Schema.Types.Mixed,
       default: {},
+      select: false,
     },
     config: {
       type: Schema.Types.Mixed,

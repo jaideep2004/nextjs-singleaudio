@@ -1,4 +1,4 @@
-import { getUserPodcastOwnership } from '@/lib/rssOwnership';
+import { getUserPodcastOwnerships } from '@/lib/rssOwnership';
 
 export type RssPodcastAccessMode = 'shared' | 'owned';
 
@@ -46,6 +46,6 @@ export async function userCanAccessPodcast(
     return true;
   }
 
-  const ownership = await getUserPodcastOwnership(user._id);
-  return Boolean(ownership && ownership.rssPodcastId === podcastId);
+  const ownerships = await getUserPodcastOwnerships(user._id);
+  return ownerships.some((ownership) => ownership.rssPodcastId === podcastId);
 }

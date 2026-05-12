@@ -72,7 +72,7 @@ export default function PublicNavBar() {
             component="div"
             sx={{ flexGrow: 1, textAlign: { xs: 'center', md: 'left' } }}
           >
-            Single Audio
+            Single Audio.
           </Typography>
           {!isMobile && (
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>

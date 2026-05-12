@@ -20,15 +20,19 @@ export abstract class BaseDspConnector implements DspConnector {
   }
 
   async deliver(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
-    const result = await this.validateTrack(payload);
-    if (!result.valid) {
-      return { state: 'failed', message: result.errors.join(', ') };
+    const validation = await this.validateTrack(payload);
+    if (!validation.valid) {
+      return { state: 'failed', message: validation.errors.join(', ') };
     }
 
     return {
-      state: 'processing',
-      externalId: `${context.providerKey}-${payload.trackId}-${Date.now()}`,
-      metadata: { mode: 'stub', note: 'Connector skeleton for direct API integration rollout' },
+      state: 'needs_attention',
+      message: `${this.displayName} connector is registered as a shell. Add partner credentials and a live connector before dispatch.`,
+      metadata: {
+        adapter: 'shellConnector',
+        providerKey: context.providerKey,
+        operation: context.operation || 'deliver',
+      },
     };
   }
 }

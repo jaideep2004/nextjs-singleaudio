@@ -249,6 +249,7 @@ export default function AdminDashboard() {
     fontWeight: 900,
     color: headingText,
     letterSpacing: 0,
+    fontSize: '1.2rem',
   };
   const sectionHeadingSx = {
     fontWeight: 700,
@@ -450,7 +451,7 @@ export default function AdminDashboard() {
                     fontWeight: 900,
                     color: headingText,
                     fontVariantNumeric: 'tabular-nums',
-                    fontSize: '2rem',
+                    fontSize: '1.6rem',
                   }}
                 >
                   {item.value}
@@ -566,7 +567,7 @@ export default function AdminDashboard() {
                   sx={{
                     mt: 1.75,
                     fontWeight: 900,
-                    fontSize: { xs: '1.75rem', sm: '2rem' },
+                    fontSize: { xs: '1.75rem', sm: '1.6rem' },
                     lineHeight: 1,
                     color: headingText,
                     fontVariantNumeric: 'tabular-nums',

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
 import { ObjectId } from 'mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
+import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
+import { generateUpcA } from '@/lib/upc';
+import { createReleaseDeliveryShellJobs } from '@/lib/dspDeliveryShell';
 
 export async function PATCH(
   req: NextRequest,
@@ -35,6 +38,35 @@ export async function PATCH(
     if (status === 'rejected') update.rejectReason = reason || '';
     if (status !== 'rejected') update.rejectReason = undefined;
 
+    const existing = await db.collection('releases').findOne({ _id });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
+    }
+
+    if (status === 'approved') {
+      const releaseUpc = existing.upc || generateUpcA();
+      const tracks = Array.isArray(existing.tracks) ? existing.tracks : [];
+      const tracksWithUpc = tracks.map((track: any) => ({
+        ...track,
+        upc: track?.upc || releaseUpc,
+      }));
+
+      const assignedTracks = await assignIsrcsToTracks(db, tracksWithUpc, {
+        releaseTitle: existing.releaseTitle,
+        source: 'release',
+        releaseId: id,
+      });
+
+      update.upc = releaseUpc;
+      update.tracks = assignedTracks;
+      update.codesAssignedAt = existing.codesAssignedAt || new Date();
+      await markIsrcsAssigned(
+        db,
+        assignedTracks.map((track: any) => track.isrc).filter(Boolean),
+        id
+      );
+    }
+
     const res = await db.collection('releases').findOneAndUpdate(
       { _id },
       { $set: update },
@@ -45,7 +77,12 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, release: res.value });
+    let deliveryShell = null;
+    if (status === 'approved') {
+      deliveryShell = await createReleaseDeliveryShellJobs(db, res.value as any, String(user._id));
+    }
+
+    return NextResponse.json({ success: true, release: res.value, deliveryShell });
   } catch (e: any) {
     return NextResponse.json({ success: false, error: e?.message || 'Failed to update status' }, { status: 500 });
   }

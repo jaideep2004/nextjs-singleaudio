@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
+  Person as PersonIcon,
   People as PeopleIcon,
   Payment as PaymentIcon,
   Settings as SettingsIcon,
@@ -116,6 +117,11 @@ const menuSections = [
   {
     label: 'System',
     items: [
+      {
+        text: 'Profile',
+        icon: <PersonIcon />,
+        path: '/admin/profile',
+      },
       {
         text: 'Music Publishing',
         icon: <LibraryMusic />,
@@ -225,45 +231,18 @@ export default function AdminSidebar() {
           justifyContent: 'space-between',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
-              display: 'grid',
-              placeItems: 'center',
-              boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)',
-            }}
-          >
-            <ShieldIcon sx={{ fontSize: 18, color: '#fff' }} />
-          </Box>
-          <Box>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 800,
-                fontSize: '1rem',
-                lineHeight: 1.2,
-                color: isDark ? '#f1f5f9' : '#0f172a',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              Single Audio
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.45)',
-                fontSize: '0.7rem',
-                fontWeight: 500,
-              }}
-            >
-              Admin Panel
-            </Typography>
-          </Box>
-        </Box>
+        <Box
+          component="img"
+          src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+          alt="Single Audio"
+          sx={{
+            width: 195,
+            height: 45,
+            objectFit: 'contain',
+            objectPosition: 'left center',
+            display: 'block',
+          }}
+        />
         <IconButton
           onClick={handleDrawerToggle}
           sx={{

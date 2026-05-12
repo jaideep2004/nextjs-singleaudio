@@ -11,7 +11,6 @@ import {
   ListItemIcon,
   ListItemText,
   Collapse,
-  Divider,
   Typography,
   useTheme,
   useMediaQuery,
@@ -31,9 +30,9 @@ import {
   Podcasts as PodcastsIcon,
   BarChart as AnalyticsIcon,
   AccountBalanceWallet,
+  Person as PersonIcon,
   LibraryMusic,
   VideoLibrary,
-  MusicNote as MusicNoteIcon 
 } from '@mui/icons-material';
 
 import { useAuth } from '@/context/AppContext';
@@ -111,6 +110,11 @@ const menuSections = [
   {
     label: 'Account',
     items: [
+      {
+        text: 'Profile',
+        icon: <PersonIcon />,
+        path: '/dashboard/profile',
+      },
       {
         text: 'Music Publishing',
         icon: <LibraryMusic />,
@@ -221,45 +225,18 @@ export default function UserSidebar() {
           justifyContent: 'space-between',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #4a6cf7 0%, #7b93f9 100%)',
-              display: 'grid',
-              placeItems: 'center',
-              boxShadow: '0 4px 12px rgba(74, 108, 247, 0.3)',
-            }}
-          >
-            <MusicNoteIcon sx={{ fontSize: 18, color: '#fff' }} />
-          </Box>
-          <Box>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 800,
-                fontSize: '1rem',
-                lineHeight: 1.2,
-                color: isDark ? '#f1f5f9' : '#0f172a',
-                letterSpacing: '-0.01em',
-              }}
-            >
-              Single Audio
-            </Typography>
-            <Typography
-              variant="caption"
-              sx={{
-                color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.45)',
-                fontSize: '0.7rem',
-                fontWeight: 500,
-              }}
-            >
-              Artist Dashboard
-            </Typography>
-          </Box>
-        </Box>
+        <Box
+          component="img"
+          src={isDark ? '/images/singleaudio-b.png' : '/images/singleaudio-w.png'}
+          alt="Single Audio"
+          sx={{
+            width: 195,
+            height: 45,
+            objectFit: 'contain',
+            objectPosition: 'left center',
+            display: 'block',
+          }}
+        />
         <IconButton
           onClick={handleDrawerToggle}
           sx={{

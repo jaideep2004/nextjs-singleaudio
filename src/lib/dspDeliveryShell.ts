@@ -1,0 +1,213 @@
+import crypto from 'crypto';
+import { Db, ObjectId } from 'mongodb';
+import { validateReleaseAssetsForDelivery } from './dspAssetReadiness';
+
+type ReleaseDoc = Record<string, any> & {
+  _id: ObjectId;
+  releaseTitle?: string;
+  title?: string;
+  stores?: string[];
+  tracks?: Array<Record<string, any>>;
+};
+
+const PROVIDER_KEY_MAP: Record<string, string> = {
+  apple: 'apple_music',
+  amazon: 'amazon_music',
+  youtube: 'youtube_music',
+  facebook: 'facebook_audio_library',
+  netease: 'netease_cloud_music',
+  wynk: 'wynk_music',
+  hungama: 'hungama_music',
+};
+
+const toProviderKey = (key: string) =>
+  (PROVIDER_KEY_MAP[key] || key).toLowerCase().trim();
+
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableStringify((value as Record<string, unknown>)[key])}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+};
+
+const sha256 = (value: unknown) =>
+  crypto.createHash('sha256').update(stableStringify(value)).digest('hex');
+
+function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: string) {
+  const tracks = Array.isArray(release.tracks) ? release.tracks : [];
+  const assetChecks = release.deliveryAssetReadiness?.checks || [];
+  const payload = {
+    releaseId: release._id.toString(),
+    releaseTitle: release.releaseTitle || release.title || 'Untitled release',
+    upc: release.upc,
+    primaryArtist: release.primaryArtist || release.artist || release.artistName,
+    label: release.label,
+    genre: release.genre,
+    language: release.language,
+    releaseDate: release.releaseDate,
+    stores: providerKeys,
+    tracks: tracks.map((track) => ({
+      id: String(track._id || track.id || track.isrc || track.title || ''),
+      title: track.title,
+      artistName: track.artistName || track.primaryArtist || release.primaryArtist,
+      isrc: track.isrc,
+      upc: track.upc || release.upc,
+      explicit: track.explicit,
+      audioFile: track.audioFile || track.audioUrl || track.fileUrl,
+      artwork: track.artwork || release.artwork || release.coverArt,
+      duration: track.duration,
+    })),
+    territories: release.territories || ['WORLD'],
+    assetChecks: assetChecks.map((check: any) => ({
+      kind: check.kind,
+      owner: check.owner,
+      value: check.value,
+      sizeBytes: check.sizeBytes,
+      checksumSha256: check.checksumSha256,
+    })),
+  };
+
+  return {
+    releaseId: release._id,
+    version: 1,
+    providerKeys,
+    payload,
+    payloadHash: sha256(payload),
+    createdBy,
+    createdAt: new Date(),
+  };
+}
+
+function evaluateNativeProviderReadiness(provider: any) {
+  if (!provider || provider.enabled === false || provider.maintenanceMode) {
+    return { state: 'paused', canDispatch: false, missing: [] };
+  }
+
+  const integrationMode = provider.integrationMode || provider.config?.integrationMode || 'shell';
+  if (integrationMode === 'shell') {
+    return {
+      state: 'shell_ready',
+      canDispatch: false,
+      missing: ['partner_contract', 'credentials', 'delivery_endpoint', 'webhook_secret'],
+    };
+  }
+
+  const config = provider.config || {};
+  const missing = ['baseUrl', 'webhookSecret'].filter((key) => !config[key]);
+  if (missing.length > 0) {
+    return { state: 'missing_credentials', canDispatch: false, missing };
+  }
+
+  return {
+    state: integrationMode === 'live' ? 'live_ready' : 'sandbox_ready',
+    canDispatch: true,
+    missing: [],
+  };
+}
+
+export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc, createdBy?: string) {
+  const rawStores = Array.isArray(release.stores) ? release.stores : [];
+  const providerKeys = Array.from(new Set(rawStores.map(toProviderKey).filter(Boolean)));
+  if (providerKeys.length === 0) {
+    return { snapshotId: null, jobsCreated: 0, providerKeys: [] };
+  }
+
+  const assetReadiness = await validateReleaseAssetsForDelivery(release);
+  await db.collection('releases').updateOne(
+    { _id: release._id },
+    {
+      $set: {
+        deliveryAssetReadiness: assetReadiness,
+        deliveryReadinessCheckedAt: new Date(),
+      },
+    }
+  );
+
+  if (!assetReadiness.ok) {
+    return {
+      snapshotId: null,
+      jobsCreated: 0,
+      providerKeys,
+      blocked: true,
+      assetReadiness,
+    };
+  }
+
+  release.deliveryAssetReadiness = assetReadiness;
+  const snapshot = buildSnapshot(release, providerKeys, createdBy);
+  const snapshotResult = await db.collection('releaseDeliverySnapshots').insertOne(snapshot);
+  const providers = await db
+    .collection('dspproviders')
+    .find({ key: { $in: providerKeys } })
+    .toArray();
+  const providerMap = new Map(providers.map((provider) => [provider.key, provider]));
+  const now = new Date();
+
+  const jobs = providerKeys.map((providerKey) => {
+    const provider = providerMap.get(providerKey);
+    const readiness = evaluateNativeProviderReadiness(provider);
+    const state = readiness.canDispatch ? 'queued' : 'needs_attention';
+    const idempotencyKey = sha256({
+      releaseId: release._id.toString(),
+      providerKey,
+      operation: 'deliver',
+      payloadHash: snapshot.payloadHash,
+    });
+
+    return {
+      targetType: 'release',
+      releaseId: release._id,
+      snapshotId: snapshotResult.insertedId,
+      providerKey,
+      operation: 'deliver',
+      state,
+      priority: 5,
+      idempotencyKey,
+      maxRetries: 5,
+      retryCount: 0,
+      deadLettered: false,
+      metadata: {
+        releaseTitle: snapshot.payload.releaseTitle,
+        payloadHash: snapshot.payloadHash,
+        readiness,
+        deliverySnapshot: {
+          upc: snapshot.payload.upc,
+          trackCount: snapshot.payload.tracks.length,
+        },
+      },
+      errorMessage: readiness.canDispatch ? undefined : `Provider not ready: ${readiness.state}`,
+      attempts: [],
+      events: [
+        {
+          state,
+          message: readiness.canDispatch
+            ? 'Release delivery job created from approval snapshot'
+            : `Release delivery shell waiting for: ${readiness.missing.join(', ') || readiness.state}`,
+          source: 'system',
+          createdAt: now,
+        },
+      ],
+      createdBy: createdBy && ObjectId.isValid(createdBy) ? new ObjectId(createdBy) : undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+
+  if (jobs.length > 0) {
+    await db.collection('deliveryjobs').bulkWrite(
+      jobs.map((job) => ({
+        updateOne: {
+          filter: { idempotencyKey: job.idempotencyKey },
+          update: { $setOnInsert: job },
+          upsert: true,
+        },
+      }))
+    );
+  }
+
+  return { snapshotId: snapshotResult.insertedId, jobsCreated: jobs.length, providerKeys };
+}

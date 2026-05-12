@@ -20,7 +20,10 @@ interface IDeliveryEvent {
 }
 
 export interface IDeliveryJob extends Document {
-  trackId: mongoose.Types.ObjectId;
+  targetType: 'track' | 'release';
+  trackId?: mongoose.Types.ObjectId;
+  releaseId?: mongoose.Types.ObjectId;
+  snapshotId?: mongoose.Types.ObjectId;
   providerKey: string;
   operation: DspDeliveryOperation;
   state: DspDeliveryState;
@@ -66,7 +69,10 @@ const DeliveryEventSchema = new Schema<IDeliveryEvent>(
 
 const DeliveryJobSchema = new Schema<IDeliveryJob>(
   {
-    trackId: { type: Schema.Types.ObjectId, ref: 'Track', required: true, index: true },
+    targetType: { type: String, enum: ['track', 'release'], default: 'track', index: true },
+    trackId: { type: Schema.Types.ObjectId, ref: 'Track', index: true },
+    releaseId: { type: Schema.Types.ObjectId, ref: 'Release', index: true },
+    snapshotId: { type: Schema.Types.ObjectId, ref: 'ReleaseDeliverySnapshot', index: true },
     providerKey: { type: String, required: true, index: true, lowercase: true, trim: true },
     operation: { type: String, enum: ['deliver', 'update', 'takedown'], default: 'deliver' },
     state: { type: String, default: 'queued', index: true },
@@ -88,5 +94,6 @@ const DeliveryJobSchema = new Schema<IDeliveryJob>(
 
 DeliveryJobSchema.index({ state: 1, providerKey: 1, createdAt: -1 });
 DeliveryJobSchema.index({ providerKey: 1, trackId: 1, operation: 1 });
+DeliveryJobSchema.index({ providerKey: 1, releaseId: 1, operation: 1 });
 
 export default mongoose.model<IDeliveryJob>('DeliveryJob', DeliveryJobSchema);

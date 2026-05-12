@@ -20,6 +20,7 @@ import {
   TableRow,
   TextField,
   Typography,
+  Link,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
@@ -34,10 +35,27 @@ type Provider = {
   key: string;
   displayName: string;
   enabled?: boolean;
+  maintenanceMode?: boolean;
+  integrationMode?: 'shell' | 'sandbox' | 'live';
+  readiness?: string;
+  readinessReport?: {
+    state: string;
+    missing: string[];
+    warnings: string[];
+    canDispatch: boolean;
+  };
+  requirement?: {
+    docsStatus: string;
+    docsUrl?: string;
+    payloadStandard: string;
+    readinessChecks: string[];
+  };
 };
 
 type DeliveryJob = {
   _id: string;
+  targetType?: 'track' | 'release';
+  releaseId?: string;
   providerKey: string;
   state: string;
   operation: string;
@@ -45,6 +63,14 @@ type DeliveryJob = {
   deadLettered: boolean;
   errorMessage?: string;
   createdAt: string;
+  metadata?: {
+    releaseTitle?: string;
+    payloadHash?: string;
+    deliverySnapshot?: {
+      upc?: string;
+      trackCount?: number;
+    };
+  };
   trackId?: { title?: string; artistName?: string; isrc?: string };
 };
 
@@ -61,6 +87,16 @@ export default function AdminDspDeliveriesPage() {
   const [bootstrapping, setBootstrapping] = useState(false);
 
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
+  const readyProviders = useMemo(
+    () => providers.filter((provider) => provider.readinessReport?.canDispatch).length,
+    [providers]
+  );
+  const readinessColor = (state?: string) => {
+    if (state === 'live_ready' || state === 'sandbox_ready') return 'success';
+    if (state === 'missing_credentials' || state === 'missing_contract') return 'warning';
+    if (state === 'paused') return 'default';
+    return 'info';
+  };
 
   const load = async () => {
     try {
@@ -169,6 +205,94 @@ export default function AdminDspDeliveriesPage() {
       />
 
       <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
+          <Box>
+            <Typography variant="overline" color="text.secondary">
+              Provider Readiness
+            </Typography>
+            <Typography variant="h6" fontWeight={800}>
+              {readyProviders}/{providers.length} dispatch-ready
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {['shell_ready', 'missing_contract', 'missing_credentials', 'sandbox_ready', 'live_ready', 'paused'].map((state) => (
+              <Chip
+                key={state}
+                size="small"
+                label={`${state}: ${providers.filter((provider) => provider.readiness === state).length}`}
+                color={readinessColor(state) as any}
+                variant="outlined"
+              />
+            ))}
+          </Stack>
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 3, overflow: 'hidden' }}>
+        <Typography variant="subtitle2" fontWeight={800} mb={1}>
+          Provider Shells
+        </Typography>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Provider</TableCell>
+              <TableCell>Mode</TableCell>
+              <TableCell>Readiness</TableCell>
+              <TableCell>Payload</TableCell>
+              <TableCell>Docs</TableCell>
+              <TableCell>Missing</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {providers.map((provider) => (
+              <TableRow key={provider.key}>
+                <TableCell>
+                  <Typography variant="body2" fontWeight={700}>
+                    {provider.displayName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {provider.key}
+                  </Typography>
+                </TableCell>
+                <TableCell>
+                  <Chip size="small" label={provider.integrationMode || 'shell'} variant="outlined" />
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    label={provider.readiness || provider.readinessReport?.state || 'unknown'}
+                    color={readinessColor(provider.readiness || provider.readinessReport?.state) as any}
+                  />
+                </TableCell>
+                <TableCell>{provider.requirement?.payloadStandard || '-'}</TableCell>
+                <TableCell>
+                  {provider.requirement?.docsUrl ? (
+                    <Link href={provider.requirement.docsUrl} target="_blank" rel="noreferrer" underline="hover">
+                      {provider.requirement.docsStatus}
+                    </Link>
+                  ) : (
+                    provider.requirement?.docsStatus || '-'
+                  )}
+                </TableCell>
+                <TableCell sx={{ maxWidth: 360 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {provider.readinessReport?.missing?.length ? provider.readinessReport.missing.join(', ') : '-'}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ))}
+            {providers.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No providers bootstrapped.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <TextField
             label="Track ID"
@@ -267,10 +391,14 @@ export default function AdminDspDeliveriesPage() {
                 <TableRow key={job._id}>
                   <TableCell>
                     <Typography variant="body2" fontWeight={600}>
-                      {job.trackId?.title || 'Unknown track'}
+                      {job.targetType === 'release'
+                        ? job.metadata?.releaseTitle || 'Release delivery'
+                        : job.trackId?.title || 'Unknown track'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {job.trackId?.artistName || 'Unknown artist'} {job.trackId?.isrc ? `| ${job.trackId.isrc}` : ''}
+                      {job.targetType === 'release'
+                        ? `${job.metadata?.deliverySnapshot?.trackCount || 0} tracks${job.metadata?.deliverySnapshot?.upc ? ` | UPC ${job.metadata.deliverySnapshot.upc}` : ''}`
+                        : `${job.trackId?.artistName || 'Unknown artist'} ${job.trackId?.isrc ? `| ${job.trackId.isrc}` : ''}`}
                     </Typography>
                   </TableCell>
                   <TableCell>{providerMap.get(job.providerKey) || job.providerKey}</TableCell>

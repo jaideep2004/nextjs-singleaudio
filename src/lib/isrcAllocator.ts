@@ -1,4 +1,4 @@
-import { Db, MongoServerError } from 'mongodb';
+import { Db, MongoServerError, ObjectId } from 'mongodb';
 
 const AUDIO_COUNTRY_CODE = 'IN';
 const AUDIO_REGISTRANT_CODE = '9SN';
@@ -14,6 +14,7 @@ type TrackLike = Record<string, unknown> & {
 interface AllocationContext {
   releaseTitle?: string;
   source?: 'release' | 'track';
+  releaseId?: string;
 }
 
 interface IsrcAllocation {
@@ -59,10 +60,17 @@ async function ensureIsrcIndexes(db: Db) {
   ]);
 }
 
-async function isAlreadyUsed(db: Db, isrc: string) {
+async function isAlreadyUsed(db: Db, isrc: string, context: AllocationContext = {}) {
+  const releaseQuery: Record<string, unknown> = { 'tracks.isrc': isrc };
+  const allocationQuery: Record<string, unknown> = { isrc };
+  if (context.releaseId) {
+    releaseQuery._id = { $ne: ObjectId.isValid(context.releaseId) ? new ObjectId(context.releaseId) : context.releaseId };
+    allocationQuery.$or = [{ releaseId: { $exists: false } }, { releaseId: { $ne: context.releaseId } }];
+  }
+
   const [allocation, release, track] = await Promise.all([
-    db.collection('isrcAllocations').findOne({ isrc }, { projection: { _id: 1 } }),
-    db.collection('releases').findOne({ 'tracks.isrc': isrc }, { projection: { _id: 1 } }),
+    db.collection('isrcAllocations').findOne(allocationQuery, { projection: { _id: 1 } }),
+    db.collection('releases').findOne(releaseQuery, { projection: { _id: 1 } }),
     db.collection('tracks').findOne({ isrc }, { projection: { _id: 1 } }),
   ]);
 
@@ -70,7 +78,12 @@ async function isAlreadyUsed(db: Db, isrc: string) {
 }
 
 async function reserveManualIsrc(db: Db, isrc: string, track: TrackLike, context: AllocationContext) {
-  if (await isAlreadyUsed(db, isrc)) {
+  if (context.releaseId) {
+    const existing = await db.collection<IsrcAllocation>('isrcAllocations').findOne({ isrc, releaseId: context.releaseId });
+    if (existing) return isrc;
+  }
+
+  if (await isAlreadyUsed(db, isrc, context)) {
     throw new Error(`ISRC ${formatIsrcForDisplay(isrc)} is already used.`);
   }
 
@@ -125,7 +138,7 @@ async function reserveGeneratedIsrc(db: Db, track: TrackLike, context: Allocatio
 
     const isrc = `${AUDIO_PREFIX}${year}${String(sequence).padStart(5, '0')}`;
 
-    if (await isAlreadyUsed(db, isrc)) continue;
+    if (await isAlreadyUsed(db, isrc, context)) continue;
 
     const allocation: IsrcAllocation = {
       _id: isrc,
