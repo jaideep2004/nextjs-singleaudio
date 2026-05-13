@@ -155,6 +155,11 @@ export const uploadRegistrationFiles = multer({
   { name: 'labelGovIdFile', maxCount: 1 },
   { name: 'incorporationCertFile', maxCount: 1 },
   { name: 'gstCertFile', maxCount: 1 },
+  { name: 'aadhaarFrontFile', maxCount: 1 },
+  { name: 'aadhaarBackFile', maxCount: 1 },
+  { name: 'panCardFile', maxCount: 1 },
+  { name: 'nationalIdFrontFile', maxCount: 1 },
+  { name: 'nationalIdBackFile', maxCount: 1 },
 ]);
 
 // Delete file

@@ -7,6 +7,11 @@ import {
   Chip,
   Button,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
   Paper,
   Stack,
 } from '@mui/material';
@@ -20,16 +25,49 @@ import {
   VerifiedUser,
   Cancel,
   Visibility,
+  Close,
+  FactCheck,
+  ImageOutlined,
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
 import Link from 'next/link';
+
+const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
+  .replace(/\/api\/?$/, '')
+  .replace(/\/$/, '');
+
+const toAssetUrl = (value?: string) => {
+  if (!value) return '';
+  if (/^(https?:|data:|blob:)/.test(value)) return value;
+  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
+  return value;
+};
+
+const formatLabel = (value: string) =>
+  value
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/[_-]/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .trim();
+
+const DetailGrid = ({ items }: { items: Array<[string, any]> }) => (
+  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.25 }}>
+    {items.filter(([, value]) => value !== undefined && value !== null && value !== '').map(([label, value]) => (
+      <Box key={label} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: 'rgba(15,23,42,0.04)' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>{label}</Typography>
+        <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{String(value)}</Typography>
+      </Box>
+    ))}
+  </Box>
+);
 
 export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; onUserUpdate: () => void; onEdit?: () => void }) {
   const { mode } = useColorMode();
   
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [reviewingKyc, setReviewingKyc] = useState(false);
+  const [kycOpen, setKycOpen] = useState(false);
 
   const handleStatusToggle = async () => {
     try {
@@ -138,6 +176,14 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
               <Button
+                variant="contained"
+                color="info"
+                startIcon={<FactCheck />}
+                onClick={() => setKycOpen(true)}
+              >
+                Review KYC File
+              </Button>
+              <Button
                 component={Link}
                 href={`/admin/users/${user._id}/preview`}
                 variant="outlined"
@@ -167,6 +213,104 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
           </Stack>
         </Paper>
       )}
+
+      <Dialog open={kycOpen} onClose={() => setKycOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ pr: 7 }}>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <FactCheck color="info" />
+            <Box>
+              <Typography variant="h6" fontWeight={900}>Manual KYC file</Typography>
+              <Typography variant="body2" color="text.secondary">
+                {user.name} - {user.email}
+              </Typography>
+            </Box>
+          </Stack>
+          <IconButton onClick={() => setKycOpen(false)} sx={{ position: 'absolute', right: 12, top: 12 }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ bgcolor: mode === 'dark' ? '#111827' : '#f8fafc' }}>
+          <Stack spacing={2.5}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={900} sx={{ mb: 1.5 }}>Profile and address</Typography>
+              <DetailGrid
+                items={[
+                  ['Account type', user.accountType || user.role],
+                  ['Region', user.onboarding?.region],
+                  ['Artist name', user.artistName],
+                  ['Label name', user.onboarding?.labelName],
+                  ['Legal name', user.onboarding?.legalName],
+                  ['Phone', user.onboarding?.phoneNumber || user.verification?.phoneNumber],
+                  ['Country', user.onboarding?.location?.country],
+                  ['State', user.onboarding?.location?.state],
+                  ['City', user.onboarding?.location?.city],
+                  ['Pincode', user.onboarding?.location?.pincode],
+                  ['Address', user.onboarding?.location?.address || user.onboarding?.legalAddress],
+                ]}
+              />
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={900} sx={{ mb: 1.5 }}>Identity</Typography>
+              <DetailGrid
+                items={[
+                  ['Aadhaar', user.onboarding?.aadhaarNumber],
+                  ['PAN', user.onboarding?.panNumber],
+                  ['National ID', user.onboarding?.idNumber],
+                  ['Registration type', user.onboarding?.registrationType],
+                  ['Total artists', user.onboarding?.totalArtists],
+                  ['Catalog size', user.onboarding?.catalogSize],
+                  ['Rights type', user.onboarding?.rightsType],
+                ]}
+              />
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Typography fontWeight={900} sx={{ mb: 1.5 }}>Payout</Typography>
+              <DetailGrid
+                items={[
+                  ['Method', user.payoutMethod?.method || user.onboarding?.payoutMethod?.method],
+                  ['Account holder', user.payoutMethod?.details?.accountHolderName],
+                  ['Account number', user.payoutMethod?.details?.accountNumber],
+                  ['IFSC', user.payoutMethod?.details?.ifscCode],
+                  ['Bank', user.payoutMethod?.details?.bankName],
+                  ['Branch', user.payoutMethod?.details?.branch],
+                  ['PayPal email', user.payoutMethod?.details?.paypalEmail],
+                ]}
+              />
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                <ImageOutlined color="info" />
+                <Typography fontWeight={900}>Document previews</Typography>
+              </Stack>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {Object.entries(user.onboarding?.documents || {}).filter(([, value]) => value).map(([key, value]) => {
+                  const url = toAssetUrl(String(value));
+                  const isPdf = url.toLowerCase().includes('.pdf');
+                  return (
+                    <Box key={key} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+                      <Box sx={{ height: 190, bgcolor: 'rgba(15,23,42,0.06)', display: 'grid', placeItems: 'center' }}>
+                        {isPdf ? (
+                          <Button component="a" href={url} target="_blank" rel="noreferrer" variant="outlined">Open PDF</Button>
+                        ) : (
+                          <Box component="img" src={url} alt={formatLabel(key)} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        )}
+                      </Box>
+                      <Divider />
+                      <Typography sx={{ p: 1.25, fontWeight: 800 }}>{formatLabel(key)}</Typography>
+                    </Box>
+                  );
+                })}
+                {Object.values(user.onboarding?.documents || {}).filter(Boolean).length === 0 && (
+                  <Typography color="text.secondary">No uploaded documents found.</Typography>
+                )}
+              </Box>
+            </Paper>
+          </Stack>
+        </DialogContent>
+      </Dialog>
 
       {/* User Details */}
       <Box sx={{ mb: 4 }}>

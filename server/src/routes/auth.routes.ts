@@ -55,7 +55,7 @@ router.get('/me', protect, authController.getMe);
  * @desc    Submit current user's KYC/onboarding data
  * @access  Private
  */
-router.put('/me/kyc', protect, authController.submitKyc);
+router.put('/me/kyc', protect, uploadRegistrationFiles, authController.submitKyc);
 
 /**
  * @route   PUT /api/auth/me

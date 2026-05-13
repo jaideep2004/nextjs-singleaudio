@@ -20,6 +20,29 @@ import {
 // Escape special regex characters in a string
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const parseJsonObject = (value: unknown): Record<string, string> => {
+  if (!value) return {};
+  if (typeof value === 'object') return value as Record<string, string>;
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const normalizeDigits = (value: unknown) => String(value || '').replace(/\D/g, '');
+const normalizeUpper = (value: unknown) => String(value || '').trim().toUpperCase();
+
+const getUploadedFileUrl = (
+  files: Record<string, Express.Multer.File[]> | undefined,
+  field: string
+) => {
+  const file = files?.[field]?.[0];
+  return file?.filename ? `/uploads/registration/${file.filename}` : '';
+};
+
 const authPayload = (user: any) => ({
   _id: user._id,
   name: user.name,
@@ -450,11 +473,14 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
     }
 
     const {
+      region,
       accountType,
       artistName,
       legalName,
       idType,
       idNumber,
+      aadhaarNumber,
+      panNumber,
       legalAddress,
       phoneNumber,
       numberOfTracks,
@@ -473,11 +499,74 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
       mobileVerificationProvider,
       kycProvider,
       kycConsent,
+      location,
+      payoutMethod,
       notes,
     } = req.body;
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const normalizedRegion = region === 'international' ? 'international' : 'india';
+    const locationData = parseJsonObject(location);
+    const payoutData = parseJsonObject(payoutMethod) as {
+      method?: 'bank_transfer' | 'paypal';
+      details?: Record<string, string>;
+    };
+    const aadhaar = normalizeDigits(aadhaarNumber || idNumber);
+    const pan = normalizeUpper(panNumber || idNumber);
 
-    if (!kycConsent) {
+    const hasKycConsent = kycConsent === true || kycConsent === 'true';
+
+    if (!hasKycConsent) {
       throw new ApiError('KYC consent is required', 400);
+    }
+
+    if (!legalAddress || !phoneNumber) {
+      throw new ApiError('Phone number and address are required', 400);
+    }
+
+    if (normalizedRegion === 'india') {
+      if (!/^\d{12}$/.test(aadhaar)) {
+        throw new ApiError('Valid 12 digit Aadhaar number is required', 400);
+      }
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+        throw new ApiError('Valid PAN number is required', 400);
+      }
+      if (payoutData.method !== 'bank_transfer') {
+        throw new ApiError('Indian users must submit bank transfer details', 400);
+      }
+      const ifsc = normalizeUpper(payoutData.details?.ifscCode);
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        throw new ApiError('Valid IFSC code is required', 400);
+      }
+      if (
+        !payoutData.details?.accountHolderName ||
+        !payoutData.details?.accountNumber ||
+        payoutData.details.accountNumber !== payoutData.details.confirmAccountNumber
+      ) {
+        throw new ApiError('Valid matching bank account details are required', 400);
+      }
+    } else {
+      if (payoutData.method !== 'paypal' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(payoutData.details?.paypalEmail || ''))) {
+        throw new ApiError('Valid PayPal email is required for international users', 400);
+      }
+    }
+
+    const documents = {
+      aadhaarFront: getUploadedFileUrl(files, 'aadhaarFrontFile'),
+      aadhaarBack: getUploadedFileUrl(files, 'aadhaarBackFile'),
+      panCard: getUploadedFileUrl(files, 'panCardFile'),
+      nationalIdFront: getUploadedFileUrl(files, 'nationalIdFrontFile'),
+      nationalIdBack: getUploadedFileUrl(files, 'nationalIdBackFile'),
+    };
+
+    if (
+      normalizedRegion === 'india' &&
+      (!documents.aadhaarFront || !documents.aadhaarBack || !documents.panCard)
+    ) {
+      throw new ApiError('Aadhaar front, Aadhaar back, and PAN card are required', 400);
+    }
+
+    if (normalizedRegion === 'international' && !documents.nationalIdFront) {
+      throw new ApiError('National ID front is required', 400);
     }
 
     if (accountType === 'artist') {
@@ -485,24 +574,47 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
       user.accountType = 'artist';
       user.artistName = artistName || user.artistName;
       user.onboarding = {
+        region: normalizedRegion,
         legalName,
-        idType,
-        idNumber,
+        idType: normalizedRegion === 'india' ? 'aadhaar' : idType || 'national_id',
+        idNumber: normalizedRegion === 'india' ? aadhaar : idNumber,
+        aadhaarNumber: normalizedRegion === 'india' ? aadhaar : undefined,
+        panNumber: normalizedRegion === 'india' ? pan : undefined,
         legalAddress,
         phoneNumber,
+        location: locationData,
+        documents,
+        payoutMethod: {
+          method: payoutData.method,
+          details: payoutData.details || {},
+          updatedAt: new Date(),
+        },
         numberOfTracks: Number(numberOfTracks) || 0,
         numberOfReleases: Number(numberOfReleases) || 0,
-        governmentIdFile: '',
+        governmentIdFile: documents.aadhaarFront || documents.nationalIdFront || '',
       } as any;
     } else if (accountType === 'label') {
       user.role = 'label' as any;
       user.accountType = 'label';
       user.onboarding = {
+        region: normalizedRegion,
         labelName,
         registrationType,
         legalName: registrationType === 'individual' ? labelLegalName : undefined,
         legalEntityName: registrationType === 'registered_company' ? legalEntityName : undefined,
         companyType: registrationType === 'registered_company' ? companyType : undefined,
+        legalAddress,
+        phoneNumber,
+        aadhaarNumber: normalizedRegion === 'india' ? aadhaar : undefined,
+        panNumber: normalizedRegion === 'india' ? pan : undefined,
+        idNumber: normalizedRegion === 'international' ? idNumber : undefined,
+        location: locationData,
+        documents,
+        payoutMethod: {
+          method: payoutData.method,
+          details: payoutData.details || {},
+          updatedAt: new Date(),
+        },
         totalArtists: Number(totalArtists) || 0,
         totalRevenue: Number(totalRevenue) || 0,
         catalogSize: Number(catalogSize) || 0,
@@ -521,7 +633,13 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
       phoneNumber,
       submittedAt: new Date(),
       rejectionReason: undefined,
-      notes,
+      notes: notes || `Manual ${normalizedRegion} KYC submitted`,
+    };
+
+    user.payoutMethod = {
+      method: payoutData.method as any,
+      details: payoutData.details || {},
+      updatedAt: new Date(),
     };
 
     await user.save();
@@ -537,6 +655,7 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
         artistName: user.artistName,
         verification: user.verification,
         onboarding: user.onboarding,
+        payoutMethod: user.payoutMethod,
       },
       'KYC submitted successfully'
     );

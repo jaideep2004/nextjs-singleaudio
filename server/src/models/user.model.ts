@@ -3,17 +3,26 @@ import bcrypt from 'bcryptjs';
 import { AdminPermission, UserRole } from '../config/constants';
 
 export interface IArtistOnboarding {
+  region?: 'india' | 'international';
   legalName: string;
-  idType: 'pan' | 'aadhaar';
+  idType: 'pan' | 'aadhaar' | 'national_id';
   idNumber: string;
   legalAddress: string;
   phoneNumber: string;
+  location?: Record<string, string>;
+  documents?: Record<string, string>;
+  payoutMethod?: {
+    method: 'bank_transfer' | 'paypal';
+    details: Record<string, string>;
+    updatedAt?: Date;
+  };
   numberOfTracks: number;
   numberOfReleases: number;
   governmentIdFile: string; // stored path / URL
 }
 
 export interface ILabelOnboarding {
+  region?: 'india' | 'international';
   labelName: string;
   registrationType: 'individual' | 'registered_company';
   // individual
@@ -34,6 +43,13 @@ export interface ILabelOnboarding {
     twitter?: string;
     facebook?: string;
     youtube?: string;
+  };
+  location?: Record<string, string>;
+  documents?: Record<string, string>;
+  payoutMethod?: {
+    method: 'bank_transfer' | 'paypal';
+    details: Record<string, string>;
+    updatedAt?: Date;
   };
 }
 
