@@ -138,7 +138,7 @@ const AppContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL =
   typeof window !== 'undefined'
-    ? process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'
+    ? '/api'
     : 'http://localhost:5000/api';
 
 const fallbackAuthContext: AuthContextType = {
