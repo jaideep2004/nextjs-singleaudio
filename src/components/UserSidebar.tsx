@@ -33,6 +33,7 @@ import {
   Person as PersonIcon,
   LibraryMusic,
   VideoLibrary,
+  LockOutlined,
 } from '@mui/icons-material';
 
 import { useAuth } from '@/context/AppContext';
@@ -79,6 +80,10 @@ const menuSections = [
         text: 'Royalties',
         icon: <TrendingUp />,
         path: '/dashboard/royalties',
+        subItems: [
+          { text: 'Statement', path: '/dashboard/royalties?view=statement' },
+          { text: 'Report', path: '/dashboard/royalties?view=report' },
+        ],
       },
       {
         text: 'Payouts',
@@ -86,8 +91,6 @@ const menuSections = [
         path: '/dashboard/payouts',
         subItems: [
           { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
-          { text: 'Statement', path: '/dashboard/payouts?view=statement' },
-          { text: 'Report', path: '/dashboard/payouts?view=report' },
         ],
       },
     ],
@@ -144,6 +147,7 @@ export default function UserSidebar() {
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const auth = useAuth();
   const user = auth?.user;
+  const kycUnderReview = user?.verification?.status === 'submitted' && (user.role === 'artist' || user.role === 'label');
 
   const isDark = theme.palette.mode === 'dark';
 
@@ -193,6 +197,11 @@ export default function UserSidebar() {
     if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
     if (subTab) return pathname === subPath && searchParams.get('tab') === subTab;
     return pathname === subPath;
+  };
+
+  const isUnlockedDuringReview = (path: string) => {
+    const [basePath] = path.split('?');
+    return basePath === '/dashboard' || basePath === '/dashboard/profile';
   };
 
   const drawer = (
@@ -322,13 +331,18 @@ export default function UserSidebar() {
               {section.label}
             </Typography>
             <List disablePadding>
-              {section.items.map((item: any) => (
+              {section.items.map((item: any) => {
+                const lockedItem = kycUnderReview && !isUnlockedDuringReview(item.path);
+                return (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
                     <ListItemButton
                       selected={isActive(item.path)}
+                      disabled={lockedItem}
                       onClick={() =>
-                        item.subItems
+                        lockedItem
+                          ? undefined
+                          : item.subItems
                           ? handleSubMenuClick(item.path)
                           : router.push(item.path)
                       }
@@ -392,6 +406,9 @@ export default function UserSidebar() {
                             : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
+                      {lockedItem && (
+                        <LockOutlined sx={{ fontSize: 15, color: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.32)', mr: 0.5 }} />
+                      )}
                       {item.subItems && (
                         <Box
                           sx={{
@@ -408,11 +425,16 @@ export default function UserSidebar() {
                   {item.subItems && (
                     <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding sx={{ py: 0.25 }}>
-                        {item.subItems.map((subItem: any) => (
+                        {item.subItems.map((subItem: any) => {
+                          const lockedSubItem = kycUnderReview && !isUnlockedDuringReview(subItem.path);
+                          return (
                           <ListItemButton
                             key={subItem.path}
                             selected={isSubItemActive(subItem.path)}
-                            onClick={() => router.push(subItem.path)}
+                            disabled={lockedSubItem}
+                            onClick={() => {
+                              if (!lockedSubItem) router.push(subItem.path);
+                            }}
                             sx={{
                               borderRadius: '8px',
                               mx: 1.5,
@@ -459,13 +481,16 @@ export default function UserSidebar() {
                                 color: isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.76)',
                               }}
                             />
+                            {lockedSubItem && (
+                              <LockOutlined sx={{ fontSize: 14, color: 'text.disabled', mr: 1 }} />
+                            )}
                           </ListItemButton>
-                        ))}
+                        )})}
                       </List>
                     </Collapse>
                   )}
                 </div>
-              ))}
+              )})}
             </List>
           </Box>
         ))}

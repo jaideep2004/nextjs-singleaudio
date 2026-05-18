@@ -104,6 +104,10 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
   };
 
   const verificationStatus = user.verification?.status || 'pending';
+  const kycHeadingName =
+    user.accountType === 'label' || user.role === 'label'
+      ? user.onboarding?.legalName || user.onboarding?.labelLegalName || user.name
+      : user.artistName || user.name;
   const verificationColor =
     verificationStatus === 'approved' ? 'success' :
     verificationStatus === 'rejected' ? 'error' :
@@ -219,7 +223,7 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
           <Stack direction="row" spacing={1.25} alignItems="center">
             <FactCheck color="info" />
             <Box>
-              <Typography variant="h6" fontWeight={900}>Manual KYC file</Typography>
+              <Typography variant="h6" fontWeight={900}>Manual KYC file - {kycHeadingName}</Typography>
               <Typography variant="body2" color="text.secondary">
                 {user.name} - {user.email}
               </Typography>

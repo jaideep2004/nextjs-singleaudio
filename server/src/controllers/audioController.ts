@@ -7,7 +7,7 @@ import {
   identifyAudioFile,
   normalizeScanPayload,
   persistScanResult,
-  uploadFileForScan,
+  uploadFirstThirtySecondsForScan,
 } from '../services/acrCloud.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { LOCAL_FFMPEG_ENABLED, UserRole } from '../config/constants';
@@ -81,7 +81,7 @@ export async function scanWithAcrCloudHandler(req: Request, res: Response) {
       size: req.file?.size,
       mimetype: req.file?.mimetype,
     });
-    const result = await uploadFileForScan(filePath, req.file?.originalname, 'audio');
+    const result = await uploadFirstThirtySecondsForScan(filePath, req.file?.originalname, 'audio');
     console.log('[ACRCloud] Manual scan submitted', {
       originalName: req.file?.originalname,
       fileId: result.fileId,

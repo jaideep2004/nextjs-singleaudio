@@ -19,12 +19,12 @@ const uploadMiddleware = [
 /**
  * @route   POST /api/tracks
  * @desc    Upload a new track
- * @access  Private (Artist)
+ * @access  Private (Artist/Label)
  */
 router.post(
   '/', 
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   uploadMiddleware,
   validate(createTrackValidator),
   trackController.uploadTrack
@@ -47,12 +47,12 @@ router.get('/:id', protect, trackController.getTrackById);
 /**
  * @route   PUT /api/tracks/:id
  * @desc    Update track
- * @access  Private (Artist)
+ * @access  Private (Artist/Label)
  */
 router.put(
   '/:id',
   protect,
-  authorize([UserRole.ARTIST]),
+  authorize([UserRole.ARTIST, UserRole.LABEL]),
   validate(updateTrackValidator),
   trackController.updateTrack
 );

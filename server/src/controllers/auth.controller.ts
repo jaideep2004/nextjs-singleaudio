@@ -16,6 +16,7 @@ import {
   sendEmailOtp,
   verifyOtpHash,
 } from '../services/otp.service';
+import { buildDashboardUrl, sendUserAndAdminEmail } from '../services/emailNotification.service';
 
 // Escape special regex characters in a string
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -34,6 +35,7 @@ const parseJsonObject = (value: unknown): Record<string, string> => {
 
 const normalizeDigits = (value: unknown) => String(value || '').replace(/\D/g, '');
 const normalizeUpper = (value: unknown) => String(value || '').trim().toUpperCase();
+const hasNumber = (value: unknown) => /\d/.test(String(value || ''));
 
 const getUploadedFileUrl = (
   files: Record<string, Express.Multer.File[]> | undefined,
@@ -130,6 +132,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       throw new ApiError('User already exists with this email', 400);
     }
 
+    if (hasNumber(name)) {
+      throw new ApiError('Full name cannot contain numbers', 400);
+    }
+
     // Check artist name uniqueness
     if (artistName) {
       const artistNameExists = await User.findOne({
@@ -208,6 +214,22 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     // Generate token
     const token = generateToken(user);
 
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'Single Audio Account Created',
+        title: 'Account Created',
+        intro: `${user.name} now has a Single Audio account.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Role: user.role,
+        },
+        actionLabel: 'Open Dashboard',
+        actionUrl: buildDashboardUrl(user.role === 'admin' || user.role === 'subadmin' ? '/admin/dashboard' : '/dashboard'),
+      }
+    ).catch((error) => console.warn('Account creation email skipped:', error));
+
     successResponse(
       res,
       {
@@ -245,6 +267,10 @@ export const startSignup = async (req: Request, res: Response): Promise<void> =>
       throw new ApiError('Name, email, and password are required', 400);
     }
 
+    if (hasNumber(name)) {
+      throw new ApiError('Full name cannot contain numbers', 400);
+    }
+
     if (!/^\+?[0-9]{10,15}$/.test(mobile)) {
       throw new ApiError('Valid mobile number is required for OTP verification', 400);
     }
@@ -252,6 +278,20 @@ export const startSignup = async (req: Request, res: Response): Promise<void> =>
     const userExists = await User.findOne({ email: normalizedEmail });
     if (userExists) {
       throw new ApiError('User already exists with this email', 400);
+    }
+
+    const mobileExists = await User.exists({ 'verification.phoneNumber': mobile });
+    if (mobileExists) {
+      throw new ApiError('Mobile number is already taken', 400);
+    }
+
+    const pendingMobileExists = await PendingSignup.exists({
+      phoneNumber: mobile,
+      email: { $ne: normalizedEmail },
+      expiresAt: { $gt: new Date() },
+    });
+    if (pendingMobileExists) {
+      throw new ApiError('Mobile number is already taken', 400);
     }
 
     const emailOtp = generateOtp();
@@ -308,6 +348,20 @@ export const verifySignup = async (req: Request, res: Response): Promise<void> =
     }
 
     const payload = pending.payload as any;
+    if (hasNumber(payload.name)) {
+      throw new ApiError('Full name cannot contain numbers', 400);
+    }
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      throw new ApiError('User already exists with this email', 400);
+    }
+
+    const existingMobile = await User.exists({ 'verification.phoneNumber': pending.phoneNumber });
+    if (existingMobile) {
+      throw new ApiError('Mobile number is already taken', 400);
+    }
+
     const user = await User.create({
       name: payload.name,
       email: normalizedEmail,
@@ -325,6 +379,24 @@ export const verifySignup = async (req: Request, res: Response): Promise<void> =
     });
 
     await pending.deleteOne();
+
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'Welcome to Single Audio',
+        title: 'Account Created',
+        intro: `${user.name} completed signup and can now submit KYC.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Role: user.role,
+          Mobile: pending.phoneNumber,
+        },
+        actionLabel: 'Open Dashboard',
+        actionUrl: buildDashboardUrl('/dashboard'),
+      }
+    ).catch((error) => console.warn('Signup email skipped:', error));
+
     successResponse(res, authPayload(user), 'User registered successfully', 201);
   } catch (error) {
     errorResponse(res, 'Signup verification failed', error);
@@ -453,7 +525,8 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       socialLinks: user.socialLinks,
       profilePicture: user.profilePicture,
       payoutMethod: user.payoutMethod,
-      createdAt: user.createdAt 
+      onboarding: user.onboarding,
+      createdAt: user.createdAt
     }, 'User profile retrieved successfully');
   } catch (error) {
     errorResponse(res, 'Failed to get user profile', error);
@@ -470,6 +543,14 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
     const user = await User.findById(req.user._id);
     if (!user) {
       throw new ApiError('User not found', 404);
+    }
+
+    if (user.verification?.status === 'submitted') {
+      throw new ApiError('KYC is already submitted and under admin review', 400);
+    }
+
+    if (user.verification?.status === 'approved') {
+      throw new ApiError('KYC is already approved', 400);
     }
 
     const {
@@ -644,6 +725,24 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
 
     await user.save();
 
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'KYC Submitted for Review',
+        title: 'KYC Submitted',
+        intro: `${user.name} submitted KYC details for admin review.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Account: user.accountType || user.role,
+          Region: normalizedRegion,
+          Status: 'submitted',
+        },
+        actionLabel: 'Review User',
+        actionUrl: buildDashboardUrl(`/admin/users/${user._id}`),
+      }
+    ).catch((error) => console.warn('KYC submission email skipped:', error));
+
     successResponse(
       res,
       {
@@ -689,6 +788,9 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       };
     }
     if (payoutMethod?.method) {
+      if (user.payoutMethod?.method) {
+        throw new ApiError('Payout method is already saved. Contact admin to change it.', 400);
+      }
       user.payoutMethod = {
         method: payoutMethod.method,
         details: payoutMethod.details || {},
@@ -697,6 +799,22 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }
 
     await user.save();
+
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'Single Audio Profile Updated',
+        title: 'Profile Updated',
+        intro: `${user.name} updated profile details.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Role: user.role,
+        },
+        actionLabel: 'Open Profile',
+        actionUrl: buildDashboardUrl('/dashboard/profile'),
+      }
+    ).catch((error) => console.warn('Profile update email skipped:', error));
 
     successResponse(res, {
       _id: user._id,
@@ -708,6 +826,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       socialLinks: user.socialLinks,
       profilePicture: user.profilePicture,
       payoutMethod: user.payoutMethod,
+      onboarding: user.onboarding,
     }, 'Profile updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update profile', error);

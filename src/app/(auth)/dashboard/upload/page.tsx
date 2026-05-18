@@ -74,13 +74,13 @@ import {
 } from '@/lib/acrCloud';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
-const API_BASE = (
-  typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
+const API_BASE =
+  (typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
     ? process.env.NEXT_PUBLIC_API_URL!
     : 'http://localhost:5000/api'
-)
-  .replace(/\/+$/, '')
-  .replace(/\/api$/, '') + '/api';
+  )
+    .replace(/\/+$/, '')
+    .replace(/\/api$/, '') + '/api';
 const VERCEL_FUNCTION_UPLOAD_LIMIT_BYTES = 4.5 * 1024 * 1024;
 const VERCEL_FUNCTION_UPLOAD_SAFE_BYTES = 4.3 * 1024 * 1024;
 const isVercelFunctionUploadTarget =
@@ -136,7 +136,7 @@ async function uploadAudioToServer(
     xhr.open('POST', `${API_BASE}/uploads/audio`);
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
-    xhr.upload.onprogress = (ev) => {
+    xhr.upload.onprogress = ev => {
       if (ev.lengthComputable && onProgress) {
         onProgress(Math.min(100, Math.round((100 * ev.loaded) / ev.total)));
       }
@@ -246,7 +246,22 @@ const releaseTypes: ReleaseTypeOption[] = [
 ];
 
 const genres = [
-  'Pop', 'Rock', 'Hip-Hop', 'Electronic', 'Jazz', 'Classical', 'Country', 'Folk', 'Reggae', 'Blues', 'R&B', 'Alternative', 'Indie', 'Metal', 'Punk', 'Other'
+  'Pop',
+  'Rock',
+  'Hip-Hop',
+  'Electronic',
+  'Jazz',
+  'Classical',
+  'Country',
+  'Folk',
+  'Reggae',
+  'Blues',
+  'R&B',
+  'Alternative',
+  'Indie',
+  'Metal',
+  'Punk',
+  'Other',
 ];
 
 const languages = [
@@ -284,7 +299,9 @@ const formatDuration = (seconds: number | string) => {
 const formatBitrate = (bpsOrKbps?: number) => {
   if (!bpsOrKbps || !Number.isFinite(bpsOrKbps)) return '';
   // Some analyzers return kbps already; if very large, treat as bps
-  return bpsOrKbps > 10000 ? `${Math.round(bpsOrKbps / 1000)} kbps` : `${Math.round(bpsOrKbps)} kbps`;
+  return bpsOrKbps > 10000
+    ? `${Math.round(bpsOrKbps / 1000)} kbps`
+    : `${Math.round(bpsOrKbps)} kbps`;
 };
 
 function AcrCloudResultPanel({
@@ -301,16 +318,33 @@ function AcrCloudResultPanel({
 
   return (
     <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: 'background.paper' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', mb: 1.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 1.5,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          mb: 1.5,
+        }}
+      >
         <Box>
-          <Typography variant="subtitle2" fontWeight={700}>ACRCloud verification</Typography>
+          <Typography variant="subtitle2" fontWeight={700}>
+            ACRCloud verification
+          </Typography>
           <Typography variant="caption" color="text.secondary">
             Scan details are available to admins during release review.
           </Typography>
         </Box>
         <Chip
           size="small"
-          icon={state === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+          icon={
+            state === 'pending' ? (
+              <CircularProgress size={12} />
+            ) : (
+              <PlaylistAddCheck fontSize="small" />
+            )
+          }
           label={getAcrCloudLabel(acrCloud)}
           color={getAcrCloudColor(acrCloud) as any}
           variant="outlined"
@@ -320,8 +354,12 @@ function AcrCloudResultPanel({
       {showProgress ? (
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-            <Typography variant="caption" color="text.secondary">ACR scan progress</Typography>
-            <Typography variant="caption" color="text.secondary">{progress}%</Typography>
+            <Typography variant="caption" color="text.secondary">
+              ACR scan progress
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {progress}%
+            </Typography>
           </Box>
           <LinearProgress
             variant={state === 'pending' ? 'determinate' : 'determinate'}
@@ -343,14 +381,22 @@ function AcrCloudResultPanel({
 import TerritoryManager, { TerritoryMode } from '@/components/territory/TerritoryManager';
 import RightsManager, { RightsType } from '@/components/rights/RightsManager';
 // --- TrackInfo type (inline, since not using TrackInfoForm) ---
-type ContributorRole = 'artist' | 'performer' | 'composer' | 'lyricist' | 'producer' | 'publisher' | 'remixer' | 'other';
+type ContributorRole =
+  | 'artist'
+  | 'performer'
+  | 'composer'
+  | 'lyricist'
+  | 'producer'
+  | 'publisher'
+  | 'remixer'
+  | 'other';
 
 interface TrackContributor {
   role: ContributorRole;
   name: string;
-}  
- 
-interface TrackInfo { 
+}
+
+interface TrackInfo {
   title: string;
   version: string;
   artist: string;
@@ -418,10 +464,10 @@ const defaultTrackInfo: TrackInfo = {
   genre: '',
   subgenre: '',
   trackNumber: 1,
-  discNumber: 1, 
+  discNumber: 1,
   duration: '',
   composers: '',
-  publishers: '',   
+  publishers: '',
   lyrics: '',
   producers: '',
   copyrightC: '',
@@ -476,12 +522,14 @@ export default function UploadPage() {
   const [artworkUploadedFilename, setArtworkUploadedFilename] = useState<string | null>(null);
   const [audioUploadedUrls, setAudioUploadedUrls] = useState<(string | null)[]>([]);
   const [audioUploadedFilenames, setAudioUploadedFilenames] = useState<(string | null)[]>([]);
-  const [audioAcrCloudStatuses, setAudioAcrCloudStatuses] = useState<(AcrCloudUploadState | null)[]>([]);
+  const [audioAcrCloudStatuses, setAudioAcrCloudStatuses] = useState<
+    (AcrCloudUploadState | null)[]
+  >([]);
   const [territoryCountries, setTerritoryCountries] = useState<string[]>([]);
   const [territoryMode, setTerritoryMode] = useState<TerritoryMode>('allowed');
   const [rightsType, setRightsType] = useState<RightsType>('exclusive');
   const [rightsDescription, setRightsDescription] = useState<string>('');
-  const [analysisResult, setAnalysisResult] = useState<any>(null); 
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState('');
   // Multi-track info state for Track Information step
   const [trackInfos, setTrackInfos] = useState<TrackInfo[]>([]);
@@ -489,14 +537,14 @@ export default function UploadPage() {
   const DSP_LIST = DSP_META;
   type DspItem = DspMeta;
   const visibleDSPs = useMemo(() => {
-    const allow = new Set(((allowedDspKeys ?? ALL_DSP_KEYS) as string[]));
+    const allow = new Set((allowedDspKeys ?? ALL_DSP_KEYS) as string[]);
     return DSP_LIST.filter((dsp: DspItem) => allow.has(dsp.key));
   }, [allowedDspKeys]);
 
   const [selectedDSPs, setSelectedDSPs] = useState<DspKey[]>([]);
   const [releaseWorldwide, setReleaseWorldwide] = useState(true);
-  const [releaseDate, setReleaseDate] = useState<string>("");
-  const [originalReleaseDate, setOriginalReleaseDate] = useState<string>("");
+  const [releaseDate, setReleaseDate] = useState<string>('');
+  const [originalReleaseDate, setOriginalReleaseDate] = useState<string>('');
   // Artwork loading indicator
   const [artworkUploading, setArtworkUploading] = useState<boolean>(false);
   // Local audio preview URLs for each selected track
@@ -511,16 +559,16 @@ export default function UploadPage() {
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
 
   const ensureTrackStateLength = (length: number) => {
-    setAnalysisResults((arr) => resizeList(arr, length, null));
-    setAnalysisLoading((arr) => resizeList(arr, length, false));
-    setAnalysisErrors((arr) => resizeList(arr, length, null));
-    setTrackUploading((arr) => resizeList(arr, length, false));
-    setAudioUploadPct((arr) => resizeList(arr, length, 0));
-    setAcrCloudProgressPct((arr) => resizeList(arr, length, 0));
-    setAudioUploadedUrls((arr) => resizeList(arr, length, null));
-    setAudioUploadedFilenames((arr) => resizeList(arr, length, null));
-    setAudioAcrCloudStatuses((arr) => resizeList(arr, length, null));
-    setTrackInfos((arr) => {
+    setAnalysisResults(arr => resizeList(arr, length, null));
+    setAnalysisLoading(arr => resizeList(arr, length, false));
+    setAnalysisErrors(arr => resizeList(arr, length, null));
+    setTrackUploading(arr => resizeList(arr, length, false));
+    setAudioUploadPct(arr => resizeList(arr, length, 0));
+    setAcrCloudProgressPct(arr => resizeList(arr, length, 0));
+    setAudioUploadedUrls(arr => resizeList(arr, length, null));
+    setAudioUploadedFilenames(arr => resizeList(arr, length, null));
+    setAudioAcrCloudStatuses(arr => resizeList(arr, length, null));
+    setTrackInfos(arr => {
       if (arr.length === length) return arr;
       if (arr.length > length) return arr.slice(0, length);
       return [
@@ -534,16 +582,25 @@ export default function UploadPage() {
   };
 
   const setTrackTitleFromFile = (index: number, file: File) => {
-    const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+    const baseName = file.name
+      .replace(/\.[^.]+$/, '')
+      .replace(/[_-]+/g, ' ')
+      .trim();
     if (!baseName) return;
-    setTrackInfos((prev) =>
-      prev.map((info, i) => (i === index ? { ...info, title: info.title.trim() ? info.title : baseName } : info))
+    setTrackInfos(prev =>
+      prev.map((info, i) =>
+        i === index ? { ...info, title: info.title.trim() ? info.title : baseName } : info
+      )
     );
   };
 
   const setAcrCloudPending = (index: number, progress = 5) => {
-    setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { ...(status || {}), state: 'pending' } : status)));
-    setAcrCloudProgressPct((prev) => prev.map((pct, i) => (i === index ? Math.max(pct, progress) : pct)));
+    setAudioAcrCloudStatuses(prev =>
+      prev.map((status, i) => (i === index ? { ...(status || {}), state: 'pending' } : status))
+    );
+    setAcrCloudProgressPct(prev =>
+      prev.map((pct, i) => (i === index ? Math.max(pct, progress) : pct))
+    );
   };
 
   const getContributorNames = (track: TrackInfo, role: ContributorRole) =>
@@ -551,8 +608,6 @@ export default function UploadPage() {
       .filter(contributor => contributor.role === role && contributor.name.trim())
       .map(contributor => contributor.name.trim())
       .join(', ');
-
-  
 
   // Simulate release submission to DSPs
   const handleSubmitRelease = async () => {
@@ -604,13 +659,13 @@ export default function UploadPage() {
         audioUrl: audioUploadedUrls[idx] || null,
         audioFile: audioUploadedFilenames[idx] || null,
         acrCloud: audioAcrCloudStatuses[idx] || null,
-      }))
+      })),
     };
     try {
       const res = await fetch('/api/releases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(releasePayload)
+        body: JSON.stringify(releasePayload),
       });
       const data = await res.json();
       if (data.success) {
@@ -625,12 +680,11 @@ export default function UploadPage() {
     }
   };
 
-
   const isDistributionValid = selectedDSPs.length > 0;
 
   // Event handlers
   const handleDSPToggle = (key: DspKey) => {
-    setSelectedDSPs(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    setSelectedDSPs(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]));
   };
   const handleSelectAll = () => {
     if (visibleDSPs.length === 0) return;
@@ -644,7 +698,10 @@ export default function UploadPage() {
   useEffect(() => {
     setTrackInfos(prev => {
       if (prev.length < tracks.length) {
-        return [...prev, ...Array.from({ length: tracks.length - prev.length }, createDefaultTrackInfo)];
+        return [
+          ...prev,
+          ...Array.from({ length: tracks.length - prev.length }, createDefaultTrackInfo),
+        ];
       } else if (prev.length > tracks.length) {
         return prev.slice(0, tracks.length);
       }
@@ -654,37 +711,51 @@ export default function UploadPage() {
 
   // Handler to update a field for a specific track
   const handleTrackInfoChange = (idx: number, field: keyof TrackInfo, value: any) => {
-    setTrackInfos(prev => prev.map((info, i) => i === idx ? { ...info, [field]: value } : info));
+    setTrackInfos(prev => prev.map((info, i) => (i === idx ? { ...info, [field]: value } : info)));
   };
 
-  const updateContributor = (trackIdx: number, contributorIdx: number, field: keyof TrackContributor, value: string) => {
-    setTrackInfos(prev => prev.map((info, i) => {
-      if (i !== trackIdx) return info;
-      return {
-        ...info,
-        contributors: info.contributors.map((contributor, cIdx) =>
-          cIdx === contributorIdx
-            ? { ...contributor, [field]: field === 'role' ? value as ContributorRole : value }
-            : contributor
-        ),
-      };
-    }));
+  const updateContributor = (
+    trackIdx: number,
+    contributorIdx: number,
+    field: keyof TrackContributor,
+    value: string
+  ) => {
+    setTrackInfos(prev =>
+      prev.map((info, i) => {
+        if (i !== trackIdx) return info;
+        return {
+          ...info,
+          contributors: info.contributors.map((contributor, cIdx) =>
+            cIdx === contributorIdx
+              ? { ...contributor, [field]: field === 'role' ? (value as ContributorRole) : value }
+              : contributor
+          ),
+        };
+      })
+    );
   };
 
   const addContributor = (trackIdx: number) => {
-    setTrackInfos(prev => prev.map((info, i) =>
-      i === trackIdx
-        ? { ...info, contributors: [...info.contributors, { role: 'performer', name: '' }] }
-        : info
-    ));
+    setTrackInfos(prev =>
+      prev.map((info, i) =>
+        i === trackIdx
+          ? { ...info, contributors: [...info.contributors, { role: 'performer', name: '' }] }
+          : info
+      )
+    );
   };
 
   const removeContributor = (trackIdx: number, contributorIdx: number) => {
-    setTrackInfos(prev => prev.map((info, i) => {
-      if (i !== trackIdx) return info;
-      const contributors = info.contributors.filter((_, cIdx) => cIdx !== contributorIdx);
-      return { ...info, contributors: contributors.length ? contributors : [{ role: 'artist', name: '' }] };
-    }));
+    setTrackInfos(prev =>
+      prev.map((info, i) => {
+        if (i !== trackIdx) return info;
+        const contributors = info.contributors.filter((_, cIdx) => cIdx !== contributorIdx);
+        return {
+          ...info,
+          contributors: contributors.length ? contributors : [{ role: 'artist', name: '' }],
+        };
+      })
+    );
   };
 
   const handleApplyTrackInfoToAll = (idx: number) => {
@@ -703,18 +774,16 @@ export default function UploadPage() {
     delete (shareable as Partial<TrackInfo>).copyrightPYear;
     delete (shareable as Partial<TrackInfo>).explicit;
 
-    setTrackInfos(prev => prev.map((info, i) => (
-      i === idx ? info : { ...info, ...shareable }
-    )));
+    setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
     setSnackOpen(true);
   };
 
   // Validation: all required fields for all tracks
-  const selectedReleaseTypeConfig = releaseTypes.find((t) => t.value === releaseType);
+  const selectedReleaseTypeConfig = releaseTypes.find(t => t.value === releaseType);
   const minTracksRequired = selectedReleaseTypeConfig?.minTracks ?? 1;
 
   const trackHasListedArtist = (info: TrackInfo) =>
-    info.contributors.some((c) => c.role === 'artist' && c.name.trim());
+    info.contributors.some(c => c.role === 'artist' && c.name.trim());
 
   const getTrackInfoIssues = () => {
     const issues: Array<{ trackIndex: number | null; message: string }> = [];
@@ -733,10 +802,14 @@ export default function UploadPage() {
         issues.push({ trackIndex: idx, message: `${label}: metadata is not ready yet.` });
         return;
       }
-      if (!info.title.trim()) issues.push({ trackIndex: idx, message: `${label}: track title is required.` });
-      if (!trackHasListedArtist(info)) issues.push({ trackIndex: idx, message: `${label}: add at least one Artist contributor.` });
-      if (!info.metadataLanguage) issues.push({ trackIndex: idx, message: `${label}: metadata language is required.` });
-      if (!(info.audioLanguage || info.language)) issues.push({ trackIndex: idx, message: `${label}: audio language is required.` });
+      if (!info.title.trim())
+        issues.push({ trackIndex: idx, message: `${label}: track title is required.` });
+      if (!trackHasListedArtist(info))
+        issues.push({ trackIndex: idx, message: `${label}: add at least one Artist contributor.` });
+      if (!info.metadataLanguage)
+        issues.push({ trackIndex: idx, message: `${label}: metadata language is required.` });
+      if (!(info.audioLanguage || info.language))
+        issues.push({ trackIndex: idx, message: `${label}: audio language is required.` });
       if (!info.genre) issues.push({ trackIndex: idx, message: `${label}: genre is required.` });
     });
 
@@ -772,7 +845,7 @@ export default function UploadPage() {
     setTrackValidationAttempted(true);
     const issues = getTrackInfoIssues();
     if (issues.length) {
-      const firstTrackIssue = issues.find((issue) => typeof issue.trackIndex === 'number');
+      const firstTrackIssue = issues.find(issue => typeof issue.trackIndex === 'number');
       if (typeof firstTrackIssue?.trackIndex === 'number') {
         setSelectedTrackIdx(firstTrackIssue.trackIndex);
       }
@@ -796,11 +869,16 @@ export default function UploadPage() {
         setPlatformAccessError('');
         const res = await fetch('/api/platforms', { cache: 'no-store' });
         const json = await res.json().catch(() => null);
-        if (!res.ok || !json?.success) throw new Error(json?.message || 'Failed to load platform access');
-        const keys = Array.isArray(json?.data?.dspKeys) ? (json.data.dspKeys as DspKey[]) : ALL_DSP_KEYS;
+        if (!res.ok || !json?.success)
+          throw new Error(json?.message || 'Failed to load platform access');
+        const keys = Array.isArray(json?.data?.dspKeys)
+          ? (json.data.dspKeys as DspKey[])
+          : ALL_DSP_KEYS;
         setAllowedDspKeys(keys);
       } catch (error) {
-        setPlatformAccessError(error instanceof Error ? error.message : 'Failed to load platform access');
+        setPlatformAccessError(
+          error instanceof Error ? error.message : 'Failed to load platform access'
+        );
         setAllowedDspKeys(ALL_DSP_KEYS);
       }
     };
@@ -809,8 +887,8 @@ export default function UploadPage() {
 
   useEffect(() => {
     const allow = new Set(visibleDSPs.map((d: DspItem) => d.key));
-    setSelectedDSPs((prev) => {
-      const filtered = prev.filter((k) => allow.has(k));
+    setSelectedDSPs(prev => {
+      const filtered = prev.filter(k => allow.has(k));
       return filtered.length ? filtered : visibleDSPs.map((d: DspItem) => d.key);
     });
   }, [visibleDSPs]);
@@ -818,19 +896,21 @@ export default function UploadPage() {
   // Keep analysis / upload state arrays in sync with tracks array length
   useEffect(() => {
     const len = tracks.length;
-    setAnalysisResults((arr) => resizeList(arr, len, null));
-    setAnalysisLoading((arr) => resizeList(arr, len, false));
-    setAnalysisErrors((arr) => resizeList(arr, len, null));
-    setTrackUploading((arr) => resizeList(arr, len, false));
-    setAudioUploadPct((arr) => resizeList(arr, len, 0));
-    setAcrCloudProgressPct((arr) => resizeList(arr, len, 0));
+    setAnalysisResults(arr => resizeList(arr, len, null));
+    setAnalysisLoading(arr => resizeList(arr, len, false));
+    setAnalysisErrors(arr => resizeList(arr, len, null));
+    setTrackUploading(arr => resizeList(arr, len, false));
+    setAudioUploadPct(arr => resizeList(arr, len, 0));
+    setAcrCloudProgressPct(arr => resizeList(arr, len, 0));
   }, [tracks.length]);
 
   // When release type changes, only enforce max track count (no empty placeholder slots)
   useEffect(() => {
-    const selectedType = releaseTypes.find((t) => t.value === releaseType);
+    const selectedType = releaseTypes.find(t => t.value === releaseType);
     if (!selectedType) return;
-    setTracks((prev) => (prev.length > selectedType.maxTracks ? prev.slice(0, selectedType.maxTracks) : prev));
+    setTracks(prev =>
+      prev.length > selectedType.maxTracks ? prev.slice(0, selectedType.maxTracks) : prev
+    );
   }, [releaseType]);
 
   // Create preview for artwork
@@ -886,20 +966,20 @@ export default function UploadPage() {
   useEffect(() => {
     // Revoke old URLs
     return () => {
-      trackPreviewUrls.forEach((url) => url && URL.revokeObjectURL(url));
+      trackPreviewUrls.forEach(url => url && URL.revokeObjectURL(url));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    setTrackPreviewUrls((prev) => {
+    setTrackPreviewUrls(prev => {
       // Revoke URLs that are no longer needed
       prev.forEach((url, i) => {
         if (url && (!tracks[i] || i >= tracks.length)) {
           URL.revokeObjectURL(url);
         }
       });
-      const next = tracks.map((f, i) => (f ? (prev[i] || URL.createObjectURL(f)) : null));
+      const next = tracks.map((f, i) => (f ? prev[i] || URL.createObjectURL(f) : null));
       return next;
     });
   }, [tracks]);
@@ -913,11 +993,12 @@ export default function UploadPage() {
 
   // Safe access to auth context
   const { user } = auth || { user: null };
-  
+
   // File validation for tracks
   const validateTrackFile = (file: File | null) => {
     if (!file) return 'No file selected';
-    if (!['audio/mpeg', 'audio/wav', 'audio/flac'].includes(file.type)) return 'Invalid audio format (mp3, wav, flac only)';
+    if (!['audio/mpeg', 'audio/wav', 'audio/flac'].includes(file.type))
+      return 'Invalid audio format (mp3, wav, flac only)';
     if (file.size > 100 * 1024 * 1024) return 'File size must be <= 100MB';
     return '';
   };
@@ -928,20 +1009,20 @@ export default function UploadPage() {
 
   const handleRemoveTrack = (index: number) => {
     delete acrCloudPollRef.current[index];
-    setTracks((prev) => {
+    setTracks(prev => {
       const next = prev.filter((_, i) => i !== index);
-      setSelectedTrackIdx((si) => (next.length === 0 ? 0 : Math.min(si, next.length - 1)));
+      setSelectedTrackIdx(si => (next.length === 0 ? 0 : Math.min(si, next.length - 1)));
       return next;
     });
-    setAnalysisResults((prev) => prev.filter((_, i) => i !== index));
-    setAnalysisLoading((prev) => prev.filter((_, i) => i !== index));
-    setAnalysisErrors((prev) => prev.filter((_, i) => i !== index));
-    setTrackUploading((prev) => prev.filter((_, i) => i !== index));
-    setAudioUploadPct((prev) => prev.filter((_, i) => i !== index));
-    setAcrCloudProgressPct((prev) => prev.filter((_, i) => i !== index));
-    setAudioUploadedUrls((prev) => prev.filter((_, i) => i !== index));
-    setAudioUploadedFilenames((prev) => prev.filter((_, i) => i !== index));
-    setAudioAcrCloudStatuses((prev) => prev.filter((_, i) => i !== index));
+    setAnalysisResults(prev => prev.filter((_, i) => i !== index));
+    setAnalysisLoading(prev => prev.filter((_, i) => i !== index));
+    setAnalysisErrors(prev => prev.filter((_, i) => i !== index));
+    setTrackUploading(prev => prev.filter((_, i) => i !== index));
+    setAudioUploadPct(prev => prev.filter((_, i) => i !== index));
+    setAcrCloudProgressPct(prev => prev.filter((_, i) => i !== index));
+    setAudioUploadedUrls(prev => prev.filter((_, i) => i !== index));
+    setAudioUploadedFilenames(prev => prev.filter((_, i) => i !== index));
+    setAudioAcrCloudStatuses(prev => prev.filter((_, i) => i !== index));
   };
 
   /** Replace audio for an existing row, or remove row when `file` is null. */
@@ -957,21 +1038,21 @@ export default function UploadPage() {
       return;
     }
 
-    setTracks((prev) => {
+    setTracks(prev => {
       const next = [...prev];
       if (index < next.length) next[index] = file;
       return next;
     });
     ensureTrackStateLength(Math.max(tracks.length, index + 1));
 
-    setAnalysisResults((prev) => prev.map((r, i) => (i === index ? null : r)));
-    setAnalysisErrors((prev) => prev.map((e, i) => (i === index ? null : e)));
-    setTrackUploading((prev) => prev.map((u, i) => (i === index ? true : u)));
-    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 1 : p)));
+    setAnalysisResults(prev => prev.map((r, i) => (i === index ? null : r)));
+    setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
+    setTrackUploading(prev => prev.map((u, i) => (i === index ? true : u)));
+    setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 1 : p)));
     setAcrCloudPending(index);
     delete acrCloudPollRef.current[index];
     setTrackTitleFromFile(index, file);
-    setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? true : l)));
+    setAnalysisLoading(prev => prev.map((l, i) => (i === index ? true : l)));
 
     try {
       const formData = new FormData();
@@ -986,56 +1067,72 @@ export default function UploadPage() {
         throw new Error(errMsg);
       }
       const data = await res.json();
-      setAnalysisResults((prev) => prev.map((r, i) => (i === index ? data : r)));
+      setAnalysisResults(prev => prev.map((r, i) => (i === index ? data : r)));
       const dur = data?.duration;
       if (typeof dur === 'number' || typeof dur === 'string') {
         const durStr = formatDuration(dur);
-        setTrackInfos((prev) =>
+        setTrackInfos(prev =>
           prev.map((info, i) => (i === index ? { ...info, duration: durStr } : info))
         );
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error analyzing audio';
-      setAnalysisErrors((prev) => prev.map((e, i) => (i === index ? msg : e)));
+      setAnalysisErrors(prev => prev.map((e, i) => (i === index ? msg : e)));
     } finally {
-      setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? false : l)));
+      setAnalysisLoading(prev => prev.map((l, i) => (i === index ? false : l)));
     }
 
     try {
-      const { url, filename, acrCloud } = await uploadAudioToServer(file, (pct) =>
-        setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
+      const { url, filename, acrCloud } = await uploadAudioToServer(file, pct =>
+        setAudioUploadPct(prev => prev.map((p, i) => (i === index ? pct : p)))
       );
-      setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
-      setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
-      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? (acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }) : status)));
-      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
-      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p)));
+      setAudioUploadedUrls(prev => prev.map((u, i) => (i === index ? url : u)));
+      setAudioUploadedFilenames(prev => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioAcrCloudStatuses(prev =>
+        prev.map((status, i) =>
+          i === index
+            ? acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }
+            : status
+        )
+      );
+      setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 100 : p)));
+      setAcrCloudProgressPct(prev =>
+        prev.map((p, i) =>
+          i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p
+        )
+      );
       if (acrCloud?.fileId && getAcrCloudState(acrCloud) === 'pending') {
         void pollAcrCloudStatus(index, acrCloud.fileId);
       }
     } catch (e) {
       console.error('Audio upload failed:', e);
-      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' } : status)));
-      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+      setAudioAcrCloudStatuses(prev =>
+        prev.map((status, i) =>
+          i === index
+            ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' }
+            : status
+        )
+      );
+      setAcrCloudProgressPct(prev => prev.map((p, i) => (i === index ? 100 : p)));
     }
-    setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
+    setTrackUploading(prev => prev.map((u, i) => (i === index ? false : u)));
   };
 
   const handleAppendTracksSelected = async (fileList: FileList | null) => {
     if (!fileList?.length) return;
-    const selectedType = releaseTypes.find((t) => t.value === releaseType);
+    const selectedType = releaseTypes.find(t => t.value === releaseType);
     const max = selectedType?.maxTracks ?? 50;
     const room = max - tracks.length;
     if (room <= 0) return;
 
     const incoming = Array.from(fileList)
-      .filter((f) => validateTrackFile(f) === '')
+      .filter(f => validateTrackFile(f) === '')
       .slice(0, room);
 
     if (!incoming.length) return;
 
     const startIdx = tracks.length;
-    setTracks((prev) => [...prev, ...incoming]);
+    setTracks(prev => [...prev, ...incoming]);
     ensureTrackStateLength(startIdx + incoming.length);
     if (appendTracksInputRef.current) appendTracksInputRef.current.value = '';
 
@@ -1050,8 +1147,8 @@ export default function UploadPage() {
     if (!file) return;
 
     // Update loading state for this track
-    setAnalysisLoading(prev => prev.map((loading, i) => i === index ? true : loading));
-    setAnalysisErrors(prev => prev.map((error, i) => i === index ? null : error));
+    setAnalysisLoading(prev => prev.map((loading, i) => (i === index ? true : loading)));
+    setAnalysisErrors(prev => prev.map((error, i) => (i === index ? null : error)));
 
     try {
       const formData = new FormData();
@@ -1060,7 +1157,7 @@ export default function UploadPage() {
         method: 'POST',
         body: formData,
       });
-      
+
       if (!res.ok) {
         let errMsg = 'Analysis failed';
         try {
@@ -1069,13 +1166,15 @@ export default function UploadPage() {
         } catch {}
         throw new Error(errMsg);
       }
-      
+
       const data = await res.json();
-      setAnalysisResults(prev => prev.map((result, i) => i === index ? data : result));
+      setAnalysisResults(prev => prev.map((result, i) => (i === index ? data : result)));
     } catch (err: any) {
-      setAnalysisErrors(prev => prev.map((error, i) => i === index ? (err.message || 'Error analyzing audio') : error));
+      setAnalysisErrors(prev =>
+        prev.map((error, i) => (i === index ? err.message || 'Error analyzing audio' : error))
+      );
     } finally {
-      setAnalysisLoading(prev => prev.map((loading, i) => i === index ? false : loading));
+      setAnalysisLoading(prev => prev.map((loading, i) => (i === index ? false : loading)));
     }
   };
 
@@ -1084,11 +1183,11 @@ export default function UploadPage() {
   };
 
   const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    setActiveStep(prevActiveStep => prevActiveStep + 1);
   };
 
   const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
+    setActiveStep(prevActiveStep => prevActiveStep - 1);
   };
 
   // Helper: analyze and upload one track (reuses same logic as handleTrackFileChange)
@@ -1103,7 +1202,7 @@ export default function UploadPage() {
     setAnalysisResults(prev => prev.map((r, i) => (i === index ? null : r)));
     setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
     setTrackUploading(prev => prev.map((u, i) => (i === index ? true : u)));
-    setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 1 : p)));
+    setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 1 : p)));
     setAcrCloudPending(index);
     delete acrCloudPollRef.current[index];
 
@@ -1116,7 +1215,10 @@ export default function UploadPage() {
       const res = await fetch('/api/audio/analyze', { method: 'POST', body: formData });
       if (!res.ok) {
         let errMsg = 'Analysis failed';
-        try { const errBody = await res.json(); errMsg = errBody?.error || errMsg; } catch {}
+        try {
+          const errBody = await res.json();
+          errMsg = errBody?.error || errMsg;
+        } catch {}
         throw new Error(errMsg);
       }
       const data = await res.json();
@@ -1124,32 +1226,52 @@ export default function UploadPage() {
       const dur = data?.duration;
       if (typeof dur === 'number' || typeof dur === 'string') {
         const durStr = formatDuration(dur);
-        setTrackInfos(prev => prev.map((info, i) => i === index ? { ...info, duration: durStr } : info));
+        setTrackInfos(prev =>
+          prev.map((info, i) => (i === index ? { ...info, duration: durStr } : info))
+        );
       }
     } catch (err: any) {
-      setAnalysisErrors(prev => prev.map((e, i) => (i === index ? (err?.message || 'Error analyzing audio') : e)));
+      setAnalysisErrors(prev =>
+        prev.map((e, i) => (i === index ? err?.message || 'Error analyzing audio' : e))
+      );
     } finally {
-      setAnalysisLoading((prev) => prev.map((l, i) => (i === index ? false : l)));
+      setAnalysisLoading(prev => prev.map((l, i) => (i === index ? false : l)));
     }
 
     try {
-      const { url, filename, acrCloud } = await uploadAudioToServer(file, (pct) =>
-        setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? pct : p)))
+      const { url, filename, acrCloud } = await uploadAudioToServer(file, pct =>
+        setAudioUploadPct(prev => prev.map((p, i) => (i === index ? pct : p)))
       );
-      setAudioUploadedUrls((prev) => prev.map((u, i) => (i === index ? url : u)));
-      setAudioUploadedFilenames((prev) => prev.map((u, i) => (i === index ? filename : u)));
-      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? (acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }) : status)));
-      setAudioUploadPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
-      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p)));
+      setAudioUploadedUrls(prev => prev.map((u, i) => (i === index ? url : u)));
+      setAudioUploadedFilenames(prev => prev.map((u, i) => (i === index ? filename : u)));
+      setAudioAcrCloudStatuses(prev =>
+        prev.map((status, i) =>
+          i === index
+            ? acrCloud || { state: 'error', lastError: 'Missing ACRCloud response' }
+            : status
+        )
+      );
+      setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 100 : p)));
+      setAcrCloudProgressPct(prev =>
+        prev.map((p, i) =>
+          i === index ? (getAcrCloudState(acrCloud) === 'pending' ? Math.max(p, 25) : 100) : p
+        )
+      );
       if (acrCloud?.fileId && getAcrCloudState(acrCloud) === 'pending') {
         void pollAcrCloudStatus(index, acrCloud.fileId);
       }
     } catch (e) {
       console.error('Audio upload failed:', e);
-      setAudioAcrCloudStatuses((prev) => prev.map((status, i) => (i === index ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' } : status)));
-      setAcrCloudProgressPct((prev) => prev.map((p, i) => (i === index ? 100 : p)));
+      setAudioAcrCloudStatuses(prev =>
+        prev.map((status, i) =>
+          i === index
+            ? { state: 'error', lastError: e instanceof Error ? e.message : 'Audio upload failed' }
+            : status
+        )
+      );
+      setAcrCloudProgressPct(prev => prev.map((p, i) => (i === index ? 100 : p)));
     } finally {
-      setTrackUploading((prev) => prev.map((u, i) => (i === index ? false : u)));
+      setTrackUploading(prev => prev.map((u, i) => (i === index ? false : u)));
     }
   };
 
@@ -1158,22 +1280,28 @@ export default function UploadPage() {
 
     for (let attempt = 0; attempt < 30; attempt += 1) {
       if (acrCloudPollRef.current[index] !== fileId) return;
-      setAcrCloudProgressPct((prev) =>
+      setAcrCloudProgressPct(prev =>
         prev.map((pct, i) => (i === index ? Math.max(pct, Math.min(90, 25 + attempt * 2)) : pct))
       );
 
-      await new Promise((resolve) => setTimeout(resolve, attempt === 0 ? 2500 : 4000));
+      await new Promise(resolve => setTimeout(resolve, attempt === 0 ? 2500 : 4000));
       if (acrCloudPollRef.current[index] !== fileId) return;
 
       try {
         const nextStatus = await fetchAcrCloudScanResult(fileId);
         if (acrCloudPollRef.current[index] !== fileId) return;
 
-        setAudioAcrCloudStatuses((prev) =>
+        setAudioAcrCloudStatuses(prev =>
           prev.map((status, i) => (i === index ? { ...(status || {}), ...nextStatus } : status))
         );
-        setAcrCloudProgressPct((prev) =>
-          prev.map((pct, i) => (i === index ? (getAcrCloudState(nextStatus) === 'pending' ? Math.max(pct, 35) : 100) : pct))
+        setAcrCloudProgressPct(prev =>
+          prev.map((pct, i) =>
+            i === index
+              ? getAcrCloudState(nextStatus) === 'pending'
+                ? Math.max(pct, 35)
+                : 100
+              : pct
+          )
         );
 
         if (getAcrCloudState(nextStatus) !== 'pending') {
@@ -1182,18 +1310,19 @@ export default function UploadPage() {
         }
       } catch (error) {
         if (attempt >= 5) {
-          setAudioAcrCloudStatuses((prev) =>
+          setAudioAcrCloudStatuses(prev =>
             prev.map((status, i) =>
               i === index
                 ? {
                     ...(status || {}),
                     state: 'error',
-                    lastError: error instanceof Error ? error.message : 'Failed to refresh ACRCloud status',
+                    lastError:
+                      error instanceof Error ? error.message : 'Failed to refresh ACRCloud status',
                   }
                 : status
             )
           );
-          setAcrCloudProgressPct((prev) => prev.map((pct, i) => (i === index ? 100 : pct)));
+          setAcrCloudProgressPct(prev => prev.map((pct, i) => (i === index ? 100 : pct)));
           delete acrCloudPollRef.current[index];
           return;
         }
@@ -1202,10 +1331,10 @@ export default function UploadPage() {
   };
 
   const handleMultiTrackFiles = async (fileList: FileList) => {
-    const selectedType = releaseTypes.find((t) => t.value === releaseType);
+    const selectedType = releaseTypes.find(t => t.value === releaseType);
     const max = selectedType?.maxTracks ?? 50;
     const files = Array.from(fileList)
-      .filter((f) => validateTrackFile(f) === '')
+      .filter(f => validateTrackFile(f) === '')
       .slice(0, max);
 
     if (!files.length) return;
@@ -1242,7 +1371,7 @@ export default function UploadPage() {
                   width: '100%',
                 }}
               >
-                {releaseTypes.map((type) => (
+                {releaseTypes.map(type => (
                   <Box
                     key={type.value}
                     sx={{
@@ -1262,13 +1391,13 @@ export default function UploadPage() {
                         borderColor: releaseType === type.value ? 'primary.main' : 'divider',
                         boxShadow:
                           releaseType === type.value
-                            ? (theme) =>
+                            ? theme =>
                                 theme.palette.mode === 'dark'
                                   ? '0 8px 32px rgba(25,118,210,0.2)'
                                   : '0 8px 28px rgba(25,118,210,0.12)'
                             : 'none',
                         '&:hover': {
-                          boxShadow: (theme) =>
+                          boxShadow: theme =>
                             theme.palette.mode === 'dark'
                               ? '0 12px 40px rgba(0,0,0,0.35)'
                               : '0 12px 36px rgba(15, 23, 42, 0.1)',
@@ -1283,7 +1412,7 @@ export default function UploadPage() {
                           right: 4,
                           zIndex: 1,
                         }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
                       >
                         <Radio
                           checked={releaseType === type.value}
@@ -1322,19 +1451,16 @@ export default function UploadPage() {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Typography variant="body1">
-                  Release Type:
-                </Typography>
+                <Typography variant="body1">Release Type:</Typography>
                 <Typography variant="body1" fontWeight="bold">
                   {releaseTypes.find(t => t.value === releaseType)?.label}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                <Typography variant="body1">
-                  Track Range:
-                </Typography>
+                <Typography variant="body1">Track Range:</Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {releaseTypes.find(t => t.value === releaseType)?.minTracks} - {releaseTypes.find(t => t.value === releaseType)?.maxTracks}
+                  {releaseTypes.find(t => t.value === releaseType)?.minTracks} -{' '}
+                  {releaseTypes.find(t => t.value === releaseType)?.maxTracks}
                 </Typography>
               </Box>
               <Grid container spacing={3} sx={{ mt: 2.5 }}>
@@ -1365,17 +1491,27 @@ export default function UploadPage() {
                     onChange={e => setUpc(e.target.value)}
                     inputProps={{ 'aria-label': 'UPC' }}
                     disabled={autoGenerateCodes}
-                    helperText={autoGenerateCodes ? 'System assigns release UPC during submit.' : 'Enter an existing release UPC.'}
+                    helperText={
+                      autoGenerateCodes
+                        ? 'System assigns release UPC during submit.'
+                        : 'Enter an existing release UPC.'
+                    }
                     InputProps={{
                       endAdornment: (
                         <InputAdornment position="end">
                           <FormControlLabel
-                            sx={{ mr: 0, '& .MuiFormControlLabel-label': { fontSize: 12, whiteSpace: 'nowrap' } }}
+                            sx={{
+                              mr: 0,
+                              '& .MuiFormControlLabel-label': {
+                                fontSize: 12,
+                                whiteSpace: 'nowrap',
+                              },
+                            }}
                             control={
                               <Checkbox
                                 size="small"
                                 checked={autoGenerateCodes}
-                                onChange={(e) => setAutoGenerateCodes(e.target.checked)}
+                                onChange={e => setAutoGenerateCodes(e.target.checked)}
                               />
                             }
                             label="Auto"
@@ -1402,12 +1538,14 @@ export default function UploadPage() {
             </Box>
           </Box>
         );
-      
+
       case 1:
         // Artwork Step
         return (
           <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Artwork</Typography>
+            <Typography variant="h5" gutterBottom fontWeight="bold">
+              Artwork
+            </Typography>
             <Typography variant="body1" color="text.secondary" paragraph>
               Upload a square JPG/PNG. Exactly 3000x3000px. Max 10MB.
             </Typography>
@@ -1421,7 +1559,8 @@ export default function UploadPage() {
                     borderRadius: '28px',
                     border: '1px solid',
                     borderColor: 'divider',
-                    boxShadow: theme => theme.palette.mode === 'dark' ? 'none' : '0 22px 56px rgba(15,23,42,0.08)',
+                    boxShadow: theme =>
+                      theme.palette.mode === 'dark' ? 'none' : '0 22px 56px rgba(15,23,42,0.08)',
                   }}
                 >
                   <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
@@ -1436,7 +1575,10 @@ export default function UploadPage() {
                         alignItems: 'center',
                         gap: { xs: 2, md: 2.5 },
                         minHeight: 360,
-                        bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.025)' : 'rgba(248,250,252,0.74)',
+                        bgcolor: theme =>
+                          theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.025)'
+                            : 'rgba(248,250,252,0.74)',
                       }}
                     >
                       <Box
@@ -1445,7 +1587,8 @@ export default function UploadPage() {
                           maxWidth: 460,
                           aspectRatio: '1 / 1',
                           justifySelf: 'center',
-                          bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
+                          bgcolor: theme =>
+                            theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -1454,9 +1597,10 @@ export default function UploadPage() {
                           border: '1px solid',
                           borderColor: 'divider',
                           boxShadow: artworkPreview
-                            ? theme => theme.palette.mode === 'dark'
-                              ? '0 18px 44px rgba(0,0,0,0.32)'
-                              : '0 18px 44px rgba(15,23,42,0.12)'
+                            ? theme =>
+                                theme.palette.mode === 'dark'
+                                  ? '0 18px 44px rgba(0,0,0,0.32)'
+                                  : '0 18px 44px rgba(15,23,42,0.12)'
                             : 'none',
                         }}
                       >
@@ -1465,42 +1609,90 @@ export default function UploadPage() {
                             component="img"
                             src={artworkPreview}
                             alt="Artwork preview"
-                            sx={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
+                            sx={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'block',
+                              objectFit: 'cover',
+                            }}
                           />
                         ) : (
                           <Album sx={{ fontSize: 56, color: 'text.secondary' }} />
                         )}
                       </Box>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'center', md: 'flex-start' }, gap: 1.25 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: { xs: 'center', md: 'flex-start' },
+                          gap: 1.25,
+                        }}
+                      >
                         <Typography variant="subtitle1" fontWeight={900}>
                           {artworkPreview ? 'Artwork Ready' : 'Add Cover Artwork'}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 240, textAlign: { xs: 'center', md: 'left' } }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ maxWidth: 240, textAlign: { xs: 'center', md: 'left' } }}
+                        >
                           Preview uses the same square crop stores will receive.
                         </Typography>
-                        <input id="artwork-upload" type="file" accept="image/jpeg,image/png" style={{ display: 'none' }}
-                          onChange={e => { if (e.target.files && e.target.files[0]) setArtworkFile(e.target.files[0]); }} />
+                        <input
+                          id="artwork-upload"
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            if (e.target.files && e.target.files[0])
+                              setArtworkFile(e.target.files[0]);
+                          }}
+                        />
                         <label htmlFor="artwork-upload">
-                        <Button variant={artworkPreview ? 'contained' : 'outlined'} component="span">
-                          {artworkPreview ? 'Change Image' : 'Select Image'}
-                        </Button>
+                          <Button
+                            variant={artworkPreview ? 'contained' : 'outlined'}
+                            component="span"
+                          >
+                            {artworkPreview ? 'Change Image' : 'Select Image'}
+                          </Button>
                         </label>
                         {artworkUploading && (
-                        <Box sx={{ width: '100%', mt: 2 }}>
-                          <LinearProgress />
-                          <Typography variant="caption" color="text.secondary">Validating artwork…</Typography>
-                        </Box>
+                          <Box sx={{ width: '100%', mt: 2 }}>
+                            <LinearProgress />
+                            <Typography variant="caption" color="text.secondary">
+                              Validating artwork…
+                            </Typography>
+                          </Box>
                         )}
-                        {artworkError && <Typography color="error" sx={{ mt: 1 }}>{artworkError}</Typography>}
+                        {artworkError && (
+                          <Typography color="error" sx={{ mt: 1 }}>
+                            {artworkError}
+                          </Typography>
+                        )}
                         {!artworkError && artworkPreview && (
-                        <Typography color="success.main" sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1, fontWeight: 800 }}>
-                          <CheckCircle fontSize="small" /> 3000x3000 verified
-                        </Typography>
+                          <Typography
+                            color="success.main"
+                            sx={{
+                              mt: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              fontWeight: 800,
+                            }}
+                          >
+                            <CheckCircle fontSize="small" /> 3000x3000 verified
+                          </Typography>
                         )}
                         <Box sx={{ display: 'grid', gap: 0.5, mt: 1 }}>
-                          <Typography variant="caption" color="text.secondary">JPG or PNG</Typography>
-                          <Typography variant="caption" color="text.secondary">Exactly 3000x3000px</Typography>
-                          <Typography variant="caption" color="text.secondary">Max 10MB</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            JPG or PNG
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Exactly 3000x3000px
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Max 10MB
+                          </Typography>
                         </Box>
                       </Box>
                     </Box>
@@ -1531,9 +1723,9 @@ export default function UploadPage() {
             </Box>
           </Box>
         );
-      
+
       case 2: {
-        const selectedTypeLb = releaseTypes.find((t) => t.value === releaseType);
+        const selectedTypeLb = releaseTypes.find(t => t.value === releaseType);
         const uploadPctAvg =
           tracks.length > 0
             ? Math.round(
@@ -1545,7 +1737,8 @@ export default function UploadPage() {
           const p = audioUploadPct[i] ?? 0;
           return p > 0 && p < 100;
         });
-        const showAggBar = tracks.length > 0 && (anyAnalyzing || anyUploadingPct || trackUploading.some(Boolean));
+        const showAggBar =
+          tracks.length > 0 && (anyAnalyzing || anyUploadingPct || trackUploading.some(Boolean));
 
         // Tracks & Info
         return (
@@ -1554,14 +1747,23 @@ export default function UploadPage() {
               Upload Your Track{tracks.length !== 1 ? 's' : ''}
             </Typography>
             <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: 720 }}>
-              {selectedTypeLb?.label === 'Single' && `Need at least ${minTracksRequired} track. Audio cards appear below after you select files.`}
-              {selectedTypeLb?.label === 'EP' && `Need ${selectedTypeLb.minTracks}–${selectedTypeLb.maxTracks} tracks. Upload multiple files or add more.`}
+              {selectedTypeLb?.label === 'Single' &&
+                `Need at least ${minTracksRequired} track. Audio cards appear below after you select files.`}
+              {selectedTypeLb?.label === 'EP' &&
+                `Need ${selectedTypeLb.minTracks}–${selectedTypeLb.maxTracks} tracks. Upload multiple files or add more.`}
               {selectedTypeLb?.label === 'Album' && `Up to ${selectedTypeLb.maxTracks} tracks.`}
             </Typography>
 
             {showAggBar && (
               <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                    mb: 1,
+                  }}
+                >
                   <Typography variant="subtitle2" fontWeight={600}>
                     Overall upload progress
                   </Typography>
@@ -1570,7 +1772,13 @@ export default function UploadPage() {
                   </Typography>
                 </Box>
                 <LinearProgress
-                  variant={anyAnalyzing || anyUploadingPct ? (anyAnalyzing ? 'indeterminate' : 'determinate') : 'determinate'}
+                  variant={
+                    anyAnalyzing || anyUploadingPct
+                      ? anyAnalyzing
+                        ? 'indeterminate'
+                        : 'determinate'
+                      : 'determinate'
+                  }
                   value={uploadPctAvg}
                   sx={{
                     height: 10,
@@ -1579,7 +1787,11 @@ export default function UploadPage() {
                     '& .MuiLinearProgress-bar': { borderRadius: 5 },
                   }}
                 />
-                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ mt: 1, display: 'block' }}
+                >
                   {tracks.length} file{tracks.length === 1 ? '' : 's'} queued
                 </Typography>
               </Paper>
@@ -1598,7 +1810,10 @@ export default function UploadPage() {
                   ))}
                   {trackInfoIssues.length > 6 ? (
                     <li>
-                      <Typography variant="body2">{trackInfoIssues.length - 6} more item{trackInfoIssues.length - 6 === 1 ? '' : 's'} need attention.</Typography>
+                      <Typography variant="body2">
+                        {trackInfoIssues.length - 6} more item
+                        {trackInfoIssues.length - 6 === 1 ? '' : 's'} need attention.
+                      </Typography>
                     </li>
                   ) : null}
                 </Box>
@@ -1623,20 +1838,27 @@ export default function UploadPage() {
                   maxWidth: { md: 520 },
                 }}
               >
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, alignItems: 'center' }}>
+                <Box
+                  sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, mb: 2, alignItems: 'center' }}
+                >
                   <input
                     id="multi-track-upload"
                     type="file"
                     accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
                     multiple
                     style={{ display: 'none' }}
-                    onChange={(e) => {
+                    onChange={e => {
                       if (e.target.files?.length) void handleMultiTrackFiles(e.target.files);
                       e.target.value = '';
                     }}
                   />
                   <label htmlFor="multi-track-upload">
-                    <Button variant="contained" component="span" startIcon={<CloudUpload />} sx={{ borderRadius: 2 }}>
+                    <Button
+                      variant="contained"
+                      component="span"
+                      startIcon={<CloudUpload />}
+                      sx={{ borderRadius: 2 }}
+                    >
                       {tracks.length === 0 ? 'Select audio files' : 'Replace all audio'}
                     </Button>
                   </label>
@@ -1646,25 +1868,49 @@ export default function UploadPage() {
                     accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
                     multiple
                     style={{ display: 'none' }}
-                    onChange={(e) => {
+                    onChange={e => {
                       void handleAppendTracksSelected(e.target.files);
                     }}
                   />
-                  {selectedTypeLb && tracks.length > 0 && tracks.length < selectedTypeLb.maxTracks && (
-                    <Button variant="outlined" startIcon={<Add />} onClick={handleAppendTracksClick} sx={{ borderRadius: 2 }}>
-                      Add more tracks
-                    </Button>
-                  )}
+                  {selectedTypeLb &&
+                    tracks.length > 0 &&
+                    tracks.length < selectedTypeLb.maxTracks && (
+                      <Button
+                        variant="outlined"
+                        startIcon={<Add />}
+                        onClick={handleAppendTracksClick}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Add more tracks
+                      </Button>
+                    )}
                 </Box>
 
                 {tracks.length === 0 ? (
-                  <Paper variant="outlined" sx={{ p: 4, borderRadius: 2, borderStyle: 'dashed', bgcolor: theme => theme.palette.action.hover }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 4,
+                      borderRadius: 2,
+                      borderStyle: 'dashed',
+                      bgcolor: theme => theme.palette.action.hover,
+                    }}
+                  >
                     <Typography color="text.secondary" align="center">
-                      No audio yet. Use <strong>Select audio files</strong> — track cards appear here automatically.
+                      No audio yet. Use <strong>Select audio files</strong> — track cards appear
+                      here automatically.
                     </Typography>
                   </Paper>
                 ) : (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%', minWidth: 0 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      width: '100%',
+                      minWidth: 0,
+                    }}
+                  >
                     {tracks.map((file, idx) => (
                       <Card
                         key={idx}
@@ -1681,57 +1927,87 @@ export default function UploadPage() {
                           overflow: 'hidden',
                         }}
                       >
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'flex-start',
-                              justifyContent: 'space-between',
-                              gap: 1,
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <Typography fontWeight={700} sx={{ flexShrink: 0 }}>
-                              Track {idx + 1}
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
-                              <input
-                                id={`track-replace-${idx}`}
-                                type="file"
-                                accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
-                                style={{ display: 'none' }}
-                                onChange={(e) => {
-                                  const next = e.target.files?.[0];
-                                  void handleTrackFileChange(idx, next ?? null);
-                                  e.target.value = '';
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Typography fontWeight={700} sx={{ flexShrink: 0 }}>
+                            Track {idx + 1}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, ml: 'auto' }}>
+                            <input
+                              id={`track-replace-${idx}`}
+                              type="file"
+                              accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                              style={{ display: 'none' }}
+                              onChange={e => {
+                                const next = e.target.files?.[0];
+                                void handleTrackFileChange(idx, next ?? null);
+                                e.target.value = '';
+                              }}
+                            />
+                            <label htmlFor={`track-replace-${idx}`}>
+                              <Button
+                                component="span"
+                                size="small"
+                                variant="text"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                Replace
+                              </Button>
+                            </label>
+                            {tracks.length > 1 ? (
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleRemoveTrack(idx);
                                 }}
-                              />
-                              <label htmlFor={`track-replace-${idx}`}>
-                                <Button component="span" size="small" variant="text" onClick={(e) => e.stopPropagation()}>
-                                  Replace
-                                </Button>
-                              </label>
-                              {tracks.length > 1 ? (
-                                <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); handleRemoveTrack(idx); }}>
-                                  <Delete fontSize="small" />
-                                </IconButton>
-                              ) : null}
-                            </Box>
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            ) : null}
                           </Box>
-                          <Chip
-                            icon={<AudioFile />}
-                            label={file.name}
-                            title={file.name}
-                            sx={{ mt: 1, mb: 1, maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }}
-                            variant="outlined"
-                          />
-                          {(trackUploading[idx] || analysisLoading[idx] || (audioUploadPct[idx] ?? 0) > 0) && (audioUploadPct[idx] ?? 0) < 100 && (
+                        </Box>
+                        <Chip
+                          icon={<AudioFile />}
+                          label={file.name}
+                          title={file.name}
+                          sx={{
+                            mt: 1,
+                            mb: 1,
+                            maxWidth: '100%',
+                            '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                          }}
+                          variant="outlined"
+                        />
+                        {(trackUploading[idx] ||
+                          analysisLoading[idx] ||
+                          (audioUploadPct[idx] ?? 0) > 0) &&
+                          (audioUploadPct[idx] ?? 0) < 100 && (
                             <Box sx={{ mb: 1 }}>
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="caption" color="text.secondary">Audio upload</Typography>
-                                <Typography variant="caption" color="text.secondary">{audioUploadPct[idx] ?? 0}%</Typography>
+                              <Box
+                                sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}
+                              >
+                                <Typography variant="caption" color="text.secondary">
+                                  Audio upload
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {audioUploadPct[idx] ?? 0}%
+                                </Typography>
                               </Box>
                               <LinearProgress
-                                variant={analysisLoading[idx] && (audioUploadPct[idx] ?? 0) <= 1 ? 'indeterminate' : 'determinate'}
+                                variant={
+                                  analysisLoading[idx] && (audioUploadPct[idx] ?? 0) <= 1
+                                    ? 'indeterminate'
+                                    : 'determinate'
+                                }
                                 value={audioUploadPct[idx] ?? 0}
                                 sx={{
                                   height: 6,
@@ -1741,40 +2017,74 @@ export default function UploadPage() {
                               />
                             </Box>
                           )}
-                          {trackPreviewUrls[idx] && (
-                            <Box sx={{ width: '100%', mt: 1 }}>
-                              <audio controls src={trackPreviewUrls[idx] || undefined} style={{ width: '100%', borderRadius: 8 }} />
-                            </Box>
-                          )}
-                          {!analysisLoading[idx] && (audioUploadPct[idx] ?? 0) >= 100 && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <CheckCircle sx={{ fontSize: 14 }} /> Upload complete
+                        {trackPreviewUrls[idx] && (
+                          <Box sx={{ width: '100%', mt: 1 }}>
+                            <audio
+                              controls
+                              src={trackPreviewUrls[idx] || undefined}
+                              style={{ width: '100%', borderRadius: 8 }}
+                            />
+                          </Box>
+                        )}
+                        {!analysisLoading[idx] && (audioUploadPct[idx] ?? 0) >= 100 && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography
+                              variant="caption"
+                              color="success.main"
+                              sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                            >
+                              <CheckCircle sx={{ fontSize: 14 }} /> Upload complete
+                            </Typography>
+                          </Box>
+                        )}
+                        {audioAcrCloudStatuses[idx] && (
+                          <Box sx={{ mb: 1 }}>
+                            <Tooltip
+                              title={
+                                audioAcrCloudStatuses[idx]?.lastError ||
+                                'ACRCloud verification status'
+                              }
+                            >
+                              <Chip
+                                size="small"
+                                icon={
+                                  getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? (
+                                    <CircularProgress size={12} />
+                                  ) : (
+                                    <PlaylistAddCheck fontSize="small" />
+                                  )
+                                }
+                                label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
+                                color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
+                                variant="outlined"
+                                sx={{ maxWidth: '100%' }}
+                              />
+                            </Tooltip>
+                            {getAcrCloudSummary(audioAcrCloudStatuses[idx]) && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: 'block', mt: 0.5 }}
+                              >
+                                {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
                               </Typography>
-                            </Box>
-                          )}
-                          {audioAcrCloudStatuses[idx] && (
-                            <Box sx={{ mb: 1 }}>
-                              <Tooltip title={audioAcrCloudStatuses[idx]?.lastError || 'ACRCloud verification status'}>
-                                <Chip
-                                  size="small"
-                                  icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
-                                  label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
-                                  color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
-                                  variant="outlined"
-                                  sx={{ maxWidth: '100%' }}
-                                />
-                              </Tooltip>
-                              {getAcrCloudSummary(audioAcrCloudStatuses[idx]) && (
-                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                  {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
-                                </Typography>
-                              )}
-                              {(acrCloudProgressPct[idx] ?? 0) > 0 && (acrCloudProgressPct[idx] ?? 0) < 100 && (
+                            )}
+                            {(acrCloudProgressPct[idx] ?? 0) > 0 &&
+                              (acrCloudProgressPct[idx] ?? 0) < 100 && (
                                 <Box sx={{ mt: 1 }}>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                    <Typography variant="caption" color="text.secondary">ACR scan</Typography>
-                                    <Typography variant="caption" color="text.secondary">{acrCloudProgressPct[idx] ?? 0}%</Typography>
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    <Typography variant="caption" color="text.secondary">
+                                      ACR scan
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {acrCloudProgressPct[idx] ?? 0}%
+                                    </Typography>
                                   </Box>
                                   <LinearProgress
                                     variant="determinate"
@@ -1787,47 +2097,83 @@ export default function UploadPage() {
                                   />
                                 </Box>
                               )}
-                            </Box>
-                          )}
-                          {analysisLoading[idx] && (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <CircularProgress size={14} />
-                              <Typography variant="caption" color="text.secondary">
-                                Analyzing…
-                              </Typography>
-                            </Box>
-                          )}
-                          {analysisResults[idx] && (
-                            <Box sx={{ mt: 0.75, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                              <Typography variant="caption" color="success.main">
-                                Format: {analysisResults[idx].format || analysisResults[idx].container || '—'}
-                              </Typography>
-                              <Typography variant="caption" color="success.main">
-                                Duration: {formatDuration(analysisResults[idx].duration)}
-                              </Typography>
-                              <Typography variant="caption" color="success.main">
-                                Bitrate: {formatBitrate(analysisResults[idx].bitrate || analysisResults[idx].bit_rate)}
-                              </Typography>
-                            </Box>
-                          )}
-                          {analysisErrors[idx] && (
-                            <Typography variant="caption" color="error.main">
-                              {analysisErrors[idx]}
+                          </Box>
+                        )}
+                        {analysisLoading[idx] && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <CircularProgress size={14} />
+                            <Typography variant="caption" color="text.secondary">
+                              Analyzing…
                             </Typography>
-                          )}
-                        </Card>
+                          </Box>
+                        )}
+                        {analysisResults[idx] && (
+                          <Box
+                            sx={{
+                              mt: 0.75,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1.5,
+                              flexWrap: 'wrap',
+                            }}
+                          >
+                            <Typography variant="caption" color="success.main">
+                              Format:{' '}
+                              {analysisResults[idx].format || analysisResults[idx].container || '—'}
+                            </Typography>
+                            <Typography variant="caption" color="success.main">
+                              Duration: {formatDuration(analysisResults[idx].duration)}
+                            </Typography>
+                            <Typography variant="caption" color="success.main">
+                              Bitrate:{' '}
+                              {formatBitrate(
+                                analysisResults[idx].bitrate || analysisResults[idx].bit_rate
+                              )}
+                            </Typography>
+                          </Box>
+                        )}
+                        {analysisErrors[idx] && (
+                          <Typography variant="caption" color="error.main">
+                            {analysisErrors[idx]}
+                          </Typography>
+                        )}
+                      </Card>
                     ))}
                   </Box>
                 )}
-                <Box sx={{ mt: 2.5, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 2 }}>
-                  <Button variant="outlined" color="primary" startIcon={<ArrowBack />} onClick={handleBack} sx={{ borderRadius: 2 }}>
+                <Box
+                  sx={{
+                    mt: 2.5,
+                    display: 'flex',
+                    justifyContent: 'flex-start',
+                    alignItems: 'center',
+                    gap: 2,
+                  }}
+                >
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<ArrowBack />}
+                    onClick={handleBack}
+                    sx={{ borderRadius: 2 }}
+                  >
                     Back
                   </Button>
                 </Box>
               </Box>
               <Box sx={{ flex: { md: '1 1 0' }, minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
-                <Box sx={{ display: 'flex', alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-                  <Typography variant="h6" fontWeight="bold">Track Information</Typography>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                    justifyContent: 'space-between',
+                    gap: 2,
+                    flexDirection: { xs: 'column', sm: 'row' },
+                  }}
+                >
+                  <Typography variant="h6" fontWeight="bold">
+                    Track Information
+                  </Typography>
                   <Button
                     variant="outlined"
                     size="small"
@@ -1839,35 +2185,93 @@ export default function UploadPage() {
                   </Button>
                 </Box>
                 {tracks.length === 0 ? (
-                  <Paper variant="outlined" sx={{ mt: 2.5, p: 3, borderRadius: 2, borderStyle: 'dashed', bgcolor: theme => theme.palette.action.hover }}>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      mt: 2.5,
+                      p: 3,
+                      borderRadius: 2,
+                      borderStyle: 'dashed',
+                      bgcolor: theme => theme.palette.action.hover,
+                    }}
+                  >
                     <Typography color="text.secondary" align="center">
                       Upload audio on the left. Each file becomes a track and unlocks metadata here.
                     </Typography>
                   </Paper>
                 ) : null}
                 {tracks.length > 0 && selectedTrackIdx >= 0 && selectedTrackIdx < tracks.length && (
-                  <Box sx={{ mt: 2.5, mb: 3, p: { xs: 2, sm: 3 }, border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper' }}>
-                    <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>Track {selectedTrackIdx + 1}</Typography>
+                  <Box
+                    sx={{
+                      mt: 2.5,
+                      mb: 3,
+                      p: { xs: 2, sm: 3 },
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                      Track {selectedTrackIdx + 1}
+                    </Typography>
                     <Box sx={{ display: 'grid', gap: 2.5 }}>
                       <Box>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Track details</Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                          Track details
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 1,
+                          }}
+                        >
                           <TextField
                             label="Track Title *"
                             fullWidth
                             required
                             value={trackInfos[selectedTrackIdx]?.title || ''}
-                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'title', e.target.value)}
-                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.title?.trim()}
-                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.title?.trim() ? 'Track title is required.' : ''}
-                            InputProps={{ endAdornment: <InputAdornment position="end"><Tooltip title="Use a clear, searchable name. Avoid extra version text here."><Info fontSize="small" /></Tooltip></InputAdornment> }}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'title', e.target.value)
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.title?.trim()
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.title?.trim()
+                                ? 'Track title is required.'
+                                : ''
+                            }
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <Tooltip title="Use a clear, searchable name. Avoid extra version text here.">
+                                    <Info fontSize="small" />
+                                  </Tooltip>
+                                </InputAdornment>
+                              ),
+                            }}
                           />
                           <TextField
                             label="Version"
                             fullWidth
                             value={trackInfos[selectedTrackIdx]?.version || ''}
-                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'version', e.target.value)}
-                            InputProps={{ endAdornment: <InputAdornment position="end"><Tooltip title="e.g., Radio Edit, Acoustic, Remix"><Info fontSize="small" /></Tooltip></InputAdornment> }}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'version', e.target.value)
+                            }
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <Tooltip title="e.g., Radio Edit, Acoustic, Remix">
+                                    <Info fontSize="small" />
+                                  </Tooltip>
+                                </InputAdornment>
+                              ),
+                            }}
                           />
                         </Box>
                       </Box>
@@ -1878,112 +2282,280 @@ export default function UploadPage() {
                       />
 
                       <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.75 }}>
-                          <Typography variant="overline" sx={{ color: 'text.secondary' }}>Contributors</Typography>
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 2,
+                            mb: 0.75,
+                          }}
+                        >
+                          <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                            Contributors
+                          </Typography>
                           <Tooltip title="Add contributor">
-                            <IconButton size="small" color="primary" onClick={() => addContributor(selectedTrackIdx)}>
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => addContributor(selectedTrackIdx)}
+                            >
                               <Add fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         </Box>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                          Add credits here. Include at least one row with role <strong>Artist</strong> (required).
-                          Use <strong>Performer</strong> for featuring guests.
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: 'block', mb: 1 }}
+                        >
+                          Add credits here. Include at least one row with role{' '}
+                          <strong>Artist</strong> (required). Use <strong>Performer</strong> for
+                          featuring guests.
                         </Typography>
                         {selectedTrackMissingArtist && (
                           <Alert severity="warning" sx={{ mb: 1.5 }}>
                             Add at least one contributor with role Artist and a name.
                           </Alert>
                         )}
-                        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-                          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' }, gap: 1, px: 1.5, py: 1, bgcolor: 'action.hover' }}>
-                            <Typography variant="caption" fontWeight={700}>Role</Typography>
-                            <Typography variant="caption" fontWeight={700}>Name</Typography>
+                        <Box
+                          sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: 'grid',
+                              gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' },
+                              gap: 1,
+                              px: 1.5,
+                              py: 1,
+                              bgcolor: 'action.hover',
+                            }}
+                          >
+                            <Typography variant="caption" fontWeight={700}>
+                              Role
+                            </Typography>
+                            <Typography variant="caption" fontWeight={700}>
+                              Name
+                            </Typography>
                           </Box>
-                          {trackInfos[selectedTrackIdx]?.contributors.map((contributor, contributorIdx) => (
-                            <Box key={`${contributorIdx}-${contributor.role}`} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' }, gap: 1.5, p: 1.5, borderTop: '1px solid', borderColor: 'divider', alignItems: 'center' }}>
-                              <TextField
-                                select
-                                size="small"
-                                value={contributor.role}
-                                onChange={e => updateContributor(selectedTrackIdx, contributorIdx, 'role', e.target.value)}
+                          {trackInfos[selectedTrackIdx]?.contributors.map(
+                            (contributor, contributorIdx) => (
+                              <Box
+                                key={`${contributorIdx}-${contributor.role}`}
+                                sx={{
+                                  display: 'grid',
+                                  gridTemplateColumns: { xs: '1fr', sm: '180px 1fr 48px' },
+                                  gap: 1.5,
+                                  p: 1.5,
+                                  borderTop: '1px solid',
+                                  borderColor: 'divider',
+                                  alignItems: 'center',
+                                }}
                               >
-                                {contributorRoles.map(role => (
-                                  <MenuItem key={role.value} value={role.value}>{role.label}</MenuItem>
-                                ))}
-                              </TextField>
-                              <TextField
-                                size="small"
-                                label="Contributor name"
-                                value={contributor.name}
-                                onChange={e => updateContributor(selectedTrackIdx, contributorIdx, 'name', e.target.value)}
-                                error={selectedTrackMissingArtist && contributor.role === 'artist' && !contributor.name.trim()}
-                                helperText={selectedTrackMissingArtist && contributor.role === 'artist' && !contributor.name.trim() ? 'Required' : ''}
-                              />
-                              <Tooltip title="Remove contributor">
-                                <IconButton size="small" color="error" onClick={() => removeContributor(selectedTrackIdx, contributorIdx)}>
-                                  <Delete fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          ))}
+                                <TextField
+                                  select
+                                  size="small"
+                                  value={contributor.role}
+                                  onChange={e =>
+                                    updateContributor(
+                                      selectedTrackIdx,
+                                      contributorIdx,
+                                      'role',
+                                      e.target.value
+                                    )
+                                  }
+                                >
+                                  {contributorRoles.map(role => (
+                                    <MenuItem key={role.value} value={role.value}>
+                                      {role.label}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                                <TextField
+                                  size="small"
+                                  label="Contributor name"
+                                  value={contributor.name}
+                                  onChange={e =>
+                                    updateContributor(
+                                      selectedTrackIdx,
+                                      contributorIdx,
+                                      'name',
+                                      e.target.value
+                                    )
+                                  }
+                                  error={
+                                    selectedTrackMissingArtist &&
+                                    contributor.role === 'artist' &&
+                                    !contributor.name.trim()
+                                  }
+                                  helperText={
+                                    selectedTrackMissingArtist &&
+                                    contributor.role === 'artist' &&
+                                    !contributor.name.trim()
+                                      ? 'Required'
+                                      : ''
+                                  }
+                                />
+                                <Tooltip title="Remove contributor">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() =>
+                                      removeContributor(selectedTrackIdx, contributorIdx)
+                                    }
+                                  >
+                                    <Delete fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
+                            )
+                          )}
                         </Box>
                       </Box>
 
                       <Box>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Metadata</Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                          Metadata
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 1,
+                          }}
+                        >
                           <TextField
                             select
                             label="Metadata Language *"
                             fullWidth
                             required
                             value={trackInfos[selectedTrackIdx]?.metadataLanguage || ''}
-                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'metadataLanguage', e.target.value)}
-                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.metadataLanguage}
-                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.metadataLanguage ? 'Metadata language is required.' : ''}
+                            onChange={e =>
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'metadataLanguage',
+                                e.target.value
+                              )
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.metadataLanguage
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.metadataLanguage
+                                ? 'Metadata language is required.'
+                                : ''
+                            }
                           >
-                            {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
+                            {languages.map(lang => (
+                              <MenuItem key={lang.code} value={lang.code}>
+                                {lang.name}
+                              </MenuItem>
+                            ))}
                           </TextField>
                           <TextField
                             select
                             label="Audio Language *"
                             fullWidth
                             required
-                            value={trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language || ''}
+                            value={
+                              trackInfos[selectedTrackIdx]?.audioLanguage ||
+                              trackInfos[selectedTrackIdx]?.language ||
+                              ''
+                            }
                             onChange={e => {
-                              handleTrackInfoChange(selectedTrackIdx, 'audioLanguage', e.target.value);
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'audioLanguage',
+                                e.target.value
+                              );
                               handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value);
                             }}
-                            error={trackValidationAttempted && !(trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language)}
-                            helperText={trackValidationAttempted && !(trackInfos[selectedTrackIdx]?.audioLanguage || trackInfos[selectedTrackIdx]?.language) ? 'Audio language is required.' : ''}
+                            error={
+                              trackValidationAttempted &&
+                              !(
+                                trackInfos[selectedTrackIdx]?.audioLanguage ||
+                                trackInfos[selectedTrackIdx]?.language
+                              )
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !(
+                                trackInfos[selectedTrackIdx]?.audioLanguage ||
+                                trackInfos[selectedTrackIdx]?.language
+                              )
+                                ? 'Audio language is required.'
+                                : ''
+                            }
                           >
-                            {languages.map(lang => (<MenuItem key={lang.code} value={lang.code}>{lang.name}</MenuItem>))}
+                            {languages.map(lang => (
+                              <MenuItem key={lang.code} value={lang.code}>
+                                {lang.name}
+                              </MenuItem>
+                            ))}
                           </TextField>
                         </Box>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 2,
+                          }}
+                        >
                           <TextField
                             select
                             label="Genre *"
                             fullWidth
                             required
                             value={trackInfos[selectedTrackIdx]?.genre || ''}
-                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)
+                            }
                             error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre}
-                            helperText={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre ? 'Genre is required.' : ''}
+                            helperText={
+                              trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre
+                                ? 'Genre is required.'
+                                : ''
+                            }
                           >
-                            {genres.map(g => (<MenuItem key={g} value={g}>{g}</MenuItem>))}
+                            {genres.map(g => (
+                              <MenuItem key={g} value={g}>
+                                {g}
+                              </MenuItem>
+                            ))}
                           </TextField>
-                          <TextField label="Subgenre" fullWidth value={trackInfos[selectedTrackIdx]?.subgenre || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)} />
+                          <TextField
+                            label="Subgenre"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.subgenre || ''}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)
+                            }
+                          />
                         </Box>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 2,
+                          }}
+                        >
                           <TextField
                             label="Original release date"
                             type="date"
                             fullWidth
                             InputLabelProps={{ shrink: true }}
                             value={originalReleaseDate}
-                            onChange={(e) => setOriginalReleaseDate(e.target.value)}
+                            onChange={e => setOriginalReleaseDate(e.target.value)}
                             helperText="If this catalog was issued before."
                           />
                           <TextField
@@ -1993,55 +2565,175 @@ export default function UploadPage() {
                             required
                             InputLabelProps={{ shrink: true }}
                             value={releaseDate}
-                            onChange={(e) => setReleaseDate(e.target.value)}
+                            onChange={e => setReleaseDate(e.target.value)}
                             error={trackValidationAttempted && !releaseDate.trim()}
-                            helperText={trackValidationAttempted && !releaseDate.trim() ? 'Digital release date is required.' : 'Date stores should go live.'}
+                            helperText={
+                              trackValidationAttempted && !releaseDate.trim()
+                                ? 'Digital release date is required.'
+                                : 'Date stores should go live.'
+                            }
                           />
                         </Box>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 2 }}>
-                          <TextField select label="Recording Year" fullWidth value={trackInfos[selectedTrackIdx]?.recordingYear || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'recordingYear', e.target.value)}>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 2,
+                          }}
+                        >
+                          <TextField
+                            select
+                            label="Recording Year"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.recordingYear || ''}
+                            onChange={e =>
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'recordingYear',
+                                e.target.value
+                              )
+                            }
+                          >
                             <MenuItem value="">Not set</MenuItem>
-                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                            {copyrightYears.map(year => (
+                              <MenuItem key={year} value={year}>
+                                {year}
+                              </MenuItem>
+                            ))}
                           </TextField>
                         </Box>
                       </Box>
 
                       <Box>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Identifiers</Typography>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                          Identifiers
+                        </Typography>
                         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2, mt: 1 }}>
                           <TextField
                             label="ISRC"
                             fullWidth
                             value={trackInfos[selectedTrackIdx]?.isrc || ''}
-                            onChange={e => handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)
+                            }
                             helperText="Leave blank for IN-9SN yearly sequence assignment."
                           />
                         </Box>
                       </Box>
 
                       <Box>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Rights</Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 120px ' }, gap: 2, mt: 1 }}>
-                          <TextField label="C-line name" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightC || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)} />
-                          <TextField select label="Year" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightCYear || String(currentYear)} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightCYear', e.target.value)}>
-                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                          Rights
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 120px ' },
+                            gap: 2,
+                            mt: 1,
+                          }}
+                        >
+                          <TextField
+                            label="C-line name"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.copyrightC || ''}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)
+                            }
+                          />
+                          <TextField
+                            select
+                            label="Year"
+                            fullWidth
+                            value={
+                              trackInfos[selectedTrackIdx]?.copyrightCYear || String(currentYear)
+                            }
+                            onChange={e =>
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'copyrightCYear',
+                                e.target.value
+                              )
+                            }
+                          >
+                            {copyrightYears.map(year => (
+                              <MenuItem key={year} value={year}>
+                                {year}
+                              </MenuItem>
+                            ))}
                           </TextField>
-                          <TextField label="P-line name" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightP || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightP', e.target.value)} />
-                          <TextField select label="Year" fullWidth value={trackInfos[selectedTrackIdx]?.copyrightPYear || String(currentYear)} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'copyrightPYear', e.target.value)}>
-                            {copyrightYears.map(year => (<MenuItem key={year} value={year}>{year}</MenuItem>))}
+                          <TextField
+                            label="P-line name"
+                            fullWidth
+                            value={trackInfos[selectedTrackIdx]?.copyrightP || ''}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'copyrightP', e.target.value)
+                            }
+                          />
+                          <TextField
+                            select
+                            label="Year"
+                            fullWidth
+                            value={
+                              trackInfos[selectedTrackIdx]?.copyrightPYear || String(currentYear)
+                            }
+                            onChange={e =>
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'copyrightPYear',
+                                e.target.value
+                              )
+                            }
+                          >
+                            {copyrightYears.map(year => (
+                              <MenuItem key={year} value={year}>
+                                {year}
+                              </MenuItem>
+                            ))}
                           </TextField>
                         </Box>
                       </Box>
 
                       <Box>
-                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>Content</Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mt: 1 }}>
+                        <Typography variant="overline" sx={{ color: 'text.secondary' }}>
+                          Content
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                            gap: 2,
+                            mt: 1,
+                          }}
+                        >
                           <Box>
-                            <TextField label="Lyrics" fullWidth multiline minRows={3} value={trackInfos[selectedTrackIdx]?.lyrics || ''} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'lyrics', e.target.value)} />
+                            <TextField
+                              label="Lyrics"
+                              fullWidth
+                              multiline
+                              minRows={3}
+                              value={trackInfos[selectedTrackIdx]?.lyrics || ''}
+                              onChange={e =>
+                                handleTrackInfoChange(selectedTrackIdx, 'lyrics', e.target.value)
+                              }
+                            />
                           </Box>
                           <Box>
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                              <TextField select label="Parental Advisory" fullWidth value={trackInfos[selectedTrackIdx]?.parentalAdvisory || 'none'} onChange={e => handleTrackInfoChange(selectedTrackIdx, 'parentalAdvisory', e.target.value)}>
+                              <TextField
+                                select
+                                label="Parental Advisory"
+                                fullWidth
+                                value={trackInfos[selectedTrackIdx]?.parentalAdvisory || 'none'}
+                                onChange={e =>
+                                  handleTrackInfoChange(
+                                    selectedTrackIdx,
+                                    'parentalAdvisory',
+                                    e.target.value
+                                  )
+                                }
+                              >
                                 <MenuItem value="none">None</MenuItem>
                                 <MenuItem value="explicit">Explicit</MenuItem>
                                 <MenuItem value="clean">Clean</MenuItem>
@@ -2051,7 +2743,13 @@ export default function UploadPage() {
                                   control={
                                     <Checkbox
                                       checked={!!trackInfos[selectedTrackIdx]?.explicit}
-                                      onChange={e => handleTrackInfoChange(selectedTrackIdx, 'explicit', e.target.checked)}
+                                      onChange={e =>
+                                        handleTrackInfoChange(
+                                          selectedTrackIdx,
+                                          'explicit',
+                                          e.target.checked
+                                        )
+                                      }
                                     />
                                   }
                                   label="Explicit Lyrics"
@@ -2060,7 +2758,13 @@ export default function UploadPage() {
                                   control={
                                     <Checkbox
                                       checked={!!trackInfos[selectedTrackIdx]?.instrumental}
-                                      onChange={e => handleTrackInfoChange(selectedTrackIdx, 'instrumental', e.target.checked)}
+                                      onChange={e =>
+                                        handleTrackInfoChange(
+                                          selectedTrackIdx,
+                                          'instrumental',
+                                          e.target.checked
+                                        )
+                                      }
                                     />
                                   }
                                   label="Instrumental"
@@ -2088,10 +2792,7 @@ export default function UploadPage() {
                 color="primary"
                 sx={{ borderRadius: 2, px: 3 }}
                 onClick={handleTracksInfoContinue}
-                disabled={
-                  analysisLoading.some(Boolean) ||
-                  trackUploading.some(Boolean)
-                }
+                disabled={analysisLoading.some(Boolean) || trackUploading.some(Boolean)}
               >
                 Continue
               </Button>
@@ -2104,16 +2805,39 @@ export default function UploadPage() {
         // Distribution Providers
         return (
           <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 3, flexDirection: { xs: 'column', md: 'row' } }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: { xs: 'flex-start', md: 'center' },
+                gap: 2,
+                mb: 3,
+                flexDirection: { xs: 'column', md: 'row' },
+              }}
+            >
               <Box>
-                <Typography variant="h5" gutterBottom fontWeight={800}>Distribution Providers</Typography>
+                <Typography variant="h5" gutterBottom fontWeight={800}>
+                  Distribution Providers
+                </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720 }}>
-                  Pick every store for this release. Selected providers are shown again in final review.
+                  Pick every store for this release. Selected providers are shown again in final
+                  review.
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
-                <Chip label={`${selectedDSPs.length}/${visibleDSPs.length} selected`} color={selectedDSPs.length ? 'primary' : 'default'} variant="outlined" />
-                <Button variant="outlined" size="small" onClick={handleSelectAll} disabled={isPlatformAccessLoading || visibleDSPs.length === 0}>{allSelected ? 'Deselect All' : 'Select All'}</Button>
+                <Chip
+                  label={`${selectedDSPs.length}/${visibleDSPs.length} selected`}
+                  color={selectedDSPs.length ? 'primary' : 'default'}
+                  variant="outlined"
+                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleSelectAll}
+                  disabled={isPlatformAccessLoading || visibleDSPs.length === 0}
+                >
+                  {allSelected ? 'Deselect All' : 'Select All'}
+                </Button>
               </Stack>
             </Box>
             {platformAccessError && (
@@ -2125,7 +2849,9 @@ export default function UploadPage() {
               <Paper variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
                 <Stack direction="row" spacing={1.5} alignItems="center">
                   <CircularProgress size={18} />
-                  <Typography variant="body2" color="text.secondary">Loading platform access...</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Loading platform access...
+                  </Typography>
                 </Stack>
               </Paper>
             ) : visibleDSPs.length === 0 ? (
@@ -2144,10 +2870,23 @@ export default function UploadPage() {
                 </Typography>
               </Paper>
             ) : (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    sm: 'repeat(2, minmax(0, 1fr))',
+                    lg: 'repeat(4, minmax(0, 1fr))',
+                  },
+                  gap: 1.5,
+                }}
+              >
                 {visibleDSPs.map((dsp: DspItem) => {
                   const selected = selectedDSPs.includes(dsp.key);
-                  const initials = (dsp.name.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase();
+                  const initials = (dsp.name.match(/\b\w/g) || [])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
                   return (
                     <Paper
                       key={dsp.key}
@@ -2155,52 +2894,74 @@ export default function UploadPage() {
                       onClick={() => handleDSPToggle(dsp.key)}
                       sx={{
                         cursor: 'pointer',
-                        p: 2,
-                        minHeight: 150,
+                        p: 1.5,
+                        minHeight: 96,
                         borderRadius: 2,
-                        borderColor: selected ? 'primary.main' : 'divider',
-                        bgcolor: selected ? 'action.selected' : 'background.paper',
+                        border: 'none',
+                        // borderColor: selected ? 'primary.main' : 'divider',
+                        bgcolor: selected
+                          ? theme.palette.mode === 'dark'
+                            ? 'rgba(74,108,247,0.16)'
+                            : 'rgba(74,108,247,0.07)'
+                          : 'background.paper',
                         display: 'flex',
-                        flexDirection: 'column',
+                        alignItems: 'center',
                         gap: 1.5,
-                        transition: 'border-color 160ms, transform 160ms, box-shadow 160ms',
+                        transition:
+                          'border-color 160ms, transform 160ms, box-shadow 160ms, background-color 160ms',
                         '&:hover': {
                           transform: 'translateY(-2px)',
-                          boxShadow: theme => theme.palette.mode === 'dark' ? '0 14px 34px rgba(0,0,0,0.28)' : '0 14px 34px rgba(15,23,42,0.08)',
+                          boxShadow: theme =>
+                            theme.palette.mode === 'dark'
+                              ? '0 14px 34px rgba(0,0,0,0.28)'
+                              : '0 14px 34px rgba(15,23,42,0.08)',
                         },
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                        <Avatar
-                          src={dsp.logo || undefined}
-                          alt={dsp.name}
-                          variant="rounded"
+                      <Avatar
+                        src={dsp.logo || undefined}
+                        alt={dsp.name}
+                        variant="rounded"
+                        sx={{
+                          width: 64,
+                          height: 64,
+                          borderRadius: 2,
+                          bgcolor: 'background.default',
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          p: 0.75,
+                          fontSize: 14,
+                          fontWeight: 900,
+                          flex: '0 0 auto',
+                        }}
+                      >
+                        {initials}
+                      </Avatar>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography fontWeight={850} noWrap>
+                          {dsp.name}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
                           sx={{
-                            width: 52,
-                            height: 52,
-                            borderRadius: 2,
-                            bgcolor: 'background.default',
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            p: 0.75,
-                            fontSize: 13,
-                            fontWeight: 900,
+                            mt: 0.35,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
                           }}
                         >
-                          {initials}
-                        </Avatar>
+                          {dsp.info}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: '0 0 auto' }}>
                         <Checkbox
                           checked={selected}
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={event => event.stopPropagation()}
                           onChange={() => handleDSPToggle(dsp.key)}
                           inputProps={{ 'aria-label': `Select ${dsp.name}` }}
                         />
-                      </Box>
-                      <Box>
-                        <Typography fontWeight={800}>{dsp.name}</Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                          {dsp.info}
-                        </Typography>
                       </Box>
                     </Paper>
                   );
@@ -2209,7 +2970,14 @@ export default function UploadPage() {
             )}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack}>Back</Button>
-              <Button variant="contained" color="primary" onClick={handleContinue} disabled={!isDistributionValid}>Continue</Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleContinue}
+                disabled={!isDistributionValid}
+              >
+                Continue
+              </Button>
             </Box>
           </Box>
         );
@@ -2218,26 +2986,41 @@ export default function UploadPage() {
         // Territories & Rights
         return (
           <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Territories & Rights</Typography>
+            <Typography variant="h5" gutterBottom fontWeight="bold">
+              Territories & Rights
+            </Typography>
             <Grid container spacing={3} sx={{ mt: 1 }}>
               <Grid xs={12} md={6}>
                 <TerritoryManager
                   value={territoryCountries}
                   mode={territoryMode}
-                  onChange={(countries, mode) => { setTerritoryCountries(countries); setTerritoryMode(mode); }}
+                  onChange={(countries, mode) => {
+                    setTerritoryCountries(countries);
+                    setTerritoryMode(mode);
+                  }}
                 />
               </Grid>
               <Grid xs={12} md={6}>
                 <RightsManager
                   rightsType={rightsType}
                   description={rightsDescription}
-                  onChange={(type, desc) => { setRightsType(type); setRightsDescription(desc); }}
+                  onChange={(type, desc) => {
+                    setRightsType(type);
+                    setRightsDescription(desc);
+                  }}
                 />
               </Grid>
             </Grid>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack}>Back</Button>
-              <Button variant="contained" color="primary" onClick={handleNext} disabled={!rightsType || territoryCountries.length === 0}>Continue</Button>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleNext}
+                disabled={!rightsType || territoryCountries.length === 0}
+              >
+                Continue
+              </Button>
             </Box>
           </Box>
         );
@@ -2245,29 +3028,48 @@ export default function UploadPage() {
         // Review & Submit
         return (
           <Box>
-            <Typography variant="h5" gutterBottom fontWeight="bold">Review & Submit</Typography>
+            <Typography variant="h5" gutterBottom fontWeight="bold">
+              Review & Submit
+            </Typography>
             <Typography variant="body1" color="text.secondary" paragraph>
               Review all details before submitting your release.
             </Typography>
-            <Paper variant="outlined" sx={{ p: { xs: 2.5, sm: 3.5 }, mb: 3, borderRadius: 2, bgcolor: 'background.paper', color: 'text.primary', boxShadow: theme => theme.palette.mode === 'dark' ? 'none' : '0 14px 40px rgba(15,23,42,0.06)' }}>
-              <Typography variant="subtitle1" fontWeight="bold">Release Overview</Typography>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: { xs: 2.5, sm: 3.5 },
+                mb: 3,
+                borderRadius: 2,
+                bgcolor: 'background.paper',
+                color: 'text.primary',
+                boxShadow: theme =>
+                  theme.palette.mode === 'dark' ? 'none' : '0 14px 40px rgba(15,23,42,0.06)',
+              }}
+            >
+              <Typography variant="subtitle1" fontWeight="bold">
+                Release Overview
+              </Typography>
               <Grid container spacing={2} sx={{ mt: 1 }}>
                 <Grid xs={12} md={4} lg={3}>
-                  <Box sx={{
-                    width: '100%',
-                    maxWidth: 240,
-                    aspectRatio: '1 / 1',
-                    bgcolor: theme => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
-                    borderRadius: '18px',
-                    overflow: 'hidden',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    boxShadow: artworkPreview
-                      ? theme => theme.palette.mode === 'dark'
-                        ? '0 18px 44px rgba(0,0,0,0.32)'
-                        : '0 18px 44px rgba(15,23,42,0.12)'
-                      : 'none',
-                  }}>
+                  <Box
+                    sx={{
+                      width: '100%',
+                      maxWidth: 240,
+                      aspectRatio: '1 / 1',
+                      bgcolor: theme =>
+                        theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.055)' : '#eef2f7',
+                      borderRadius: '18px',
+                      overflow: 'hidden',
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      boxShadow: artworkPreview
+                        ? theme =>
+                            theme.palette.mode === 'dark'
+                              ? '0 18px 44px rgba(0,0,0,0.32)'
+                              : '0 18px 44px rgba(15,23,42,0.12)'
+                        : 'none',
+                    }}
+                  >
                     {artworkPreview ? (
                       <Box
                         component="img"
@@ -2276,7 +3078,16 @@ export default function UploadPage() {
                         sx={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }}
                       />
                     ) : (
-                      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary' }}>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'text.secondary',
+                        }}
+                      >
                         <Album />
                       </Box>
                     )}
@@ -2284,20 +3095,28 @@ export default function UploadPage() {
                 </Grid>
                 <Grid xs={12} md={8} lg={9}>
                   <Box>
-                    <strong>Release Title:</strong> {releaseTitle || 'N/A'}<br />
-                    <strong>Type:</strong> {releaseType}<br />
+                    <strong>Release Title:</strong> {releaseTitle || 'N/A'}
+                    <br />
+                    <strong>Type:</strong> {releaseType}
+                    <br />
                     <strong>Primary artist:</strong>{' '}
                     {trackInfos[0] ? getContributorNames(trackInfos[0], 'artist') || '—' : '—'}
                     <br />
-                    <strong>Label:</strong> {label || 'N/A'}<br />
-                    <strong>Original Release Date:</strong> {originalReleaseDate || 'N/A'}<br />
-                    <strong>Release Date:</strong> {releaseDate || 'N/A'}<br />
-                    <strong>Tracks:</strong> {tracks.length}<br />
+                    <strong>Label:</strong> {label || 'N/A'}
+                    <br />
+                    <strong>Original Release Date:</strong> {originalReleaseDate || 'N/A'}
+                    <br />
+                    <strong>Release Date:</strong> {releaseDate || 'N/A'}
+                    <br />
+                    <strong>Tracks:</strong> {tracks.length}
+                    <br />
                   </Box>
                 </Grid>
               </Grid>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>Tracklist</Typography>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1.5 }}>
+                Tracklist
+              </Typography>
               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, mb: 2 }}>
                 <Table size="small" aria-label="release review tracklist">
                   <TableHead>
@@ -2318,7 +3137,10 @@ export default function UploadPage() {
                       const remixCredits = getContributorNames(track, 'remixer');
                       const contributors = track.contributors
                         .filter(contributor => contributor.name.trim())
-                        .map(contributor => `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`)
+                        .map(
+                          contributor =>
+                            `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`
+                        )
                         .join(' | ');
 
                       return (
@@ -2329,35 +3151,75 @@ export default function UploadPage() {
                                 src={artworkPreview || undefined}
                                 alt={releaseTitle || 'Artwork'}
                                 variant="rounded"
-                                sx={{ width: 48, height: 48, borderRadius: 1.5, bgcolor: 'background.default' }}
+                                sx={{
+                                  width: 48,
+                                  height: 48,
+                                  borderRadius: 1.5,
+                                  bgcolor: 'background.default',
+                                }}
                               >
                                 <Album fontSize="small" />
                               </Avatar>
                               <Box>
                                 <Typography variant="body2" fontWeight={800}>
-                                  {idx + 1}. {track.title || `Track ${idx + 1}`}{track.version ? ` (${track.version})` : ''}
+                                  {idx + 1}. {track.title || `Track ${idx + 1}`}
+                                  {track.version ? ` (${track.version})` : ''}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
-                                  {track.duration ? `${track.duration} | ` : ''}{track.isrc ? `ISRC ${track.isrc}` : 'ISRC auto'}
+                                  {track.duration ? `${track.duration} | ` : ''}
+                                  {track.isrc ? `ISRC ${track.isrc}` : 'ISRC auto'}
                                 </Typography>
                               </Box>
                             </Box>
                           </TableCell>
                           <TableCell sx={{ minWidth: 220 }}>
-                            <Typography variant="body2" fontWeight={700}>{mainArtist}</Typography>
+                            <Typography variant="body2" fontWeight={700}>
+                              {mainArtist}
+                            </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {[featPerf ? `Feat. ${featPerf}` : '', remixCredits ? `Remix ${remixCredits}` : ''].filter(Boolean).join(' | ') || 'No featured credits'}
+                              {[
+                                featPerf ? `Feat. ${featPerf}` : '',
+                                remixCredits ? `Remix ${remixCredits}` : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' | ') || 'No featured credits'}
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ minWidth: 260 }}>
                             <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
-                              <Chip size="small" label={track.genre ? `${track.genre}${track.subgenre ? ` / ${track.subgenre}` : ''}` : 'Genre missing'} variant="outlined" />
-                              <Chip size="small" label={track.audioLanguage || track.language || 'Audio language missing'} variant="outlined" />
-                              <Chip size="small" label={track.explicit ? 'Explicit' : 'Clean'} variant="outlined" />
-                              <Chip size="small" label={track.instrumental ? 'Instrumental' : 'Vocal'} variant="outlined" />
+                              <Chip
+                                size="small"
+                                label={
+                                  track.genre
+                                    ? `${track.genre}${track.subgenre ? ` / ${track.subgenre}` : ''}`
+                                    : 'Genre missing'
+                                }
+                                variant="outlined"
+                              />
+                              <Chip
+                                size="small"
+                                label={
+                                  track.audioLanguage || track.language || 'Audio language missing'
+                                }
+                                variant="outlined"
+                              />
+                              <Chip
+                                size="small"
+                                label={track.explicit ? 'Explicit' : 'Clean'}
+                                variant="outlined"
+                              />
+                              <Chip
+                                size="small"
+                                label={track.instrumental ? 'Instrumental' : 'Vocal'}
+                                variant="outlined"
+                              />
                             </Stack>
                             {contributors ? (
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ display: 'block', mt: 0.75 }}
+                              >
                                 {contributors}
                               </Typography>
                             ) : null}
@@ -2367,7 +3229,13 @@ export default function UploadPage() {
                               <Stack spacing={0.5} alignItems="flex-start">
                                 <Chip
                                   size="small"
-                                  icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
+                                  icon={
+                                    getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? (
+                                      <CircularProgress size={12} />
+                                    ) : (
+                                      <PlaylistAddCheck fontSize="small" />
+                                    )
+                                  }
                                   label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
                                   color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
                                   variant="outlined"
@@ -2379,16 +3247,23 @@ export default function UploadPage() {
                                 ) : null}
                               </Stack>
                             ) : (
-                              <Typography variant="caption" color="text.secondary">Pending upload scan</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Pending upload scan
+                              </Typography>
                             )}
                           </TableCell>
                           <TableCell align="right">
                             {trackPreviewUrls[idx] ? (
-                              <IconButton size="small" aria-label={`Play ${track.title || `Track ${idx + 1}`}`}>
+                              <IconButton
+                                size="small"
+                                aria-label={`Play ${track.title || `Track ${idx + 1}`}`}
+                              >
                                 <PlayArrow />
                               </IconButton>
                             ) : (
-                              <Typography variant="caption" color="text.secondary">No preview</Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                No preview
+                              </Typography>
                             )}
                           </TableCell>
                         </TableRow>
@@ -2405,143 +3280,207 @@ export default function UploadPage() {
                   const featPerf = getContributorNames(track, 'performer');
                   const remixCredits = getContributorNames(track, 'remixer');
                   return (
-                  <li key={idx}>
-                    <div>
-                      <strong>{track.title || `Track ${idx + 1}`}</strong>
-                      {track.version ? ` (${track.version})` : ''}
-                      {` — ${mainArtist}`}
-                      {featPerf ? ` feat. ${featPerf}` : ''}
-                      {remixCredits ? ` [Remix: ${remixCredits}]` : ''}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
-                      {track.duration ? `Duration: ${track.duration} · ` : ''}
-                      {track.genre ? `Genre: ${track.genre}${track.subgenre ? `/${track.subgenre}` : ''} · ` : ''}
-                      {track.metadataLanguage ? `Metadata Language: ${track.metadataLanguage} · ` : ''}
-                      {track.audioLanguage || track.language ? `Audio Language: ${track.audioLanguage || track.language} · ` : ''}
-                      {track.isrc ? `ISRC: ${track.isrc} · ` : ''}
-                      {track.parentalAdvisory && track.parentalAdvisory !== 'none' ? `Advisory: ${track.parentalAdvisory} · ` : ''}
-                      {track.instrumental ? `Instrumental · ` : ''}
-                      {track.recordingYear ? `Recording Year: ${track.recordingYear} · ` : ''}
-                      {track.copyrightC ? `© ${track.copyrightC} · ` : ''}
-                      {track.copyrightP ? `℗ ${track.copyrightP}` : ''}
-                    </div>
-                    {audioAcrCloudStatuses[idx] && (
-                      <div style={{ marginTop: 6 }}>
-                        <Chip
-                          size="small"
-                          icon={getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? <CircularProgress size={12} /> : <PlaylistAddCheck fontSize="small" />}
-                          label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
-                          color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
-                          variant="outlined"
-                        />
-                        {getAcrCloudSummary(audioAcrCloudStatuses[idx]) ? (
-                          <div style={{ fontSize: 12, color: 'var(--mui-palette-text-secondary)', marginTop: 4 }}>
-                            {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
-                          </div>
-                        ) : null}
+                    <li key={idx}>
+                      <div>
+                        <strong>{track.title || `Track ${idx + 1}`}</strong>
+                        {track.version ? ` (${track.version})` : ''}
+                        {` — ${mainArtist}`}
+                        {featPerf ? ` feat. ${featPerf}` : ''}
+                        {remixCredits ? ` [Remix: ${remixCredits}]` : ''}
                       </div>
-                    )}
-                    {(track.composers || track.publishers || track.producers) && (
                       <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
-                        {track.composers ? `Composers: ${track.composers} · ` : ''}
-                        {track.publishers ? `Publishers: ${track.publishers} · ` : ''}
-                        {track.producers ? `Producers: ${track.producers}` : ''}
+                        {track.duration ? `Duration: ${track.duration} · ` : ''}
+                        {track.genre
+                          ? `Genre: ${track.genre}${track.subgenre ? `/${track.subgenre}` : ''} · `
+                          : ''}
+                        {track.metadataLanguage
+                          ? `Metadata Language: ${track.metadataLanguage} · `
+                          : ''}
+                        {track.audioLanguage || track.language
+                          ? `Audio Language: ${track.audioLanguage || track.language} · `
+                          : ''}
+                        {track.isrc ? `ISRC: ${track.isrc} · ` : ''}
+                        {track.parentalAdvisory && track.parentalAdvisory !== 'none'
+                          ? `Advisory: ${track.parentalAdvisory} · `
+                          : ''}
+                        {track.instrumental ? `Instrumental · ` : ''}
+                        {track.recordingYear ? `Recording Year: ${track.recordingYear} · ` : ''}
+                        {track.copyrightC ? `© ${track.copyrightC} · ` : ''}
+                        {track.copyrightP ? `℗ ${track.copyrightP}` : ''}
                       </div>
-                    )}
-                    {track.contributors.some(contributor => contributor.name.trim()) && (
-                      <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
-                        Contributors: {track.contributors
-                          .filter(contributor => contributor.name.trim())
-                          .map(contributor => `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`)
-                          .join(' · ')}
-                      </div>
-                    )}
-                    {(track.copyrightC || track.copyrightP) && (
-                      <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
-                        {track.upc ? `UPC: ${track.upc}` : ''}
-                      </div>
-                    )}
-                    {trackPreviewUrls[idx] && (
-                      <div style={{ marginTop: 8 }}>
-                        <audio controls src={trackPreviewUrls[idx] || undefined} style={{ width: '100%' }} />
-                      </div>
-                    )}
-                  </li>
+                      {audioAcrCloudStatuses[idx] && (
+                        <div style={{ marginTop: 6 }}>
+                          <Chip
+                            size="small"
+                            icon={
+                              getAcrCloudState(audioAcrCloudStatuses[idx]) === 'pending' ? (
+                                <CircularProgress size={12} />
+                              ) : (
+                                <PlaylistAddCheck fontSize="small" />
+                              )
+                            }
+                            label={getAcrCloudLabel(audioAcrCloudStatuses[idx])}
+                            color={getAcrCloudColor(audioAcrCloudStatuses[idx]) as any}
+                            variant="outlined"
+                          />
+                          {getAcrCloudSummary(audioAcrCloudStatuses[idx]) ? (
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: 'var(--mui-palette-text-secondary)',
+                                marginTop: 4,
+                              }}
+                            >
+                              {getAcrCloudSummary(audioAcrCloudStatuses[idx])}
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                      {(track.composers || track.publishers || track.producers) && (
+                        <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
+                          {track.composers ? `Composers: ${track.composers} · ` : ''}
+                          {track.publishers ? `Publishers: ${track.publishers} · ` : ''}
+                          {track.producers ? `Producers: ${track.producers}` : ''}
+                        </div>
+                      )}
+                      {track.contributors.some(contributor => contributor.name.trim()) && (
+                        <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
+                          Contributors:{' '}
+                          {track.contributors
+                            .filter(contributor => contributor.name.trim())
+                            .map(
+                              contributor =>
+                                `${contributorRoles.find(role => role.value === contributor.role)?.label || contributor.role}: ${contributor.name.trim()}`
+                            )
+                            .join(' · ')}
+                        </div>
+                      )}
+                      {(track.copyrightC || track.copyrightP) && (
+                        <div style={{ fontSize: 13, color: 'var(--mui-palette-text-secondary)' }}>
+                          {track.upc ? `UPC: ${track.upc}` : ''}
+                        </div>
+                      )}
+                      {trackPreviewUrls[idx] && (
+                        <div style={{ marginTop: 8 }}>
+                          <audio
+                            controls
+                            src={trackPreviewUrls[idx] || undefined}
+                            style={{ width: '100%' }}
+                          />
+                        </div>
+                      )}
+                    </li>
                   );
                 })}
               </ol>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold">Distribution Providers</Typography>
+              <Typography variant="subtitle2" fontWeight="bold">
+                Distribution Providers
+              </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, mt: 1 }}>
-                {selectedDSPs.map((key) => {
+                {selectedDSPs.map(key => {
                   const dsp =
                     visibleDSPs.find((d: DspItem) => d.key === key) ||
                     DSP_LIST.find((d: DspItem) => d.key === key);
                   if (!dsp) return null;
                   return (
-                    <Chip key={key} label={dsp.name} avatar={<Avatar src={dsp.logo} alt={dsp.name} />} variant="outlined" />
+                    <Chip
+                      key={key}
+                      label={dsp.name}
+                      avatar={<Avatar src={dsp.logo} alt={dsp.name} />}
+                      variant="outlined"
+                    />
                   );
                 })}
                 {selectedDSPs.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">No providers selected</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    No providers selected
+                  </Typography>
                 )}
               </Box>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2" fontWeight="bold">Territories & Rights</Typography>
+              <Typography variant="subtitle2" fontWeight="bold">
+                Territories & Rights
+              </Typography>
               <Box sx={{ mt: 1 }}>
                 <Typography variant="body2" sx={{ mb: 1 }}>
                   Mode: <strong>{territoryMode === 'allowed' ? 'Allowed' : 'Disallowed'}</strong>
                 </Typography>
                 {territoryCountries.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">No territories selected</Typography>
-                ) : (() => {
-                  const REVIEW_TR_MAX = 14;
-                  const sortedTerritory = [...territoryCountries]
-                    .map((code) => ({
-                      code,
-                      label: countries.find((ct) => ct.code === code)?.label || code,
-                    }))
-                    .sort((a, b) => a.label.localeCompare(b.label));
-                  const showExpandToggle = sortedTerritory.length > REVIEW_TR_MAX;
-                  const visible = reviewTerritoriesExpanded
-                    ? sortedTerritory
-                    : sortedTerritory.slice(0, REVIEW_TR_MAX);
-                  return (
-                    <Box>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                        {visible.map(({ code, label }) => (
-                          <Chip key={code} label={label} size="small" variant="outlined" sx={{ borderRadius: 2 }} />
-                        ))}
+                  <Typography variant="body2" color="text.secondary">
+                    No territories selected
+                  </Typography>
+                ) : (
+                  (() => {
+                    const REVIEW_TR_MAX = 14;
+                    const sortedTerritory = [...territoryCountries]
+                      .map(code => ({
+                        code,
+                        label: countries.find(ct => ct.code === code)?.label || code,
+                      }))
+                      .sort((a, b) => a.label.localeCompare(b.label));
+                    const showExpandToggle = sortedTerritory.length > REVIEW_TR_MAX;
+                    const visible = reviewTerritoriesExpanded
+                      ? sortedTerritory
+                      : sortedTerritory.slice(0, REVIEW_TR_MAX);
+                    return (
+                      <Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                          {visible.map(({ code, label }) => (
+                            <Chip
+                              key={code}
+                              label={label}
+                              size="small"
+                              variant="outlined"
+                              sx={{ borderRadius: 2 }}
+                            />
+                          ))}
+                        </Box>
+                        {showExpandToggle ? (
+                          <Button
+                            size="small"
+                            onClick={() => setReviewTerritoriesExpanded(prev => !prev)}
+                            endIcon={
+                              <ExpandMore
+                                sx={{
+                                  transition: 'transform 0.2s',
+                                  transform: reviewTerritoriesExpanded
+                                    ? 'rotate(180deg)'
+                                    : 'rotate(0deg)',
+                                }}
+                              />
+                            }
+                            sx={{ mt: 1 }}
+                          >
+                            {reviewTerritoriesExpanded
+                              ? 'Show fewer territories'
+                              : `Show all ${sortedTerritory.length} territories`}
+                          </Button>
+                        ) : null}
                       </Box>
-                      {showExpandToggle ? (
-                        <Button
-                          size="small"
-                          onClick={() => setReviewTerritoriesExpanded((prev) => !prev)}
-                          endIcon={<ExpandMore sx={{
-                            transition: 'transform 0.2s',
-                            transform: reviewTerritoriesExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                          }} />}
-                          sx={{ mt: 1 }}
-                        >
-                          {reviewTerritoriesExpanded
-                            ? 'Show fewer territories'
-                            : `Show all ${sortedTerritory.length} territories`}
-                        </Button>
-                      ) : null}
-                    </Box>
-                  );
-                })()}
+                    );
+                  })()
+                )}
                 <Box sx={{ mt: 1.5 }}>
                   <Typography variant="body2">
-                    Rights: <strong>{rightsType}</strong>{rightsDescription ? ` — ${rightsDescription}` : ''}
+                    Rights: <strong>{rightsType}</strong>
+                    {rightsDescription ? ` — ${rightsDescription}` : ''}
                   </Typography>
                 </Box>
               </Box>
             </Paper>
             {submitState === 'idle' ? (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                <Button onClick={handleBack} sx={{ borderRadius: 2 }}>Back</Button>
-                <Button variant="contained" color="primary" sx={{ borderRadius: 2, px: 3 }} onClick={handleSubmitRelease} disabled={!isTrackInfoListValid}>
+                <Button onClick={handleBack} sx={{ borderRadius: 2 }}>
+                  Back
+                </Button>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  sx={{ borderRadius: 2, px: 3 }}
+                  onClick={handleSubmitRelease}
+                  disabled={!isTrackInfoListValid}
+                >
                   Submit Release
                 </Button>
               </Box>
@@ -2557,7 +3496,7 @@ export default function UploadPage() {
         );
     }
   };
-  
+
   // Show loading state until client-side hydration is complete
   if (!mounted) {
     return (
@@ -2573,8 +3512,6 @@ export default function UploadPage() {
       </Box>
     );
   }
-  
-
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -2597,47 +3534,51 @@ export default function UploadPage() {
           backdropFilter: 'blur(18px)',
         }}
       >
-      <Stepper
-        activeStep={activeStep}
-        alternativeLabel
-        sx={{
-          '& .MuiStepConnector-line': {
-            borderTopWidth: 2,
-            borderColor: theme => theme.palette.divider,
-          },
-          '& .Mui-active .MuiStepConnector-line, & .Mui-completed .MuiStepConnector-line': {
-            borderColor: 'primary.main',
-          },
-          '& .MuiStepLabel-labelContainer': {
-            typography: 'caption',
-            mt: { xs: 1, md: 0 },
-          },
-        }}
-      >
-        {steps.map((label, index) => (
-          <Step key={label}>
-            <StepLabel
-              sx={{ cursor: 'pointer', '& .Mui-active': { fontWeight: 700 }, '& .Mui-completed': { fontWeight: 600 } }}
-              onClick={() => setActiveStep(index)} 
-              componentsProps={{
-                label: {
-                  role: 'button',
-                  tabIndex: 0,
-                  onKeyDown: (e: React.KeyboardEvent) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setActiveStep(index);
-                    }
+        <Stepper
+          activeStep={activeStep}
+          alternativeLabel
+          sx={{
+            '& .MuiStepConnector-line': {
+              borderTopWidth: 2,
+              borderColor: theme => theme.palette.divider,
+            },
+            '& .Mui-active .MuiStepConnector-line, & .Mui-completed .MuiStepConnector-line': {
+              borderColor: 'primary.main',
+            },
+            '& .MuiStepLabel-labelContainer': {
+              typography: 'caption',
+              mt: { xs: 1, md: 0 },
+            },
+          }}
+        >
+          {steps.map((label, index) => (
+            <Step key={label}>
+              <StepLabel
+                sx={{
+                  cursor: 'pointer',
+                  '& .Mui-active': { fontWeight: 700 },
+                  '& .Mui-completed': { fontWeight: 600 },
+                }}
+                onClick={() => setActiveStep(index)}
+                componentsProps={{
+                  label: {
+                    role: 'button',
+                    tabIndex: 0,
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setActiveStep(index);
+                      }
+                    },
+                    'aria-label': `Go to ${label}`,
                   },
-                  'aria-label': `Go to ${label}`,
-                },
-              }}
-            >
-              {label}
-            </StepLabel>
-          </Step>
-        ))}
-      </Stepper>
+                }}
+              >
+                {label}
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
       </Paper>
 
       <Paper
@@ -2645,9 +3586,10 @@ export default function UploadPage() {
         sx={{
           p: { xs: 2.25, sm: 3.5, md: 4.5 },
           ...premiumSurfaceSx(theme),
-          background: theme.palette.mode === 'dark'
-            ? 'linear-gradient(135deg, rgba(18,26,43,0.98), rgba(11,16,32,0.96))'
-            : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94))',
+          background:
+            theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, rgba(18,26,43,0.98), rgba(11,16,32,0.96))'
+              : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94))',
         }}
       >
         {renderStepContent()}

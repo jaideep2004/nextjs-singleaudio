@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 import { getCurrentBackendUser } from '@/lib/currentUser';
+import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
 
 function getClientKey(req: NextRequest) {
   return (
@@ -40,6 +41,12 @@ function escapeRegex(value: string) {
 export async function POST(req: NextRequest) { 
   try {
     const user = await getCurrentBackendUser();
+    if ((user.role === 'artist' || user.role === 'label') && user.verification?.status !== 'approved') {
+      return NextResponse.json(
+        { success: false, error: 'KYC approval is required before submitting releases' },
+        { status: 403 }
+      );
+    }
     const { db } = await connectToDatabase();
     await enforceMongoRateLimit(db, {
       key: `POST:/api/releases:${getClientKey(req)}`,
@@ -61,6 +68,24 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date(),
       status: 'pending',
     });
+
+    void sendUserAndAdminEmail(
+      db,
+      { name: user.name, email: user.email },
+      {
+        subject: 'New Release Submitted',
+        title: 'Release Submitted',
+        intro: `${user.name} submitted a new release for review.`,
+        details: {
+          Release: body.releaseTitle || body.title || 'Untitled release',
+          User: user.name,
+          Email: user.email,
+          Status: 'pending',
+        },
+        actionLabel: 'Review Releases',
+        actionUrl: appUrl('/admin/releases?status=pending'),
+      }
+    ).catch((error) => console.warn('Release submission email skipped:', error));
 
     return NextResponse.json({ success: true, id: result.insertedId });
   } catch (error: unknown) {

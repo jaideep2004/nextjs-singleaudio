@@ -222,6 +222,8 @@ UserSchema.pre<IUser>('save', async function (next) {
   }
 });
 
+UserSchema.index({ 'verification.phoneNumber': 1 }, { sparse: true });
+
 // Compare password method
 UserSchema.methods.comparePassword = async function (
   candidatePassword: string

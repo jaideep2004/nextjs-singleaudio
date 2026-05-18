@@ -5,6 +5,7 @@ import { getCurrentBackendUser } from '@/lib/currentUser';
 import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
 import { generateUpcA } from '@/lib/upc';
 import { createReleaseDeliveryShellJobs } from '@/lib/dspDeliveryShell';
+import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
 
 export async function PATCH(
   req: NextRequest,
@@ -80,6 +81,28 @@ export async function PATCH(
     let deliveryShell = null;
     if (status === 'approved') {
       deliveryShell = await createReleaseDeliveryShellJobs(db, res.value as any, String(user._id));
+    }
+
+    if (status === 'approved' || status === 'rejected') {
+      void sendUserAndAdminEmail(
+        db,
+        { name: existing.ownerName || existing.primaryArtist || existing.artist, email: existing.ownerEmail },
+        {
+          subject: `Release ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+          title: `Release ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+          intro: status === 'approved'
+            ? 'Your release has been approved for distribution.'
+            : 'Your release needs correction before distribution.',
+          details: {
+            Release: existing.releaseTitle || existing.title || 'Untitled release',
+            Status: status,
+            Reason: reason,
+            ReviewedBy: user.email,
+          },
+          actionLabel: status === 'approved' ? 'Open Releases' : 'Review Release',
+          actionUrl: appUrl(status === 'approved' ? '/dashboard/releases' : `/dashboard/releases/${id}`),
+        }
+      ).catch((error) => console.warn('Release status email skipped:', error));
     }
 
     return NextResponse.json({ success: true, release: res.value, deliveryShell });

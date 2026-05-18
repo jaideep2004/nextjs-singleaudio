@@ -39,5 +39,6 @@ export enum NotificationType {
   RELEASE_REJECTED = 'release_rejected',
   PAYOUT_APPROVED = 'payout_approved',
   PAYOUT_REJECTED = 'payout_rejected',
+  EMAIL = 'email',
   SYSTEM = 'system'
 } 

@@ -247,8 +247,8 @@ export default function AdminDashboard() {
   const mutedText = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.52)';
   const featureHeadingSx = {
     fontWeight: 900,
-    color: headingText,
-    letterSpacing: 0,
+    color: headingText, 
+    letterSpacing: 0, 
     fontSize: '1.2rem',
   };
   const sectionHeadingSx = {

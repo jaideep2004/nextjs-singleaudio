@@ -23,6 +23,7 @@ import {
 import { AccountBalance, AccountBalanceWallet, ArrowForward, Payment } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, PremiumPanel } from '@/components/premium/PremiumSurface';
+import { useAuth } from '@/context/AppContext';
 import { payoutAPI, royaltyAPI } from '@/services/api';
 
 type Method = 'bank_transfer' | 'paypal';
@@ -40,6 +41,7 @@ export default function PayoutsPage() {
 function PayoutsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const activeView = searchParams.get('view') === 'statement' || searchParams.get('view') === 'report'
     ? searchParams.get('view')!
     : 'method';
@@ -57,8 +59,14 @@ function PayoutsContent() {
   const [financeLoading, setFinanceLoading] = useState(false);
   const [royalties, setRoyalties] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
+  const savedPayoutMethod = user?.payoutMethod?.method ? user.payoutMethod : null;
 
   useEffect(() => {
+    if (savedPayoutMethod?.method) {
+      setMethod(savedPayoutMethod.method);
+      setForm((prev) => ({ ...prev, ...(savedPayoutMethod.details || {}) }));
+      return;
+    }
     const raw = window.localStorage.getItem('singleaudio-payment-method');
     if (!raw) return;
     try {
@@ -68,7 +76,7 @@ function PayoutsContent() {
     } catch {
       // Ignore malformed local state.
     }
-  }, []);
+  }, [savedPayoutMethod]);
 
   useEffect(() => {
     if (activeView === 'method') return;
@@ -106,6 +114,10 @@ function PayoutsContent() {
   const saveMethod = async () => {
     try {
       setError('');
+      if (savedPayoutMethod?.method) {
+        setError('Payout method is already saved. Contact admin to change it.');
+        return;
+      }
       const payload = { method, details: form };
       window.localStorage.setItem(
         'singleaudio-payment-method',
@@ -167,9 +179,15 @@ function PayoutsContent() {
                 </Typography>
               </Box>
 
+              {savedPayoutMethod?.method && (
+                <Alert severity="info" sx={{ borderRadius: 2 }}>
+                  Payout method is saved and locked. Contact admin to change bank or PayPal details.
+                </Alert>
+              )}
+
               <RadioGroup row value={method} onChange={(event) => setMethod(event.target.value as Method)}>
-                <FormControlLabel value="bank_transfer" control={<Radio />} label={<Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><AccountBalance /> Bank Transfer</Box>} />
-                <FormControlLabel value="paypal" control={<Radio />} label={<Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><Payment /> PayPal</Box>} />
+                <FormControlLabel disabled={Boolean(savedPayoutMethod?.method)} value="bank_transfer" control={<Radio />} label={<Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><AccountBalance /> Bank Transfer</Box>} />
+                <FormControlLabel disabled={Boolean(savedPayoutMethod?.method)} value="paypal" control={<Radio />} label={<Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}><Payment /> PayPal</Box>} />
               </RadioGroup>
 
               {method === 'paypal' ? (
@@ -179,6 +197,7 @@ function PayoutsContent() {
                   value={form.paypalEmail}
                   onChange={(event) => setForm((prev) => ({ ...prev, paypalEmail: event.target.value }))}
                   fullWidth
+                  disabled={Boolean(savedPayoutMethod?.method)}
                 />
               ) : (
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
@@ -195,12 +214,13 @@ function PayoutsContent() {
                       value={form[key as keyof typeof form]}
                       onChange={(event) => setForm((prev) => ({ ...prev, [key]: event.target.value }))}
                       fullWidth
+                      disabled={Boolean(savedPayoutMethod?.method)}
                     />
                   ))}
                 </Box>
               )}
 
-              <Button variant="contained" onClick={saveMethod} sx={{ alignSelf: 'flex-start' }}>
+              <Button variant="contained" onClick={saveMethod} disabled={Boolean(savedPayoutMethod?.method)} sx={{ alignSelf: 'flex-start' }}>
                 Save Payment Method
               </Button>
             </Stack>

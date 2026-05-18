@@ -70,7 +70,6 @@ const menuSections = [
           { text: 'Pending', path: '/admin/releases?status=pending' },
           { text: 'Approved', path: '/admin/releases?status=approved' },
           { text: 'Rejected', path: '/admin/releases?status=rejected' },
-          { text: 'Tracks', path: '/admin/tracks' },
         ],
       },
       {

@@ -61,7 +61,7 @@ async function smtpCommand(socket: tls.TLSSocket, command: string) {
   }
 }
 
-export async function sendEmailMessage(email: string, subject: string, text: string): Promise<void> {
+export async function sendEmailMessage(email: string, subject: string, text: string, html?: string): Promise<void> {
   const user = process.env.SMTP_GMAIL_USER;
   const pass = process.env.SMTP_GMAIL_APP_PASSWORD;
   if (!user || !pass) {
@@ -89,9 +89,9 @@ export async function sendEmailMessage(email: string, subject: string, text: str
     `To: ${email}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=utf-8',
+    html ? 'Content-Type: text/html; charset=utf-8' : 'Content-Type: text/plain; charset=utf-8',
     '',
-    text,
+    html || text,
     '.',
   ].join('\r\n');
   socket.write(`${message}\r\n`);

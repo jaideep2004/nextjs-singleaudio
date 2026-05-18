@@ -17,6 +17,10 @@ export const requestPayout = async (req: AuthRequest, res: Response): Promise<vo
     const { amount, currency, paymentMethod, paymentDetails } = req.body;
     const user = req.user;
 
+    if ((user.role === UserRole.ARTIST || user.role === UserRole.LABEL) && user.verification?.status !== 'approved') {
+      throw new ApiError('KYC approval is required before requesting payouts', 403);
+    }
+
     if (Number(amount) < MINIMUM_PAYOUT_USD) {
       throw new ApiError(`Minimum payout amount is ${MINIMUM_PAYOUT_USD} USD`, 400);
     }

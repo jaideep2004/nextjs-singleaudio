@@ -33,7 +33,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { SelectChangeEvent } from '@mui/material/Select';
 import {
   AccountBalance,
@@ -189,9 +189,17 @@ export default function RoyaltiesPage() {
 function RoyaltiesContent() {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'payouts' ? 1 : 0);
+  const getTabFromQuery = useCallback(() => {
+    const view = searchParams.get('view');
+    if (view === 'report') return 1;
+    if (searchParams.get('tab') === 'payouts') return 2;
+    return 0;
+  }, [searchParams]);
+
+  const [activeTab, setActiveTab] = useState(getTabFromQuery);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [royaltyData, setRoyaltyData] = useState<RoyaltyItem[]>([]);
@@ -310,8 +318,14 @@ function RoyaltiesContent() {
     fetchTracks();
   }, [fetchPayouts, fetchTracks]);
 
+  useEffect(() => {
+    setActiveTab(getTabFromQuery());
+  }, [getTabFromQuery]);
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+    const next = newValue === 1 ? '?view=report' : newValue === 2 ? '?tab=payouts' : '?view=statement';
+    router.push(`/dashboard/royalties${next}`);
   };
 
   const handleMonthChange = (event: SelectChangeEvent<number>) => {

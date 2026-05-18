@@ -17,7 +17,7 @@ export interface IPendingSignup extends Document {
 const PendingSignupSchema = new Schema(
   {
     email: { type: String, required: true, lowercase: true, trim: true, index: true },
-    phoneNumber: { type: String, required: true, trim: true },
+    phoneNumber: { type: String, required: true, trim: true, index: true },
     payload: { type: Schema.Types.Mixed, required: true },
     emailOtpHash: { type: String, required: true },
     smsOtpHash: { type: String, required: true },

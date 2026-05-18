@@ -22,7 +22,7 @@ router.post('/analyze', upload.single('file'), analyzeAudioHandler);
 router.post(
   '/acr/identify',
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   upload.single('file'),
   identifyWithAcrCloudHandler
 );
@@ -30,7 +30,7 @@ router.post(
 router.post(
   '/acr/scan',
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   upload.single('file'),
   scanWithAcrCloudHandler
 );
@@ -38,7 +38,7 @@ router.post(
 router.get(
   '/acr/scan/:fileId',
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   getAcrCloudScanResultHandler
 );
 

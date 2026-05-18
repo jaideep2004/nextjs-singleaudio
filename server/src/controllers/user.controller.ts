@@ -5,6 +5,7 @@ import AuditLog from '../models/auditLog.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { AdminPermission, SUBADMIN_PERMISSION_PRESETS, UserRole } from '../config/constants';
+import { buildDashboardUrl, sendUserAndAdminEmail } from '../services/emailNotification.service';
 
 const resolveAdminPermissions = (role: string, preset?: string, overrides?: AdminPermission[]) => {
   if (role === UserRole.ADMIN) {
@@ -46,6 +47,23 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       socialLinks,
       createdBy: req.user._id // Track who created this user
     });
+
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'Single Audio Account Created by Admin',
+        title: 'Account Created',
+        intro: `${user.name} was created by an admin.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Role: user.role,
+          CreatedBy: req.user.email || String(req.user._id),
+        },
+        actionLabel: 'Open Account',
+        actionUrl: buildDashboardUrl(user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN ? '/admin/dashboard' : '/dashboard'),
+      }
+    ).catch((error) => console.warn('Admin user creation email skipped:', error));
 
     successResponse(
       res,
@@ -196,6 +214,23 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
 
     await user.save();
 
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: 'Single Audio User Profile Updated',
+        title: 'User Profile Updated',
+        intro: `${user.name} account details were updated by an admin.`,
+        details: {
+          User: user.name,
+          Email: user.email,
+          Role: user.role,
+          UpdatedBy: req.user.email || String(req.user._id),
+        },
+        actionLabel: 'Open User',
+        actionUrl: buildDashboardUrl(`/admin/users/${user._id}`),
+      }
+    ).catch((error) => console.warn('Admin user update email skipped:', error));
+
     successResponse(res, user, 'User updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update user', error);
@@ -257,6 +292,28 @@ export const reviewUserVerification = async (req: AuthRequest, res: Response): P
     };
 
     await user.save();
+
+    void sendUserAndAdminEmail(
+      { name: user.name, email: user.email },
+      {
+        subject: `KYC ${status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Updated'}`,
+        title: `KYC ${status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Updated'}`,
+        intro: status === 'rejected'
+          ? 'KYC needs correction. Please review the reason and resubmit.'
+          : status === 'approved'
+            ? 'KYC is approved. Dashboard tools are unlocked.'
+            : 'KYC status was updated.',
+        details: {
+          User: user.name,
+          Email: user.email,
+          Status: status,
+          Reason: rejectionReason,
+          ReviewedBy: req.user.email || String(req.user._id),
+        },
+        actionLabel: status === 'rejected' ? 'Resubmit KYC' : 'Open Dashboard',
+        actionUrl: buildDashboardUrl(status === 'rejected' ? '/dashboard' : '/dashboard'),
+      }
+    ).catch((error) => console.warn('KYC review email skipped:', error));
 
     successResponse(res, user, 'User verification updated successfully');
   } catch (error) {

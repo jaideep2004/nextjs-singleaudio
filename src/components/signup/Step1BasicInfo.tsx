@@ -48,7 +48,11 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
         rules={{
           required: 'Full name is required',
           maxLength: { value: 50, message: 'Name cannot exceed 50 characters' },
-          validate: (v) => v.trim().length > 0 || 'Full name is required',
+          validate: (v) => {
+            if (!v.trim()) return 'Full name is required';
+            if (/\d/.test(v)) return 'Full name cannot contain numbers';
+            return true;
+          },
         }}
         render={({ field }) => (
           <TextField

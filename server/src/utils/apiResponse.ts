@@ -43,9 +43,19 @@ export const errorResponse = (
   error?: any,
   statusCode = 500
 ): void => {
-  res.status(statusCode).json({
+  const isApiError = typeof error?.statusCode === 'number' && typeof error?.message === 'string';
+  const isDuplicateKey = error?.code === 11000;
+  const duplicateField = isDuplicateKey ? Object.keys(error?.keyPattern || error?.keyValue || {})[0] : '';
+  const effectiveMessage = isApiError
+    ? error.message
+    : isDuplicateKey && duplicateField
+      ? `${duplicateField.charAt(0).toUpperCase()}${duplicateField.slice(1)} is already taken`
+      : message;
+  const effectiveStatus = isApiError ? error.statusCode : isDuplicateKey ? 400 : statusCode;
+
+  res.status(effectiveStatus).json({
     success: false,
-    message,
+    message: effectiveMessage,
     error: process.env.NODE_ENV === 'development' ? error : undefined,
   });
 };

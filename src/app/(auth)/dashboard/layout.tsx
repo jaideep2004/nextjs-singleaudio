@@ -1,21 +1,26 @@
 'use client';
 
 import { Suspense } from 'react';
-import { Box } from '@mui/material';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import TopNavigation from '@/components/TopNavigation';
 import UserSidebar from '@/components/UserSidebar';
-import KycGate, { userNeedsKyc } from '@/components/kyc/KycGate';
+import KycGate, { userKycUnderReview, userNeedsKyc } from '@/components/kyc/KycGate';
 import { useAuth } from '@/context/AppContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
+  const pathname = usePathname();
   const { user } = useAuth();
-  const locked = userNeedsKyc(user);
+  const needsKycForm = userNeedsKyc(user);
+  const underReview = userKycUnderReview(user);
+  const reviewAllowed = pathname === '/dashboard' || pathname.startsWith('/dashboard/profile');
   
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {!locked && (
+      {!needsKycForm && (
         <Suspense fallback={null}>
           <UserSidebar />
         </Suspense>
@@ -47,7 +52,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             mx: 'auto',
           }}
         >
-          <KycGate>{children}</KycGate>
+          {!needsKycForm && underReview && (
+            <Alert severity="info" sx={{ mt: 2, mb: 2, borderRadius: 2 }}>
+              KYC verification under progress. Dashboard actions unlock after admin approval.
+            </Alert>
+          )}
+          {!needsKycForm && underReview && !reviewAllowed ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: { xs: 3, md: 4 },
+                borderRadius: 3,
+                maxWidth: 720,
+                mx: 'auto',
+                textAlign: 'center',
+                bgcolor: 'background.paper',
+              }}
+            >
+              <Stack spacing={2} alignItems="center">
+                <Typography variant="h5" fontWeight={900}>KYC Verification Under Progress</Typography>
+                <Typography color="text.secondary">
+                  This section is locked until admin approves your KYC. You can still view dashboard status and profile details.
+                </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <Button component={Link} href="/dashboard" variant="contained">Open Dashboard</Button>
+                  <Button component={Link} href="/dashboard/profile" variant="outlined">Open Profile</Button>
+                </Stack>
+              </Stack>
+            </Paper>
+          ) : (
+            <KycGate>{children}</KycGate>
+          )}
         </Box>
       </Box>
     </Box>

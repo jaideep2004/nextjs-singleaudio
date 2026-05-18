@@ -26,6 +26,12 @@ interface User {
     rejectionReason?: string;
     notes?: string;
   };
+  onboarding?: Record<string, any>;
+  payoutMethod?: {
+    method?: 'bank_transfer' | 'paypal';
+    details?: Record<string, any>;
+    updatedAt?: string;
+  };
 }
 
 interface SignupPayload {
@@ -81,6 +87,8 @@ interface AuthResponse {
     adminPreset?: string;
     permissions?: string[];
     verification?: User['verification'];
+    onboarding?: User['onboarding'];
+    payoutMethod?: User['payoutMethod'];
   };
 }
 
@@ -95,6 +103,8 @@ interface UserPayload {
   adminPreset?: string;
   permissions?: string[];
   verification?: User['verification'];
+  onboarding?: User['onboarding'];
+  payoutMethod?: User['payoutMethod'];
 }
 
 interface DecodedToken {
@@ -108,6 +118,8 @@ interface DecodedToken {
   adminPreset?: string;
   permissions?: string[];
   verification?: User['verification'];
+  onboarding?: User['onboarding'];
+  payoutMethod?: User['payoutMethod'];
 }
 
 interface AuthContextType {
@@ -171,6 +183,8 @@ const toUser = (payload: UserPayload): User => ({
   adminPreset: payload.adminPreset,
   permissions: payload.permissions || [],
   verification: payload.verification,
+  onboarding: payload.onboarding,
+  payoutMethod: payload.payoutMethod,
 });
 
 export function AppContextProvider({ children }: { children: ReactNode }) {

@@ -7,6 +7,9 @@ export interface CurrentBackendUser {
   role: 'artist' | 'label' | 'admin' | 'subadmin';
   artistName?: string;
   permissions?: string[];
+  verification?: {
+    status?: 'pending' | 'submitted' | 'approved' | 'rejected';
+  };
 }
 
 export async function getCurrentBackendUser(): Promise<CurrentBackendUser> {

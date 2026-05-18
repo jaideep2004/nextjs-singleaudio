@@ -64,7 +64,12 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function userNeedsKyc(user: ReturnType<typeof useAuth>['user']) {
   if (!user || !isArtistOrLabel(user.role)) return false;
-  return user.verification?.status !== 'approved';
+  const status = user.verification?.status || 'pending';
+  return status === 'pending' || status === 'rejected';
+}
+
+export function userKycUnderReview(user: ReturnType<typeof useAuth>['user']) {
+  return Boolean(user && isArtistOrLabel(user.role) && user.verification?.status === 'submitted');
 }
 
 const readLookup = async <T,>(url: string, fallback: T): Promise<T> => {

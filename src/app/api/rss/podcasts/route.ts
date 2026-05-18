@@ -10,10 +10,18 @@ import {
   upsertUserPodcastOwnership,
 } from '@/lib/rssOwnership';
 import { CreateRssPodcastPayload } from '@/types/rss';
+import { connectToDatabase } from '@/utils/mongodb';
+import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
 
 export async function GET() {
   try {
     const user = await getCurrentBackendUser();
+    if ((user.role === 'artist' || user.role === 'label') && user.verification?.status !== 'approved') {
+      return NextResponse.json(
+        { success: false, message: 'KYC approval is required before creating podcasts' },
+        { status: 403 }
+      );
+    }
     const accessMode = getRssPodcastAccessMode();
     const workspaceSupervisor = isRssWorkspaceSupervisor(user.email);
 
@@ -127,6 +135,26 @@ export async function POST(request: NextRequest) {
     if (accessMode === 'owned' && !workspaceSupervisor) {
       await upsertUserPodcastOwnership(user._id, podcast.id);
     }
+
+    void connectToDatabase()
+      .then(({ db }) => sendUserAndAdminEmail(
+        db,
+        { name: user.name, email: user.email },
+        {
+          subject: 'Podcast Created',
+          title: 'Podcast Created',
+          intro: `${user.name} created a podcast workspace.`,
+          details: {
+            Podcast: payload.title,
+            User: user.name,
+            Email: user.email,
+            CreatedBy: user.role,
+          },
+          actionLabel: 'Open Podcasts',
+          actionUrl: appUrl(user.role === 'admin' || user.role === 'subadmin' ? '/admin/podcasts' : '/dashboard/podcasts'),
+        }
+      ))
+      .catch((error) => console.warn('Podcast creation email skipped:', error));
 
     return NextResponse.json(
       { success: true, data: podcast, meta: { accessMode, workspaceSupervisor } },

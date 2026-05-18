@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { uploadAudio, uploadImage, getFileUrl } from '../utils/fileUpload';
 import { protect, authorize } from '../middleware/auth.middleware';
 import { UserRole } from '../config/constants';
-import { isAcrCloudFileScanningConfigured, uploadFileForScan } from '../services/acrCloud.service';
+import { isAcrCloudFileScanningConfigured, uploadFirstThirtySecondsForScan } from '../services/acrCloud.service';
 
 const router = Router();
 
@@ -10,7 +10,7 @@ const router = Router();
 router.post(
   '/artwork',
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   uploadImage.single('artwork'),
   (req, res) => {
   // @ts-ignore multer adds file
@@ -28,7 +28,7 @@ router.post(
 router.post(
   '/audio',
   protect,
-  authorize([UserRole.ARTIST, UserRole.ADMIN]),
+  authorize([UserRole.ARTIST, UserRole.LABEL, UserRole.ADMIN]),
   uploadAudio.single('audio'),
   async (req, res) => {
   // @ts-ignore multer adds file
@@ -47,8 +47,9 @@ router.post(
         originalName: file.originalname,
         size: file.size,
         mimetype: file.mimetype,
+        sampleSeconds: 30,
       });
-      acrCloud = await uploadFileForScan(file.path, file.originalname, 'audio');
+      acrCloud = await uploadFirstThirtySecondsForScan(file.path, file.originalname, 'audio');
       console.log('[ACRCloud] Upload scan submitted', {
         filename,
         fileId: acrCloud.fileId,
@@ -74,7 +75,7 @@ router.post(
     });
     acrCloud = {
       state: 'not_configured',
-      lastError: 'ACRCloud file scanning is not configured'
+      lastError: 'ACRCloud 30-second file scanning is not configured'
     };
   }
 

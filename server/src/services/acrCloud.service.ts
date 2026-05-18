@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
+import { spawn } from 'child_process';
 import Track from '../models/track.model';
 import {
   AcrCloudAiDetection,
@@ -14,6 +16,7 @@ import {
 const IDENTIFY_ENDPOINT = '/v1/identify';
 const SIGNATURE_VERSION = '1';
 const MAX_IDENTIFY_BYTES = 5 * 1024 * 1024;
+const SCAN_SAMPLE_SECONDS = 30;
 
 interface AcrCloudConfig {
   consoleToken?: string;
@@ -70,6 +73,56 @@ function toNumber(value: unknown, fallback = 0): number {
 
 function toOptionalNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function getFfmpegBinary(): string {
+  const configuredPath = process.env.FFMPEG_PATH;
+  if (configuredPath) return configuredPath;
+  const ffmpegStaticPath = require('ffmpeg-static') as string | null;
+  if (!ffmpegStaticPath) {
+    throw new Error('FFmpeg binary is not available for ACRCloud sample creation');
+  }
+  return ffmpegStaticPath;
+}
+
+async function createThirtySecondSample(filePath: string): Promise<string> {
+  const outputPath = path.join(
+    os.tmpdir(),
+    `acrcloud-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.mp3`
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    const ffmpeg = spawn(getFfmpegBinary(), [
+      '-y',
+      '-i',
+      filePath,
+      '-t',
+      String(SCAN_SAMPLE_SECONDS),
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      '44100',
+      '-b:a',
+      '96k',
+      outputPath,
+    ]);
+
+    let stderr = '';
+    ffmpeg.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    ffmpeg.on('error', reject);
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`FFmpeg sample creation failed: ${stderr.trim() || `exit ${code}`}`));
+    });
+  });
+
+  return outputPath;
 }
 
 function normalizeAiDetection(results: any): AcrCloudAiDetection[] {
@@ -225,6 +278,50 @@ export async function identifyAudioFile(filePath: string, dataType: 'audio' | 'f
   return result;
 }
 
+export async function identifyFirstThirtySeconds(filePath: string): Promise<AcrCloudScanSummary> {
+  let samplePath: string | null = null;
+  try {
+    samplePath = await createThirtySecondSample(filePath);
+    const result = await identifyAudioFile(samplePath, 'audio');
+
+    return {
+      state: result.fingerprintMatches.length > 0 ? 'ready' : 'no_results',
+      aiDetection: [],
+      fingerprintMatches: result.fingerprintMatches,
+      rawResult: {
+        scanMode: 'first_30_seconds_identification',
+        sampleSeconds: SCAN_SAMPLE_SECONDS,
+        ...((result.raw && typeof result.raw === 'object') ? result.raw as Record<string, unknown> : { raw: result.raw }),
+      },
+    };
+  } finally {
+    if (samplePath) {
+      await fs.unlink(samplePath).catch(() => undefined);
+    }
+  }
+}
+
+export async function uploadFirstThirtySecondsForScan(filePath: string, name?: string, dataType: AcrCloudDataType = 'audio'): Promise<AcrCloudScanSummary> {
+  let samplePath: string | null = null;
+  try {
+    samplePath = await createThirtySecondSample(filePath);
+    const scan = await uploadFileForScan(samplePath, name ? `${name} (first ${SCAN_SAMPLE_SECONDS}s)` : undefined, dataType);
+    return {
+      ...scan,
+      rawResult: {
+        scanMode: 'first_30_seconds_file_scan',
+        sampleSeconds: SCAN_SAMPLE_SECONDS,
+        originalName: name,
+        result: scan.rawResult,
+      },
+    };
+  } finally {
+    if (samplePath) {
+      await fs.unlink(samplePath).catch(() => undefined);
+    }
+  }
+}
+
 export async function uploadFileForScan(filePath: string, name?: string, dataType: AcrCloudDataType = 'audio'): Promise<AcrCloudScanSummary> {
   const config = getConfig();
   const token = requireValue(config.consoleToken, 'ACRCLOUD_CONSOLE_TOKEN');
@@ -300,7 +397,7 @@ export async function startTrackAcrCloudScan(trackId: string, audioPath: string,
     });
     await Track.findByIdAndUpdate(trackId, {
       'acrCloud.scanState': 'not_configured',
-      'acrCloud.lastError': 'ACRCloud file scanning is not configured',
+      'acrCloud.lastError': 'ACRCloud 30-second file scanning is not configured',
       'acrCloud.checkedAt': new Date(),
     });
     return;
@@ -314,7 +411,7 @@ export async function startTrackAcrCloudScan(trackId: string, audioPath: string,
       'acrCloud.checkedAt': new Date(),
     });
 
-    const scan = await uploadFileForScan(audioPath, name, 'audio');
+    const scan = await uploadFirstThirtySecondsForScan(audioPath, name, 'audio');
     await Track.findByIdAndUpdate(trackId, {
       'acrCloud.fileId': scan.fileId,
       'acrCloud.scanState': scan.state,
