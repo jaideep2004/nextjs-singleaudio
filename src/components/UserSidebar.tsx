@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   IconButton,
   Avatar,
+  Tooltip,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -24,6 +25,7 @@ import {
   ExpandMore,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   Album,
   TrendingUp,
   CloudUpload as CloudUploadIcon,
@@ -39,6 +41,7 @@ import {
 import { useAuth } from '@/context/AppContext';
 
 const drawerWidth = 264;
+const collapsedDrawerWidth = 76;
 
 const menuSections = [
   {
@@ -144,12 +147,15 @@ export default function UserSidebar() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const auth = useAuth();
   const user = auth?.user;
   const kycUnderReview = user?.verification?.status === 'submitted' && (user.role === 'artist' || user.role === 'label');
 
   const isDark = theme.palette.mode === 'dark';
+  const desktopCollapsed = collapsed && !isMobile;
+  const currentDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : drawerWidth;
 
   // Auto-expand submenus when on matching routes
   useEffect(() => {
@@ -173,6 +179,11 @@ export default function UserSidebar() {
 
   const handleSubMenuClick = (item: string) => {
     setOpenSubMenu(openSubMenu === item ? null : item);
+  };
+
+  const handleDesktopCollapse = () => {
+    setCollapsed((current) => !current);
+    setOpenSubMenu(null);
   };
 
   const isActive = (path: string) => {
@@ -231,21 +242,23 @@ export default function UserSidebar() {
           py: 2.5,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: desktopCollapsed ? 'center' : 'space-between',
         }}
       >
-        <Box
-          component="img"
-          src={isDark ? '/images/singleaudio-b.png' : '/images/singleaudio-w.png'}
-          alt="Single Audio"
-          sx={{
-            width: 195,
-            height: 45,
-            objectFit: 'contain',
-            objectPosition: 'left center',
-            display: 'block',
-          }}
-        />
+        {!desktopCollapsed && (
+          <Box
+            component="img"
+            src={isDark ? '/images/singleaudio-b.png' : '/images/singleaudio-w.png'}
+            alt="Single Audio"
+            sx={{
+              width: 195,
+              height: 45,
+              objectFit: 'contain',
+              objectPosition: 'left center',
+              display: 'block',
+            }}
+          />
+        )}
         <IconButton
           onClick={handleDrawerToggle}
           sx={{
@@ -256,6 +269,24 @@ export default function UserSidebar() {
         >
           <ChevronLeftIcon />
         </IconButton>
+        <Tooltip title={desktopCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
+          <IconButton
+            onClick={handleDesktopCollapse}
+            aria-label={desktopCollapsed ? 'Expand dashboard sidebar' : 'Collapse dashboard sidebar'}
+            sx={{
+              display: { xs: 'none', md: 'inline-flex' },
+              width: 36,
+              height: 36,
+              color: isDark ? 'rgba(255,255,255,0.62)' : 'rgba(15,23,42,0.58)',
+              bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
+              '&:hover': {
+                bgcolor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)',
+              },
+            }}
+          >
+            {desktopCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* User Profile Mini */}
@@ -264,11 +295,11 @@ export default function UserSidebar() {
           mx: 2,
           mb: 2,
           p: 1.5,
+          display: desktopCollapsed ? 'none' : 'flex',
           borderRadius: '12px',
           bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)',
           border: '1px solid',
           borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-          display: 'flex',
           alignItems: 'center',
           gap: 1.5,
         }}
@@ -321,7 +352,7 @@ export default function UserSidebar() {
                 px: 2,
                 pt: sectionIdx > 0 ? 1.5 : 0.5,
                 pb: 0.75,
-                display: 'block',
+                display: desktopCollapsed ? 'none' : 'block',
                 color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(15,23,42,0.4)',
                 letterSpacing: '0.08em',
                 fontWeight: 700,
@@ -336,23 +367,28 @@ export default function UserSidebar() {
                 return (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
-                    <ListItemButton
-                      selected={isActive(item.path)}
-                      disabled={lockedItem}
-                      onClick={() =>
-                        lockedItem
-                          ? undefined
-                          : item.subItems
-                          ? handleSubMenuClick(item.path)
-                          : router.push(item.path)
-                      }
-                      sx={{
+                    <Tooltip title={desktopCollapsed ? item.text : ''} placement="right" disableInteractive>
+                      <ListItemButton
+                        selected={isActive(item.path)}
+                        disabled={lockedItem}
+                        onClick={() =>
+                          lockedItem
+                            ? undefined
+                            : desktopCollapsed
+                              ? router.push(item.path)
+                              : item.subItems
+                                ? handleSubMenuClick(item.path)
+                                : router.push(item.path)
+                        }
+                        sx={{
                         borderRadius: '10px',
                         mx: 0.75,
                         py: 0.85,
-                        px: 1.5,
+                        px: desktopCollapsed ? 1 : 1.5,
+                        minHeight: 44,
+                        justifyContent: desktopCollapsed ? 'center' : 'flex-start',
                         position: 'relative',
-                        transition: 'all 150ms ease',
+                        transition: 'background-color 150ms ease, color 150ms ease',
                         '&.Mui-selected': {
                           backgroundColor: isDark
                             ? 'rgba(74, 108, 247, 0.12)'
@@ -388,7 +424,7 @@ export default function UserSidebar() {
                     >
                       <ListItemIcon
                         sx={{
-                          minWidth: 36,
+                          minWidth: desktopCollapsed ? 0 : 36,
                           color: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(15, 23, 42, 0.45)',
                           '& .MuiSvgIcon-root': { fontSize: 20 },
                         }}
@@ -397,6 +433,7 @@ export default function UserSidebar() {
                       </ListItemIcon>
                       <ListItemText
                         primary={item.text}
+                        sx={{ display: desktopCollapsed ? 'none' : 'block' }}
                         primaryTypographyProps={{
                           fontWeight: isActive(item.path) ? 800 : 700,
                           fontSize: '0.875rem',
@@ -406,10 +443,10 @@ export default function UserSidebar() {
                             : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
-                      {lockedItem && (
+                      {lockedItem && !desktopCollapsed && (
                         <LockOutlined sx={{ fontSize: 15, color: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.32)', mr: 0.5 }} />
                       )}
-                      {item.subItems && (
+                      {item.subItems && !desktopCollapsed && (
                         <Box
                           sx={{
                             color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
@@ -420,9 +457,10 @@ export default function UserSidebar() {
                           {openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}
                         </Box>
                       )}
-                    </ListItemButton>
+                      </ListItemButton>
+                    </Tooltip>
                   </ListItem>
-                  {item.subItems && (
+                  {item.subItems && !desktopCollapsed && (
                     <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding sx={{ py: 0.25 }}>
                         {item.subItems.map((subItem: any) => {
@@ -503,6 +541,7 @@ export default function UserSidebar() {
           borderTop: '1px solid',
           borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.06)',
           textAlign: 'center',
+          display: desktopCollapsed ? 'none' : 'block',
         }}
       >
         <Typography
@@ -524,7 +563,11 @@ export default function UserSidebar() {
     <Box sx={{ display: 'flex' }}>
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{
+          width: { md: currentDrawerWidth },
+          flexShrink: { md: 0 },
+          transition: 'width 180ms ease',
+        }}
         aria-label="navigation sidebar"
       >
         {/* Mobile drawer */}
@@ -553,9 +596,10 @@ export default function UserSidebar() {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: drawerWidth,
+              width: currentDrawerWidth,
               border: 'none',
               backgroundColor: 'transparent',
+              transition: 'width 180ms ease',
             },
           }}
           open

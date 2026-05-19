@@ -111,6 +111,60 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
   const companyTabIndex = audience === 'dashboard' && isLabel ? 1 : -1;
   const bankTabIndex = audience === 'dashboard' ? tabs.length - 1 : -1;
 
+  const profileSummary = (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2, md: 2.5 },
+        width: { xs: '100%', md: 640, lg: 720 },
+        maxWidth: '100%',
+        borderRadius: { xs: 4, md: 5 },
+        bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.92)',
+        border: '1px solid',
+        borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.08)',
+        boxShadow: theme.palette.mode === 'dark'
+          ? '0 18px 50px rgba(0,0,0,0.34)'
+          : '0 18px 50px rgba(27,39,68,0.12)',
+      }}
+    >
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        alignItems={{ xs: 'center', sm: 'center' }}
+        justifyContent="space-between"
+        textAlign={{ xs: 'center', sm: 'left' }}
+      >
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
+          <Avatar
+            sx={{
+              width: 84,
+              height: 84,
+              fontSize: 30,
+              fontWeight: 900,
+              bgcolor: audience === 'admin' ? '#ef4444' : '#4a6cf7',
+              flex: '0 0 auto',
+            }}
+          >
+            {initials || 'SA'}
+          </Avatar>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>
+              {displayName || user?.email || 'Profile'}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
+              {user?.email || 'No email available'}
+            </Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-end' }}>
+          <Chip icon={<Shield />} label={roleLabel(user?.role)} size="small" />
+          {user?.accountType && <Chip icon={<Badge />} label={roleLabel(user.accountType)} size="small" variant="outlined" />}
+          {user?.verification?.status && <Chip label={`KYC ${user.verification.status}`} size="small" color={user.verification.status === 'approved' ? 'success' : user.verification.status === 'rejected' ? 'error' : 'warning'} />}
+        </Stack>
+      </Stack>
+    </Paper>
+  );
+
   return (
     <Box sx={{ width: '100%' }}>
       <PremiumHeader
@@ -121,26 +175,10 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
             ? 'Manage administrator identity and account details.'
             : 'Manage profile, company, and payout readiness.'
         }
+        action={profileSummary}
       />
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '0.75fr 1.35fr' }, gap: 3 }}>
-        <Paper elevation={0} sx={{ ...premiumSurfaceSx(theme), p: { xs: 2.5, md: 3 }, borderRadius: 3, alignSelf: 'start' }}>
-          <Stack spacing={2.25} alignItems="center" textAlign="center">
-            <Avatar sx={{ width: 76, height: 76, fontSize: 28, fontWeight: 900, bgcolor: audience === 'admin' ? '#ef4444' : '#4a6cf7' }}>
-              {initials || 'SA'}
-            </Avatar>
-            <Box>
-              <Typography variant="h6" fontWeight={900}>{displayName || user?.email || 'Profile'}</Typography>
-              <Typography variant="body2" color="text.secondary">{user?.email || 'No email available'}</Typography>
-            </Box>
-            <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
-              <Chip icon={<Shield />} label={roleLabel(user?.role)} size="small" />
-              {user?.accountType && <Chip icon={<Badge />} label={roleLabel(user.accountType)} size="small" variant="outlined" />}
-              {user?.verification?.status && <Chip label={`KYC ${user.verification.status}`} size="small" color={user.verification.status === 'approved' ? 'success' : user.verification.status === 'rejected' ? 'error' : 'warning'} />}
-            </Stack>
-          </Stack>
-        </Paper>
-
+      <Stack spacing={3}>
         <Paper elevation={0} sx={{ ...premiumSurfaceSx(theme), borderRadius: 3, overflow: 'hidden' }}>
           <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile sx={{ px: 1, pt: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
             {tabs.map((item, index) => (
@@ -239,7 +277,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
             )}
           </Box>
         </Paper>
-      </Box>
+      </Stack>
     </Box>
   );
 }

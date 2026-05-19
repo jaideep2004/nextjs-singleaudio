@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type SyntheticEvent } from 'react';
 import {
   Alert,
   Box,
@@ -14,6 +14,7 @@ import {
   Paper,
   Select,
   Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
@@ -23,12 +24,27 @@ import {
   TableRow,
   TextField,
   Typography,
+  Tabs,
   useTheme,
 } from '@mui/material';
 import { Download, LibraryMusic, PlaylistAddCheck, SelectAll } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 type TrackMetadataRow = Record<string, string>;
+type AdminPublishingTab = 'pending' | 'approved' | 'completed';
+type ColumnDisplay = Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', 'none' | 'table-cell'>;
+type ColumnConfig = {
+  key: string;
+  label: string;
+  width: number;
+  display?: Partial<ColumnDisplay>;
+};
+
+const publishingTabs: Array<{ value: AdminPublishingTab; label: string }> = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'completed', label: 'Completed' },
+];
 
 const columns: Array<{ key: string; label: string }> = [
   { key: 'releaseTitle', label: 'Release Title' },
@@ -39,8 +55,8 @@ const columns: Array<{ key: string; label: string }> = [
   { key: 'releaseUpc', label: 'Release UPC' },
   { key: 'ownerName', label: 'Owner Name' },
   { key: 'ownerEmail', label: 'Owner Email' },
-  { key: 'trackNumber', label: 'Track Number' },
-  { key: 'discNumber', label: 'Disc Number' },
+  // { key: 'trackNumber', label: 'Track Number' },
+  // { key: 'discNumber', label: 'Disc Number' },
   { key: 'title', label: 'Track Title' },
   { key: 'version', label: 'Version' },
   { key: 'artist', label: 'Primary Artist' },
@@ -76,7 +92,35 @@ const columns: Array<{ key: string; label: string }> = [
   { key: 'updatedAt', label: 'Updated At' },
 ];
 
-const visibleColumns = columns.slice(0, 14);
+const visibleColumns: ColumnConfig[] = [
+  { key: 'releaseTitle', label: 'Release Title', width: 150 },
+  {
+    key: 'releaseType',
+    label: 'Release Type',
+    width: 112,
+    display: { xs: 'none', md: 'table-cell' },
+  },
+  {
+    key: 'releaseStatus',
+    label: 'Release Status',
+    width: 126,
+    display: { xs: 'none', md: 'table-cell' },
+  },
+  {
+    key: 'releaseDate',
+    label: 'Release Date',
+    width: 120,
+    display: { xs: 'none', sm: 'table-cell' },
+  },
+  { key: 'label', label: 'Label', width: 96, display: { xs: 'none', lg: 'table-cell' } },
+  { key: 'ownerName', label: 'Owner Name', width: 126, display: { xs: 'none', lg: 'table-cell' } },
+  { key: 'title', label: 'Track Title', width: 170 },
+  { key: 'version', label: 'Version', width: 88, display: { xs: 'none', md: 'table-cell' } },
+  { key: 'artist', label: 'Primary Artist', width: 138, display: { xs: 'none', sm: 'table-cell' } },
+  { key: 'isrc', label: 'ISRC', width: 118 },
+];
+
+const checkboxColumnWidth = 56;
 
 const audiamColumns: Array<{
   key: string;
@@ -167,7 +211,9 @@ export default function AdminMusicPublishingPage() {
   const [total, setTotal] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectCount, setSelectCount] = useState(25);
+  const [activeTab, setActiveTab] = useState<AdminPublishingTab>('pending');
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
 
   const selectedRows = useMemo(
@@ -185,7 +231,7 @@ export default function AdminMusicPublishingPage() {
       setError('');
       try {
         const response = await fetch(
-          `/api/admin/music-publishing/tracks?page=${page + 1}&limit=${rowsPerPage}`,
+          `/api/admin/music-publishing/tracks?stage=${activeTab}&page=${page + 1}&limit=${rowsPerPage}`,
           {
             signal: controller.signal,
           }
@@ -209,7 +255,13 @@ export default function AdminMusicPublishingPage() {
 
     loadTracks();
     return () => controller.abort();
-  }, [page, rowsPerPage]);
+  }, [activeTab, page, rowsPerPage]);
+
+  const handleTabChange = (_event: SyntheticEvent, value: AdminPublishingTab) => {
+    setActiveTab(value);
+    setPage(0);
+    setSelectedIds([]);
+  };
 
   const handleSelectRow = (id: string) => {
     setSelectedIds(current =>
@@ -225,7 +277,20 @@ export default function AdminMusicPublishingPage() {
     setSelectedIds(rows.slice(0, Math.min(selectCount, rows.length)).map(row => row.id));
   };
 
-  const handleExport = () => {
+  const updateSelectedTracks = async (action: 'mark_approved' | 'mark_completed') => {
+    const response = await fetch('/api/admin/music-publishing/tracks', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ids: selectedIds }),
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.error || 'Failed to update selected tracks');
+    }
+    return Array.isArray(payload.data?.updatedIds) ? (payload.data.updatedIds as string[]) : [];
+  };
+
+  const handleExport = async () => {
     if (!selectedRows.length) return;
     const xml = buildExcelXml(selectedRows);
     const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
@@ -237,10 +302,39 @@ export default function AdminMusicPublishingPage() {
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
+
+    try {
+      setActionLoading(true);
+      setError('');
+      const updatedIds = await updateSelectedTracks('mark_approved');
+      setRows(current => current.filter(row => !updatedIds.includes(row.id)));
+      setTotal(current => Math.max(0, current - updatedIds.length));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export downloaded, but status update failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedRows.length) return;
+    try {
+      setActionLoading(true);
+      setError('');
+      const updatedIds = await updateSelectedTracks('mark_completed');
+      setRows(current => current.filter(row => !updatedIds.includes(row.id)));
+      setTotal(current => Math.max(0, current - updatedIds.length));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to approve selected tracks');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
-    <Box sx={{ px: { xs: 0, md: 1 }, py: 1, maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
+    <Box sx={{ px: 0, py: 1, maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
       <PremiumHeader
         eyebrow="Admin Publishing"
         title="Music Publishing"
@@ -257,6 +351,28 @@ export default function AdminMusicPublishingPage() {
         }}
       >
         <Stack direction="column" spacing={2} alignItems="stretch" sx={{ minWidth: 0 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            allowScrollButtonsMobile
+            aria-label="Admin music publishing status tabs"
+            sx={{
+              minHeight: 44,
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                minHeight: 44,
+                textTransform: 'none',
+                fontWeight: 850,
+              },
+            }}
+          >
+            {publishingTabs.map(item => (
+              <Tab key={item.value} value={item.value} label={item.label} />
+            ))}
+          </Tabs>
+
           <Box sx={{ flex: '1 1 auto', minWidth: 0, width: '100%' }}>
             <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
               <Chip icon={<LibraryMusic />} label={`${total} Tracks`} variant="outlined" />
@@ -310,9 +426,19 @@ export default function AdminMusicPublishingPage() {
               variant="contained"
               startIcon={<Download />}
               onClick={handleExport}
-              disabled={!selectedRows.length}
+              disabled={activeTab !== 'pending' || !selectedRows.length || actionLoading}
+              sx={{ display: activeTab === 'pending' ? 'inline-flex' : 'none' }}
             >
-              Export Excel
+              {actionLoading ? 'Exporting…' : 'Export Excel'}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<PlaylistAddCheck />}
+              onClick={handleApprove}
+              disabled={activeTab !== 'approved' || !selectedRows.length || actionLoading}
+              sx={{ display: activeTab === 'approved' ? 'inline-flex' : 'none' }}
+            >
+              {actionLoading ? 'Approving…' : 'Approve'}
             </Button>
           </Stack>
         </Stack>
@@ -339,6 +465,7 @@ export default function AdminMusicPublishingPage() {
                 maxHeight: 'calc(100vh - 310px)',
                 overflowX: 'auto',
                 overflowY: 'auto',
+                overscrollBehaviorX: 'contain',
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(99,102,241,0.55) transparent',
                 '&::-webkit-scrollbar': {
@@ -357,10 +484,19 @@ export default function AdminMusicPublishingPage() {
                 },
               }}
             >
-              <Table stickyHeader size="small" aria-label="track metadata export table">
+              <Table
+                stickyHeader
+                size="small"
+                aria-label="track metadata export table"
+                sx={{
+                  tableLayout: 'fixed',
+                  width: '100%',
+                  minWidth: { xs: 600, sm: 850, md: 1080, lg: 1220 },
+                }}
+              >
                 <TableHead>
                   <TableRow>
-                    <TableCell padding="checkbox">
+                    <TableCell padding="checkbox" sx={{ width: checkboxColumnWidth }} style={{padding:"0 24px 0 16px"}}>
                       <Checkbox
                         checked={allPageSelected}
                         indeterminate={selectedIds.length > 0 && !allPageSelected}
@@ -369,7 +505,18 @@ export default function AdminMusicPublishingPage() {
                       />
                     </TableCell>
                     {visibleColumns.map(column => (
-                      <TableCell key={column.key} sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}>
+                      <TableCell
+                        key={column.key}
+                        sx={{
+                          display: column.display,
+                          fontWeight: 800,
+                          whiteSpace: 'nowrap',
+                          width: column.width,
+                          minWidth: column.width,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
                         {column.label}
                       </TableCell>
                     ))}
@@ -382,7 +529,11 @@ export default function AdminMusicPublishingPage() {
                         <Box sx={{ py: 6, textAlign: 'center' }}>
                           <Typography fontWeight={800}>No track metadata found</Typography>
                           <Typography variant="body2" color="text.secondary">
-                            Submitted releases with tracks appear here.
+                            {activeTab === 'pending'
+                              ? 'Submitted release tracks awaiting export appear here.'
+                              : activeTab === 'approved'
+                                ? 'Exported tracks awaiting admin approval appear here.'
+                                : 'Completed publishing tracks appear here.'}
                           </Typography>
                         </Box>
                       </TableCell>
@@ -392,7 +543,11 @@ export default function AdminMusicPublishingPage() {
                       const checked = selectedIds.includes(row.id);
                       return (
                         <TableRow key={row.id} hover selected={checked}>
-                          <TableCell padding="checkbox">
+                          <TableCell
+                            padding="checkbox"
+                            sx={{ width: checkboxColumnWidth }}
+                            
+                          >
                             <Checkbox
                               checked={checked}
                               onChange={() => handleSelectRow(row.id)}
@@ -400,11 +555,27 @@ export default function AdminMusicPublishingPage() {
                             />
                           </TableCell>
                           {visibleColumns.map(column => (
-                            <TableCell key={column.key} sx={{ maxWidth: 220 }}>
+                            <TableCell
+                              key={column.key}
+                              sx={{
+                                display: column.display,
+                                width: column.width,
+                                minWidth: column.width,
+                                verticalAlign: 'middle',
+                              }}
+                            >
                               <Typography
                                 variant="body2"
                                 title={row[column.key] || ''}
-                                style={{ wordBreak: 'break-all' }}
+                                sx={{
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: column.key === 'title' ? 3 : 2,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  overflowWrap: 'anywhere',
+                                  wordBreak: column.key === 'isrc' ? 'break-all' : 'normal',
+                                  lineHeight: 1.35,
+                                }}
                               >
                                 {row[column.key] || '-'}
                               </Typography>
@@ -429,6 +600,14 @@ export default function AdminMusicPublishingPage() {
                 py: 1,
                 borderTop: 1,
                 borderColor: 'divider',
+                '& .MuiTablePagination-root': { overflow: 'visible' },
+                '& .MuiTablePagination-toolbar': {
+                  flexWrap: 'wrap',
+                  justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+                  gap: 1,
+                  minHeight: 44,
+                  px: 0,
+                },
               }}
             >
               <FormControl size="small" sx={{ minWidth: 130, display: { xs: 'none', sm: 'flex' } }}>

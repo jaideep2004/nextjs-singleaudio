@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
+import {
+  PublishingStage,
+  asMusicPublishingStage,
+  getMusicPublishingTrackKey,
+  normalizeMusicPublishingTracks,
+} from '@/lib/musicPublishing';
 
 const MAX_LIMIT = 250;
-
-type ReleaseTrack = Record<string, any>;
 
 function getClientKey(req: NextRequest) {
   return (
@@ -15,77 +20,28 @@ function getClientKey(req: NextRequest) {
   );
 }
 
-function asString(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  if (Array.isArray(value)) return value.map(asString).filter(Boolean).join(', ');
-  if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
+function getNextStage(action: unknown): PublishingStage | null {
+  if (action === 'mark_approved') return 'approved';
+  if (action === 'mark_completed') return 'completed';
+  return null;
 }
 
-function normalizeTrack(release: Record<string, any>, track: ReleaseTrack, index: number) {
-  const releaseId = asString(release._id);
-  const trackKey = asString(track._id || track.id || track.isrc || `${releaseId}-${index}`);
-  const contributors = Array.isArray(track.contributors)
-    ? track.contributors
-        .map((contributor: any) => `${contributor.role || 'contributor'}:${contributor.name || ''}`)
-        .filter(Boolean)
-        .join(', ')
-    : '';
-  const lyricists = Array.isArray(track.contributors)
-    ? track.contributors
-        .filter((contributor: any) => contributor.role === 'lyricist' && contributor.name)
-        .map((contributor: any) => contributor.name)
-        .join(', ')
-    : '';
-
+function splitTrackId(id: string) {
+  const index = id.indexOf(':');
+  if (index <= 0 || index === id.length - 1) return null;
   return {
-    id: `${releaseId}:${trackKey}`,
-    releaseId,
-    releaseTitle: asString(release.releaseTitle || release.title),
-    releaseType: asString(release.releaseType),
-    releaseStatus: asString(release.status),
-    releaseDate: asString(release.releaseDate),
-    originalReleaseDate: asString(track.originalReleaseDate || release.originalReleaseDate),
-    label: asString(release.label),
-    releaseUpc: asString(release.upc),
-    ownerName: asString(release.ownerName || release.ownerArtistName || release.primaryArtist),
-    ownerEmail: asString(release.ownerEmail),
-    territories: asString(release.territories),
-    stores: asString(release.stores),
-    trackNumber: asString(track.trackNumber || index + 1),
-    discNumber: asString(track.discNumber || 1),
-    title: asString(track.title),
-    version: asString(track.version),
-    artist: asString(track.artist || release.primaryArtist),
-    featuring: asString(track.featuring),
-    remixer: asString(track.remixer),
-    isrc: asString(track.isrc),
-    trackUpc: asString(track.upc),
-    duration: asString(track.duration),
-    genre: asString(track.genre),
-    subgenre: asString(track.subgenre),
-    metadataLanguage: asString(track.metadataLanguage),
-    audioLanguage: asString(track.audioLanguage || track.language),
-    explicit: track.explicit ? 'Yes' : 'No',
-    parentalAdvisory: asString(track.parentalAdvisory),
-    instrumental: track.instrumental ? 'Yes' : 'No',
-    composers: asString(track.composers),
-    lyricists: asString(lyricists),
-    publishers: asString(track.publishers),
-    producers: asString(track.producers),
-    copyrightC: asString(track.copyrightC),
-    copyrightCYear: asString(track.copyrightCYear),
-    copyrightP: asString(track.copyrightP),
-    copyrightPYear: asString(track.copyrightPYear),
-    recordingYear: asString(track.recordingYear),
-    contributors,
-    audioFile: asString(track.audioFile),
-    audioUrl: asString(track.audioUrl),
-    acrState: asString(track.acrCloud?.scanState || track.acrCloud?.state),
-    acrSummary: asString(track.acrCloud?.fingerprintMatches?.[0]?.title),
-    updatedAt: asString(release.updatedAt),
-    createdAt: asString(release.createdAt),
+    releaseId: unquoteIdSegment(id.slice(0, index)),
+    trackKey: unquoteIdSegment(id.slice(index + 1)),
   };
+}
+
+function unquoteIdSegment(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'string' ? parsed : value;
+  } catch {
+    return value;
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -106,9 +62,10 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(searchParams.get('page') || 1));
     const limit = Math.min(MAX_LIMIT, Math.max(10, Number(searchParams.get('limit') || 50)));
     const skip = (page - 1) * limit;
+    const stage = asMusicPublishingStage(searchParams.get('stage') || 'pending');
 
     const releases = await db.collection('releases')
-      .find({}, {
+      .find({ status: 'approved' }, {
         projection: {
           releaseTitle: 1,
           title: 1,
@@ -132,10 +89,8 @@ export async function GET(req: NextRequest) {
       .sort({ updatedAt: -1, createdAt: -1 })
       .toArray();
 
-    const rows = releases.flatMap((release) =>
-      Array.isArray(release.tracks)
-        ? release.tracks.map((track: ReleaseTrack, index: number) => normalizeTrack(release, track, index))
-        : []
+    const rows = normalizeMusicPublishingTracks(releases).filter(
+      (row) => row.publishingStatus === stage
     );
 
     return NextResponse.json({
@@ -149,6 +104,112 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load track metadata';
+    const status = error instanceof RateLimitError ? error.statusCode : message === 'Authentication required' ? 401 : 500;
+    return NextResponse.json({ success: false, error: message }, { status });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const user = await getCurrentBackendUser();
+    if (user.role !== 'admin' && user.role !== 'subadmin') {
+      return NextResponse.json({ success: false, error: 'Admin access required' }, { status: 403 });
+    }
+
+    const { db } = await connectToDatabase();
+    await enforceMongoRateLimit(db, {
+      key: `PATCH:/api/admin/music-publishing/tracks:${user._id || getClientKey(req)}`,
+      limit: 60,
+      windowMs: 60 * 1000,
+    });
+
+    const body = await req.json().catch(() => ({}));
+    const ids: string[] = Array.isArray(body?.ids)
+      ? body.ids.filter((id: unknown): id is string => typeof id === 'string')
+      : [];
+    const nextStage = getNextStage(body?.action);
+
+    if (!ids.length) {
+      return NextResponse.json({ success: false, error: 'No tracks selected' }, { status: 400 });
+    }
+    if (!nextStage) {
+      return NextResponse.json({ success: false, error: 'Invalid publishing action' }, { status: 400 });
+    }
+
+    const grouped = new Map<string, Set<string>>();
+    ids.forEach((id: string) => {
+      const parsed = splitTrackId(id);
+      if (!parsed) return;
+      const keys = grouped.get(parsed.releaseId) || new Set<string>();
+      keys.add(parsed.trackKey);
+      grouped.set(parsed.releaseId, keys);
+    });
+
+    const now = new Date();
+    const updatedIds: string[] = [];
+
+    for (const [releaseId, trackKeys] of grouped.entries()) {
+      let _id: ObjectId;
+      try {
+        _id = new ObjectId(releaseId);
+      } catch {
+        continue;
+      }
+
+      const release = await db.collection('releases').findOne(
+        { _id },
+        { projection: { tracks: 1 } }
+      );
+      const tracks = Array.isArray(release?.tracks) ? release.tracks : [];
+      const changedIds: string[] = [];
+      const nextTracks = tracks.map((track: Record<string, any>, index: number) => {
+        const trackKey = getMusicPublishingTrackKey(releaseId, track, index);
+        if (!trackKeys.has(trackKey)) return track;
+
+        const trackId = `${releaseId}:${trackKey}`;
+        changedIds.push(trackId);
+        return {
+          ...track,
+          publishingStatus: nextStage,
+          publishingUpdatedAt: now,
+          publishingUpdatedBy: String(user._id),
+          ...(nextStage === 'approved' ? { publishingExportedAt: now } : {}),
+          ...(nextStage === 'completed' ? { publishingCompletedAt: now } : {}),
+        };
+      });
+
+      if (!changedIds.length) continue;
+      updatedIds.push(...changedIds);
+
+      await db.collection('releases').updateOne(
+        { _id },
+        {
+          $set: {
+            tracks: nextTracks,
+            updatedAt: now,
+          },
+          $push: {
+            adminActions: {
+              action: `music_publishing_${nextStage}`,
+              at: now,
+              adminId: user._id,
+              adminEmail: user.email,
+              trackIds: changedIds,
+            },
+          },
+        }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        updatedIds,
+        skippedIds: ids.filter((id: string) => !updatedIds.includes(id)),
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to update publishing tracks';
     const status = error instanceof RateLimitError ? error.statusCode : message === 'Authentication required' ? 401 : 500;
     return NextResponse.json({ success: false, error: message }, { status });
   }

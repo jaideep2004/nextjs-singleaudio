@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   IconButton,
   Chip,
+  Tooltip,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -27,6 +28,7 @@ import {
   ExpandMore,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
   Album,
   TrendingUp,
   Shield as ShieldIcon,
@@ -39,6 +41,7 @@ import { useAuth } from '@/context/AppContext';
 import { hasAdminPermission, isFullAdmin, isSubadmin, type AdminPermission } from '@/lib/adminAccess';
 
 const drawerWidth = 264;
+const collapsedDrawerWidth = 76;
 
 const menuSections = [
   {
@@ -150,10 +153,13 @@ export default function AdminSidebar() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const { user } = useAuth();
 
   const isDark = theme.palette.mode === 'dark';
+  const desktopCollapsed = collapsed && !isMobile;
+  const currentDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : drawerWidth;
   const canSee = (item: any) => {
     if (isFullAdmin(user)) return true;
     if (!item.permission) return false;
@@ -177,6 +183,11 @@ export default function AdminSidebar() {
 
   const handleSubMenuClick = (item: string) => {
     setOpenSubMenu(openSubMenu === item ? null : item);
+  };
+
+  const handleDesktopCollapse = () => {
+    setCollapsed((current) => !current);
+    setOpenSubMenu(null);
   };
 
   const isActive = (path: string) => {
@@ -227,21 +238,23 @@ export default function AdminSidebar() {
           py: 2.5,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: desktopCollapsed ? 'center' : 'space-between',
         }}
       >
-        <Box
-          component="img"
-          src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-          alt="Single Audio"
-          sx={{
-            width: 195,
-            height: 45,
-            objectFit: 'contain',
-            objectPosition: 'left center',
-            display: 'block',
-          }}
-        />
+        {!desktopCollapsed && (
+          <Box
+            component="img"
+            src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+            alt="Single Audio"
+            sx={{
+              width: 195,
+              height: 45,
+              objectFit: 'contain',
+              objectPosition: 'left center',
+              display: 'block',
+            }}
+          />
+        )}
         <IconButton
           onClick={handleDrawerToggle}
           sx={{
@@ -251,10 +264,28 @@ export default function AdminSidebar() {
         >
           <ChevronLeftIcon />
         </IconButton>
+        <Tooltip title={desktopCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
+          <IconButton
+            onClick={handleDesktopCollapse}
+            aria-label={desktopCollapsed ? 'Expand admin sidebar' : 'Collapse admin sidebar'}
+            sx={{
+              display: { xs: 'none', md: 'inline-flex' },
+              width: 36,
+              height: 36,
+              color: isDark ? 'rgba(255,255,255,0.62)' : 'rgba(15,23,42,0.58)',
+              bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.05)',
+              '&:hover': {
+                bgcolor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(15,23,42,0.09)',
+              },
+            }}
+          >
+            {desktopCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* Admin Badge */}
-      <Box sx={{ mx: 2, mb: 2 }}>
+      <Box sx={{ mx: 2, mb: 2, display: desktopCollapsed ? 'none' : 'block' }}>
         <Chip
           icon={<ShieldIcon sx={{ fontSize: 14 }} />}
           label={isSubadmin(user) ? 'Subadmin Access' : 'Administrator'}
@@ -289,7 +320,7 @@ export default function AdminSidebar() {
                 px: 2,
                 pt: sectionIdx > 0 ? 1.5 : 0.5,
                 pb: 0.75,
-                display: 'block',
+                display: desktopCollapsed ? 'none' : 'block',
                 color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(15,23,42,0.4)',
                 letterSpacing: '0.08em',
                 fontWeight: 700,
@@ -302,20 +333,25 @@ export default function AdminSidebar() {
               {section.items.map((item: any) => (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
-                    <ListItemButton
-                      selected={isActive(item.path)}
-                      onClick={() =>
-                        item.subItems
-                          ? handleSubMenuClick(item.path)
-                          : router.push(item.path)
-                      }
-                      sx={{
+                    <Tooltip title={desktopCollapsed ? item.text : ''} placement="right" disableInteractive>
+                      <ListItemButton
+                        selected={isActive(item.path)}
+                        onClick={() =>
+                          desktopCollapsed
+                            ? router.push(item.path)
+                            : item.subItems
+                              ? handleSubMenuClick(item.path)
+                              : router.push(item.path)
+                        }
+                        sx={{
                         borderRadius: '10px',
                         mx: 0.75,
                         py: 0.85,
-                        px: 1.5,
+                        px: desktopCollapsed ? 1 : 1.5,
+                        minHeight: 44,
+                        justifyContent: desktopCollapsed ? 'center' : 'flex-start',
                         position: 'relative',
-                        transition: 'all 150ms ease',
+                        transition: 'background-color 150ms ease, color 150ms ease',
                         '&.Mui-selected': {
                           backgroundColor: isDark
                             ? 'rgba(74, 108, 247, 0.12)'
@@ -350,7 +386,7 @@ export default function AdminSidebar() {
                     >
                       <ListItemIcon
                         sx={{
-                          minWidth: 36,
+                          minWidth: desktopCollapsed ? 0 : 36,
                           color: isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(15, 23, 42, 0.45)',
                           '& .MuiSvgIcon-root': { fontSize: 20 },
                         }}
@@ -359,6 +395,7 @@ export default function AdminSidebar() {
                       </ListItemIcon>
                       <ListItemText
                         primary={item.text}
+                        sx={{ display: desktopCollapsed ? 'none' : 'block' }}
                         primaryTypographyProps={{
                           fontWeight: isActive(item.path) ? 800 : 700,
                           fontSize: '0.875rem',
@@ -368,7 +405,7 @@ export default function AdminSidebar() {
                             : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
-                      {item.subItems && (
+                      {item.subItems && !desktopCollapsed && (
                         <Box
                           sx={{
                             color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
@@ -379,9 +416,10 @@ export default function AdminSidebar() {
                           {openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}
                         </Box>
                       )}
-                    </ListItemButton>
+                      </ListItemButton>
+                    </Tooltip>
                   </ListItem>
-                  {item.subItems && (
+                  {item.subItems && !desktopCollapsed && (
                     <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
                       <List component="div" disablePadding sx={{ py: 0.25 }}>
                         {item.subItems.map((subItem: any) => (
@@ -454,6 +492,7 @@ export default function AdminSidebar() {
           borderTop: '1px solid',
           borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.06)',
           textAlign: 'center',
+          display: desktopCollapsed ? 'none' : 'block',
         }}
       >
         <Typography
@@ -475,7 +514,11 @@ export default function AdminSidebar() {
     <Box sx={{ display: 'flex' }}>
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{
+          width: { md: currentDrawerWidth },
+          flexShrink: { md: 0 },
+          transition: 'width 180ms ease',
+        }}
         aria-label="admin navigation"
       >
         {/* Mobile drawer */}
@@ -504,9 +547,10 @@ export default function AdminSidebar() {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': {
               boxSizing: 'border-box',
-              width: drawerWidth,
+              width: currentDrawerWidth,
               border: 'none',
               backgroundColor: 'transparent',
+              transition: 'width 180ms ease',
             },
           }}
           open

@@ -112,7 +112,7 @@ export function PremiumHeader({
             </Typography>
           ) : null}
         </Box>
-        {action ? <Box sx={{ flexShrink: 0 }}>{action}</Box> : null}
+        {action ? <Box sx={{ flexShrink: 0, width: { xs: '100%', md: 'auto' } }}>{action}</Box> : null}
       </Stack>
     </Paper>
   );
