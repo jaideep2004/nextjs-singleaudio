@@ -1,12 +1,12 @@
 # Graph Report - nextjs-singleaudio  (2026-05-20)
 
 ## Corpus Check
-- 276 files · ~446,696 words
+- 276 files · ~446,870 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1083 nodes · 1469 edges · 47 communities detected
-- Extraction: 76% EXTRACTED · 24% INFERRED · 0% AMBIGUOUS · INFERRED: 347 edges (avg confidence: 0.8)
+- 1085 nodes · 1475 edges · 48 communities detected
+- Extraction: 76% EXTRACTED · 24% INFERRED · 0% AMBIGUOUS · INFERRED: 351 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -40,30 +40,31 @@
 - [[_COMMUNITY_Community 30|Community 30]]
 - [[_COMMUNITY_Community 31|Community 31]]
 - [[_COMMUNITY_Community 32|Community 32]]
-- [[_COMMUNITY_Community 34|Community 34]]
-- [[_COMMUNITY_Community 37|Community 37]]
+- [[_COMMUNITY_Community 33|Community 33]]
+- [[_COMMUNITY_Community 35|Community 35]]
 - [[_COMMUNITY_Community 38|Community 38]]
 - [[_COMMUNITY_Community 39|Community 39]]
-- [[_COMMUNITY_Community 42|Community 42]]
+- [[_COMMUNITY_Community 40|Community 40]]
 - [[_COMMUNITY_Community 43|Community 43]]
-- [[_COMMUNITY_Community 45|Community 45]]
+- [[_COMMUNITY_Community 44|Community 44]]
 - [[_COMMUNITY_Community 46|Community 46]]
 - [[_COMMUNITY_Community 47|Community 47]]
-- [[_COMMUNITY_Community 49|Community 49]]
-- [[_COMMUNITY_Community 53|Community 53]]
-- [[_COMMUNITY_Community 55|Community 55]]
-- [[_COMMUNITY_Community 57|Community 57]]
-- [[_COMMUNITY_Community 59|Community 59]]
+- [[_COMMUNITY_Community 48|Community 48]]
+- [[_COMMUNITY_Community 50|Community 50]]
+- [[_COMMUNITY_Community 54|Community 54]]
+- [[_COMMUNITY_Community 56|Community 56]]
+- [[_COMMUNITY_Community 58|Community 58]]
 - [[_COMMUNITY_Community 60|Community 60]]
 - [[_COMMUNITY_Community 61|Community 61]]
-- [[_COMMUNITY_Community 63|Community 63]]
+- [[_COMMUNITY_Community 62|Community 62]]
+- [[_COMMUNITY_Community 64|Community 64]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `errorResponse()` - 60 edges
 2. `successResponse()` - 56 edges
 3. `proxyBackend()` - 34 edges
-4. `getCurrentBackendUser()` - 27 edges
-5. `connectToDatabase()` - 27 edges
+4. `connectToDatabase()` - 29 edges
+5. `getCurrentBackendUser()` - 27 edges
 6. `SpotifyStoreIntegration` - 18 edges
 7. `notFoundResponse()` - 18 edges
 8. `processCatalogExportJob()` - 18 edges
@@ -71,22 +72,22 @@
 10. `YoutubeContentIdStoreIntegration` - 17 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `identifyWithAcrCloudHandler()` --calls--> `errorResponse()`  [INFERRED]
-  server\src\controllers\audioController.ts → server\src\utils\apiResponse.ts
-- `identifyWithAcrCloudHandler()` --calls--> `successResponse()`  [INFERRED]
-  server\src\controllers\audioController.ts → server\src\utils\apiResponse.ts
-- `scanWithAcrCloudHandler()` --calls--> `errorResponse()`  [INFERRED]
-  server\src\controllers\audioController.ts → server\src\utils\apiResponse.ts
-- `scanWithAcrCloudHandler()` --calls--> `successResponse()`  [INFERRED]
-  server\src\controllers\audioController.ts → server\src\utils\apiResponse.ts
+- `identifyWithAcrCloudHandler()` --calls--> `identifyAudioFile()`  [INFERRED]
+  server\src\controllers\audioController.ts → server\src\services\acrCloud.service.ts
+- `scanWithAcrCloudHandler()` --calls--> `uploadFirstThirtySecondsForScan()`  [INFERRED]
+  server\src\controllers\audioController.ts → server\src\services\acrCloud.service.ts
+- `scanWithAcrCloudHandler()` --calls--> `identifyFirstThirtySeconds()`  [INFERRED]
+  server\src\controllers\audioController.ts → server\src\services\acrCloud.service.ts
+- `scanWithAcrCloudHandler()` --calls--> `uploadFileForScan()`  [INFERRED]
+  server\src\controllers\audioController.ts → server\src\services\acrCloud.service.ts
 - `getAcrCloudScanResultHandler()` --calls--> `getScanResult()`  [INFERRED]
   server\src\controllers\audioController.ts → server\src\services\acrCloud.service.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.05
-Nodes (85): handleSubmit(), acrCloudCallbackHandler(), getAcrCloudScanResultHandler(), authPayload(), changePassword(), checkArtistName(), escapeRegex(), forgotPassword() (+77 more)
+Cohesion: 0.06
+Nodes (79): handleSubmit(), acrCloudCallbackHandler(), analyzeAudioHandler(), deleteTempFile(), getAcrCloudScanResultHandler(), identifyWithAcrCloudHandler(), scanWithAcrCloudHandler(), authPayload() (+71 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.03
@@ -94,7 +95,7 @@ Nodes (41): POST(), GET(), GET(), POST(), POST(), canReadRelease(), DELETE(), GE
 
 ### Community 2 - "Community 2"
 Cohesion: 0.06
-Nodes (46): GET(), GET(), POST(), GET(), serializeJob(), getCurrentBackendUser(), sanitizeDspKeys(), getRssPodcastAccessMode() (+38 more)
+Nodes (48): GET(), GET(), POST(), GET(), serializeJob(), getCurrentBackendUser(), sanitizeDspKeys(), getRssPodcastAccessMode() (+40 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.1
@@ -114,23 +115,23 @@ Nodes (23): GET(), getClientKey(), POST(), requireFullAdmin(), serializeJob(), e
 
 ### Community 7 - "Community 7"
 Cohesion: 0.14
-Nodes (23): analyzeAudioHandler(), deleteTempFile(), identifyWithAcrCloudHandler(), scanWithAcrCloudHandler(), createThirtySecondSample(), getConfig(), getFsBaseUrl(), getScanResult() (+15 more)
+Nodes (23): deliver(), validateCredentials(), validateTrack(), Boolean(), episodeStepValid(), createThirtySecondSample(), getConfig(), getFsBaseUrl() (+15 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.11
 Nodes (9): DspDeliveryService, getErrorMessage(), getHeadersRecord(), toPlainObject(), baseRequirement(), evaluateDspReadiness(), getDspRequirement(), applyMetadataRules() (+1 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.12
-Nodes (21): deliver(), validateCredentials(), validateTrack(), goNext(), isArtistOrLabel(), submitKyc(), userKycUnderReview(), userNeedsKyc() (+13 more)
-
-### Community 10 - "Community 10"
 Cohesion: 0.08
 Nodes (5): fetchPayouts(), formatCurrency(), handleApprovePayout(), handleRejectPayout(), onPayoutSubmit()
 
-### Community 11 - "Community 11"
+### Community 10 - "Community 10"
 Cohesion: 0.11
 Nodes (12): canSee(), AdminLayout(), AuthGuard(), useAuth(), useAdminAuth(), canAccessAdminPath(), getAdminRouteAccess(), getFirstAllowedAdminPath() (+4 more)
+
+### Community 11 - "Community 11"
+Cohesion: 0.13
+Nodes (16): startSignup(), generateOtp(), getOtpExpiry(), hashOtp(), readSmtpResponse(), sendAmazeSmsOtp(), sendEmailMessage(), sendEmailOtp() (+8 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.12
@@ -169,24 +170,24 @@ Cohesion: 0.23
 Nodes (6): buildExcelXml(), handleApprove(), handleExport(), handleTabChange(), loadTracks(), updateSelectedTracks()
 
 ### Community 24 - "Community 24"
-Cohesion: 0.21
-Nodes (5): handleNext(), assertVercelUploadSize(), async(), uploadArtworkToServer(), uploadAudioToServer()
+Cohesion: 0.23
+Nodes (6): goNext(), isArtistOrLabel(), submitKyc(), userKycUnderReview(), userNeedsKyc(), validateStep()
 
 ### Community 25 - "Community 25"
+Cohesion: 0.45
+Nodes (10): assignTrackIsrc(), ensureIndexes(), formatIsrcForDisplay(), getDb(), isAlreadyUsed(), isDuplicateKeyError(), markTrackIsrcAssigned(), normalizeIsrc() (+2 more)
+
+### Community 26 - "Community 26"
 Cohesion: 0.22
 Nodes (2): handleNotificationClick(), handleNotificationsClose()
 
-### Community 26 - "Community 26"
+### Community 27 - "Community 27"
 Cohesion: 0.31
 Nodes (2): getErrorMessage(), StoreFactory
 
-### Community 27 - "Community 27"
+### Community 28 - "Community 28"
 Cohesion: 0.25
 Nodes (2): handleNotificationClick(), handleNotificationsClose()
-
-### Community 28 - "Community 28"
-Cohesion: 0.29
-Nodes (2): fetchReleases(), getTrackCount()
 
 ### Community 29 - "Community 29"
 Cohesion: 0.32
@@ -197,78 +198,82 @@ Cohesion: 0.29
 Nodes (2): formatDate(), getReleaseTrackCount()
 
 ### Community 31 - "Community 31"
+Cohesion: 0.29
+Nodes (2): fetchReleases(), getTrackCount()
+
+### Community 32 - "Community 32"
 Cohesion: 0.33
 Nodes (1): ApiConnector
 
-### Community 32 - "Community 32"
+### Community 33 - "Community 33"
 Cohesion: 0.38
 Nodes (3): audioFileFilter(), imageFileFilter(), trackUploadFileFilter()
 
-### Community 34 - "Community 34"
+### Community 35 - "Community 35"
 Cohesion: 0.38
 Nodes (3): handleDrop(), handleInputChange(), validateAndSet()
 
-### Community 37 - "Community 37"
+### Community 38 - "Community 38"
 Cohesion: 0.47
 Nodes (4): getProvider(), getSignedUrl(), saveFileMeta(), logAudit()
 
-### Community 38 - "Community 38"
+### Community 39 - "Community 39"
 Cohesion: 0.6
 Nodes (5): createNotification(), notifyPayoutApproved(), notifyPayoutRejected(), notifyReleaseApproved(), notifyReleaseRejected()
 
-### Community 39 - "Community 39"
+### Community 40 - "Community 40"
 Cohesion: 0.53
 Nodes (4): handleBootstrapPhase1(), handleDispatch(), handleRetry(), load()
 
-### Community 42 - "Community 42"
+### Community 43 - "Community 43"
 Cohesion: 0.47
 Nodes (3): canFetchNotifications(), hasAuthToken(), isPublicAuthPath()
 
-### Community 43 - "Community 43"
+### Community 44 - "Community 44"
 Cohesion: 0.47
 Nodes (4): getApiKey(), parseResponse(), RssApiError, rssFetch()
 
-### Community 45 - "Community 45"
+### Community 46 - "Community 46"
 Cohesion: 0.4
 Nodes (1): GCSProvider
 
-### Community 46 - "Community 46"
+### Community 47 - "Community 47"
 Cohesion: 0.4
 Nodes (1): S3Provider
 
-### Community 47 - "Community 47"
+### Community 48 - "Community 48"
 Cohesion: 0.5
 Nodes (2): checkToken(), clearToken()
 
-### Community 49 - "Community 49"
+### Community 50 - "Community 50"
 Cohesion: 0.67
 Nodes (2): ReleaseVersionService, stableStringify()
 
-### Community 53 - "Community 53"
+### Community 54 - "Community 54"
 Cohesion: 0.83
 Nodes (3): PremiumPanel(), premiumSurfaceSx(), premiumTableSx()
 
-### Community 55 - "Community 55"
+### Community 56 - "Community 56"
 Cohesion: 1.0
 Nodes (2): connectDB(), startServer()
 
-### Community 57 - "Community 57"
+### Community 58 - "Community 58"
 Cohesion: 1.0
 Nodes (2): analyzeAudio(), getFfmpeg()
 
-### Community 59 - "Community 59"
+### Community 60 - "Community 60"
 Cohesion: 0.67
 Nodes (1): GenericAudioConnector
 
-### Community 60 - "Community 60"
+### Community 61 - "Community 61"
 Cohesion: 0.67
 Nodes (1): ApiError
 
-### Community 61 - "Community 61"
+### Community 62 - "Community 62"
 Cohesion: 1.0
 Nodes (2): middleware(), validateToken()
 
-### Community 63 - "Community 63"
+### Community 64 - "Community 64"
 Cohesion: 1.0
 Nodes (2): POST(), saveFileToDisk()
 
@@ -283,53 +288,53 @@ Nodes (2): POST(), saveFileToDisk()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 20`** (12 nodes): `constructor()`, `count()`, `create()`, `delete()`, `exists()`, `find()`, `findById()`, `findOne()`, `paginate()`, `softDelete()`, `update()`, `base.repository.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 25`** (10 nodes): `formatNotificationDate()`, `getBreadcrumb()`, `getNotificationTitle()`, `handleClick()`, `handleClose()`, `handleLogout()`, `handleNotificationClick()`, `handleNotificationsClose()`, `handleNotificationsOpen()`, `AdminHeader.tsx`
+- **Thin community `Community 26`** (10 nodes): `formatNotificationDate()`, `getBreadcrumb()`, `getNotificationTitle()`, `handleClick()`, `handleClose()`, `handleLogout()`, `handleNotificationClick()`, `handleNotificationsClose()`, `handleNotificationsOpen()`, `AdminHeader.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 26`** (9 nodes): `store.factory.ts`, `getErrorMessage()`, `StoreFactory`, `.constructor()`, `.getInstance()`, `.getIntegration()`, `.getSupportedStores()`, `.initializeDefaultIntegrations()`, `.registerIntegration()`
+- **Thin community `Community 27`** (9 nodes): `store.factory.ts`, `getErrorMessage()`, `StoreFactory`, `.constructor()`, `.getInstance()`, `.getIntegration()`, `.getSupportedStores()`, `.initializeDefaultIntegrations()`, `.registerIntegration()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 27`** (9 nodes): `formatNotificationDate()`, `getBreadcrumb()`, `getNotificationTitle()`, `handleNotificationClick()`, `handleNotificationsClose()`, `handleNotificationsOpen()`, `handleUserMenuClose()`, `handleUserMenuOpen()`, `TopNavigation.tsx`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 28`** (8 nodes): `fetchReleases()`, `formatDate()`, `getFilteredReleases()`, `getStatusChip()`, `getTrackCount()`, `handleTabChange()`, `page.tsx`, `page.tsx`
+- **Thin community `Community 28`** (9 nodes): `formatNotificationDate()`, `getBreadcrumb()`, `getNotificationTitle()`, `handleNotificationClick()`, `handleNotificationsClose()`, `handleNotificationsOpen()`, `handleUserMenuClose()`, `handleUserMenuOpen()`, `TopNavigation.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 30`** (8 nodes): `fetchDashboardData()`, `fetchData()`, `formatDate()`, `getReleaseTrackCount()`, `getStatusChip()`, `handlePlayPause()`, `page.tsx`, `page.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 31`** (7 nodes): `ApiConnector`, `.buildHeaders()`, `.constructor()`, `.deliver()`, `.validateCredentials()`, `.validateWebhookSignature()`, `apiConnector.ts`
+- **Thin community `Community 31`** (8 nodes): `fetchReleases()`, `formatDate()`, `getFilteredReleases()`, `getStatusChip()`, `getTrackCount()`, `handleTabChange()`, `page.tsx`, `page.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 45`** (5 nodes): `gcsProvider.ts`, `GCSProvider`, `.constructor()`, `.generateSignedUrl()`, `.uploadFile()`
+- **Thin community `Community 32`** (7 nodes): `ApiConnector`, `.buildHeaders()`, `.constructor()`, `.deliver()`, `.validateCredentials()`, `.validateWebhookSignature()`, `apiConnector.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 46`** (5 nodes): `s3Provider.ts`, `S3Provider`, `.constructor()`, `.generateSignedUrl()`, `.uploadFile()`
+- **Thin community `Community 46`** (5 nodes): `gcsProvider.ts`, `GCSProvider`, `.constructor()`, `.generateSignedUrl()`, `.uploadFile()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (5 nodes): `checkToken()`, `clearToken()`, `loginAsAdmin()`, `testApiAccess()`, `admin-check.tsx`
+- **Thin community `Community 47`** (5 nodes): `s3Provider.ts`, `S3Provider`, `.constructor()`, `.generateSignedUrl()`, `.uploadFile()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (4 nodes): `ReleaseVersionService`, `.createVersion()`, `stableStringify()`, `releaseVersion.service.ts`
+- **Thin community `Community 48`** (5 nodes): `checkToken()`, `clearToken()`, `loginAsAdmin()`, `testApiAccess()`, `admin-check.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 55`** (3 nodes): `index.ts`, `connectDB()`, `startServer()`
+- **Thin community `Community 50`** (4 nodes): `ReleaseVersionService`, `.createVersion()`, `stableStringify()`, `releaseVersion.service.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 57`** (3 nodes): `audioAnalysisService.ts`, `analyzeAudio()`, `getFfmpeg()`
+- **Thin community `Community 56`** (3 nodes): `index.ts`, `connectDB()`, `startServer()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 59`** (3 nodes): `GenericAudioConnector`, `.constructor()`, `genericAudioConnector.ts`
+- **Thin community `Community 58`** (3 nodes): `audioAnalysisService.ts`, `analyzeAudio()`, `getFfmpeg()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 60`** (3 nodes): `ApiError.ts`, `ApiError`, `.constructor()`
+- **Thin community `Community 60`** (3 nodes): `GenericAudioConnector`, `.constructor()`, `genericAudioConnector.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 61`** (3 nodes): `middleware()`, `middleware.ts`, `validateToken()`
+- **Thin community `Community 61`** (3 nodes): `ApiError.ts`, `ApiError`, `.constructor()`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 63`** (3 nodes): `POST()`, `saveFileToDisk()`, `route.ts`
+- **Thin community `Community 62`** (3 nodes): `middleware()`, `middleware.ts`, `validateToken()`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 64`** (3 nodes): `POST()`, `saveFileToDisk()`, `route.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `sendUserAndAdminEmail()` connect `Community 0` to `Community 3`?**
-  _High betweenness centrality (0.071) - this node is a cross-community bridge._
+  _High betweenness centrality (0.072) - this node is a cross-community bridge._
 - **Why does `PATCH()` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 18`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
-- **Why does `proxyBackend()` connect `Community 1` to `Community 3`?**
-  _High betweenness centrality (0.059) - this node is a cross-community bridge._
+  _High betweenness centrality (0.069) - this node is a cross-community bridge._
+- **Why does `Boolean()` connect `Community 7` to `Community 2`, `Community 3`, `Community 9`, `Community 24`, `Community 25`?**
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
 - **Are the 57 inferred relationships involving `errorResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`errorResponse()` has 57 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 55 inferred relationships involving `successResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`successResponse()` has 55 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 32 inferred relationships involving `proxyBackend()` (e.g. with `GET()` and `POST()`) actually correct?**
   _`proxyBackend()` has 32 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 26 inferred relationships involving `getCurrentBackendUser()` (e.g. with `requireFullAdmin()` and `GET()`) actually correct?**
-  _`getCurrentBackendUser()` has 26 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 27 inferred relationships involving `connectToDatabase()` (e.g. with `GET()` and `POST()`) actually correct?**
+  _`connectToDatabase()` has 27 INFERRED edges - model-reasoned connections that need verification._
