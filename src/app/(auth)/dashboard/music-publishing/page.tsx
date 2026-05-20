@@ -7,6 +7,7 @@ import {
   Chip,
   CircularProgress,
   FormControl,
+  InputAdornment,
   InputLabel,
   MenuItem,
   Paper,
@@ -21,10 +22,11 @@ import {
   TablePagination,
   TableRow,
   Tabs,
+  TextField,
   Typography,
   useTheme,
 } from '@mui/material';
-import { CheckCircle, LibraryMusic, PendingActions } from '@mui/icons-material';
+import { CheckCircle, LibraryMusic, PendingActions, Search } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 type UserPublishingTab = 'pending' | 'approved';
@@ -52,8 +54,17 @@ export default function MusicPublishingPage() {
   const [rowsPerPage, setRowsPerPage] = useState(50);
   const [total, setTotal] = useState(0);
   const [activeTab, setActiveTab] = useState<UserPublishingTab>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,8 +73,14 @@ export default function MusicPublishingPage() {
       setLoading(true);
       setError('');
       try {
+        const params = new URLSearchParams({
+          tab: activeTab,
+          page: String(page + 1),
+          limit: String(rowsPerPage),
+        });
+        if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
         const response = await fetch(
-          `/api/music-publishing/tracks?tab=${activeTab}&page=${page + 1}&limit=${rowsPerPage}`,
+          `/api/music-publishing/tracks?${params.toString()}`,
           { signal: controller.signal }
         );
         const payload = await response.json().catch(() => null);
@@ -84,7 +101,7 @@ export default function MusicPublishingPage() {
 
     loadTracks();
     return () => controller.abort();
-  }, [activeTab, page, rowsPerPage]);
+  }, [activeTab, debouncedSearchQuery, page, rowsPerPage]);
 
   const handleTabChange = (_event: SyntheticEvent, value: UserPublishingTab) => {
     setActiveTab(value);
@@ -92,7 +109,7 @@ export default function MusicPublishingPage() {
   };
 
   return (
-    <Box sx={{ px: { xs: 0, md: 1 }, py: 1, maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
       <PremiumHeader
         eyebrow="Publishing"
         title="Music Publishing"
@@ -129,12 +146,34 @@ export default function MusicPublishingPage() {
             ))}
           </Tabs>
 
-          <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
-            <Chip icon={<LibraryMusic />} label={`${total} Tracks`} variant="outlined" />
-            <Chip
-              color={activeTab === 'approved' ? 'success' : 'warning'}
-              label={activeTab === 'approved' ? 'Admin Approved' : 'Awaiting Approval'}
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }} useFlexGap flexWrap="wrap">
+            <TextField
+              label="Search Tracks"
+              name="musicPublishingSearch"
+              placeholder="Name, ISRC, UPC, artist…"
+              size="small"
+              value={searchQuery}
+              onChange={event => {
+                setSearchQuery(event.target.value);
+                setPage(0);
+              }}
+              autoComplete="off"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: '100%', md: 360 } }}
             />
+            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+              <Chip icon={<LibraryMusic />} label={`${total} Tracks`} variant="outlined" />
+              <Chip
+                color={activeTab === 'approved' ? 'success' : 'warning'}
+                label={activeTab === 'approved' ? 'Admin Approved' : 'Awaiting Approval'}
+              />
+            </Stack>
           </Stack>
         </Stack>
       </Paper>

@@ -24,8 +24,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
-  Alert,
-  Snackbar,
   useTheme,
   useMediaQuery,
   MenuItem,
@@ -47,6 +45,7 @@ import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { isFullAdmin } from '@/lib/adminAccess';
+import { toast } from 'sonner';
 
 interface AdminUser {
   _id: string;
@@ -70,12 +69,6 @@ interface AdminUsersResponseData {
   };
 }
 
-interface SnackbarState {
-  open: boolean;
-  message: string;
-  severity: 'success' | 'error' | 'warning' | 'info';
-}
-
 export default function AdminUsersPage() {
   const router = useRouter();
   const theme = useTheme();
@@ -94,7 +87,6 @@ export default function AdminUsersPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
-  const [snackbar, setSnackbar] = useState<SnackbarState>({ open: false, message: '', severity: 'success' });
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [kycFilter, setKycFilter] = useState('');
   const [reviewingKyc, setReviewingKyc] = useState<string | null>(null);
@@ -133,7 +125,7 @@ export default function AdminUsersPage() {
       console.error('Error fetching users:', error);
       setUsers([]);
       setTotalUsers(0);
-      showSnackbar('Error fetching users', 'error');
+      showToast('Error fetching users', 'error');
     } finally {
       setLoading(false);
     }
@@ -187,14 +179,14 @@ export default function AdminUsersPage() {
     try {
       const response = await adminAPI.deleteUser(userToDelete._id);
       if (response.success) {
-        showSnackbar('User deleted successfully', 'success');
+        showToast('User deleted successfully', 'success');
         void fetchUsers();
       } else {
-        showSnackbar(response.message || 'Failed to delete user', 'error');
+        showToast(response.message || 'Failed to delete user', 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete user';
-      showSnackbar(message, 'error');
+      showToast(message, 'error');
     } finally {
       setDeleteDialogOpen(false);
       setUserToDelete(null);
@@ -211,18 +203,18 @@ export default function AdminUsersPage() {
       });
       
       if (response.success) {
-        showSnackbar(`User ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success');
+        showToast(`User ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success');
         setUsers(prevUsers => 
           prevUsers.map(u => 
             u._id === selectedUser._id ? { ...u, isActive: newStatus } : u
           )
         );
       } else {
-        showSnackbar(response.message || `Failed to ${newStatus ? 'activate' : 'deactivate'} user`, 'error');
+        showToast(response.message || `Failed to ${newStatus ? 'activate' : 'deactivate'} user`, 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update user status';
-      showSnackbar(message, 'error');
+      showToast(message, 'error');
     } finally {
       setUpdatingStatus(null);
     }
@@ -237,14 +229,14 @@ export default function AdminUsersPage() {
       });
 
       if (response.success) {
-        showSnackbar(`KYC ${status} successfully`, 'success');
+        showToast(`KYC ${status} successfully`, 'success');
         void fetchUsers();
       } else {
-        showSnackbar(response.message || 'Failed to update KYC', 'error');
+        showToast(response.message || 'Failed to update KYC', 'error');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to update KYC';
-      showSnackbar(message, 'error');
+      showToast(message, 'error');
     } finally {
       setReviewingKyc(null);
     }
@@ -261,12 +253,8 @@ export default function AdminUsersPage() {
     return <Chip label={normalized} color={color as any} size="small" sx={{ height: 22, fontSize: '0.7rem', minWidth: 76 }} />;
   };
 
-  const showSnackbar = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
-    setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
+  const showToast = (message: string, severity: 'success' | 'error' | 'warning' | 'info') => {
+    toast[severity](message);
   };
 
   const handleCloseDeleteDialog = () => {
@@ -655,21 +643,6 @@ export default function AdminUsersPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

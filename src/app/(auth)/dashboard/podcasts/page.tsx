@@ -31,15 +31,6 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ImageIcon from '@mui/icons-material/Image';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-} from 'recharts';
 import { useAuth } from '@/context/AppContext';
 import {
   CreateRssEpisodePayload,
@@ -50,6 +41,7 @@ import {
   RssPodcast,
   RssPresignedUpload,
 } from '@/types/rss';
+import { toast } from 'sonner';
 
 const LANGUAGE_OPTIONS = [
   { value: 'en-us', label: 'English (US)' },
@@ -62,7 +54,7 @@ const LANGUAGE_OPTIONS = [
 ];
 
 type PodcastAccessMode = 'shared' | 'owned';
-type ActiveView = 'podcast' | 'episodes' | 'analytics';
+type ActiveView = 'podcast' | 'episodes' | 'payouts';
 
 interface PodcastFormState {
   title: string;
@@ -169,7 +161,7 @@ const PODCAST_DESTINATIONS = [
   { name: 'Amazon Music', mark: 'AM', color: '#2563eb' },
   { name: 'Podcast Index', mark: 'PI', color: '#f97316' },
   { name: 'Listen Notes', mark: 'LN', color: '#dc2626' },
-  { name: 'RSS.com Community', mark: 'RSS', color: '#f97316' },
+  { name: 'Podcast Community', mark: 'PC', color: '#f97316' },
   { name: 'Castamatic', mark: 'CA', color: '#0891b2' },
   { name: 'Castbox', mark: 'CB', color: '#ef4444' },
   { name: 'Castro', mark: 'C', color: '#4338ca' },
@@ -199,11 +191,13 @@ function step2Valid(form: PodcastFormState) {
 
 // ─── Episode step 1 validation ───────────────────────────────────────────────
 function episodeStepValid(step: number, form: EpisodeFormState, audio: File | null) {
-  if (step === 0) return form.title.trim().length > 0 && Boolean(audio);
+  if (step === 0) {
+    return form.title.trim().length > 0 && form.description.trim().length > 0 && Boolean(audio);
+  }
   return true;
 }
 
-export function PodcastsContent() {
+export function PodcastsContent({ allowPodcastCreation = false }: { allowPodcastCreation?: boolean }) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -215,7 +209,13 @@ export function PodcastsContent() {
   // Derive active view from URL query param
   const viewParam = searchParams.get('view') as ActiveView | null;
   const activeView: ActiveView =
-    viewParam === 'episodes' ? 'episodes' : viewParam === 'analytics' ? 'analytics' : 'podcast';
+    viewParam === 'payouts'
+      ? 'payouts'
+      : viewParam === 'episodes'
+        ? 'episodes'
+        : allowPodcastCreation
+          ? 'podcast'
+          : 'episodes';
 
   const [categories, setCategories] = useState<RssCategory[]>([]);
   const [podcasts, setPodcasts] = useState<RssPodcast[]>([]);
@@ -230,14 +230,8 @@ export function PodcastsContent() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmittingPodcast, setIsSubmittingPodcast] = useState(false);
   const [isSubmittingEpisode, setIsSubmittingEpisode] = useState(false);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
-    null
-  );
   const [accessMode, setAccessMode] = useState<PodcastAccessMode>('shared');
   const [workspaceSupervisor, setWorkspaceSupervisor] = useState(false);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
-  const [analyticsData, setAnalyticsData] = useState<unknown>(null);
   const [podcastCoverPreview, setPodcastCoverPreview] = useState<string | null>(null);
 
   // Step form state
@@ -255,8 +249,14 @@ export function PodcastsContent() {
     () => episodes.filter(e => e.status === 'published').length,
     [episodes]
   );
+  const selectedPodcast = useMemo(
+    () => podcasts.find(podcast => podcast.id === selectedPodcastId) || null,
+    [podcasts, selectedPodcastId]
+  );
 
-  const hasPodcast = accessMode === 'owned' && podcasts.length > 0 && !workspaceSupervisor;
+  const hasPodcast =
+    !allowPodcastCreation && accessMode === 'owned' && podcasts.length > 0 && !workspaceSupervisor;
+  const canCreatePodcasts = allowPodcastCreation;
 
   // Auto-fill author from user
   useEffect(() => {
@@ -298,10 +298,7 @@ export function PodcastsContent() {
           setSelectedPodcastId(cur => cur ?? podJson.data![0].id);
         }
       } catch (error) {
-        setFeedback({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to load podcast workspace',
-        });
+        toast.error(error instanceof Error ? error.message : 'Failed to load podcast workspace');
       } finally {
         setIsBootstrapping(false);
       }
@@ -352,73 +349,11 @@ export function PodcastsContent() {
         setMidrollsByEpisode({});
         setMidrollInputs({});
       } catch (error) {
-        setFeedback({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Failed to load episodes',
-        });
+        toast.error(error instanceof Error ? error.message : 'Failed to load episodes');
       }
     };
     void load();
   }, [selectedPodcastId]);
-
-  // Load analytics
-  useEffect(() => {
-    if (activeView !== 'analytics' || !selectedPodcastId) {
-      setAnalyticsData(null);
-      setAnalyticsError(null);
-      setAnalyticsLoading(false);
-      return;
-    }
-    const load = async () => {
-      try {
-        setAnalyticsLoading(true);
-        setAnalyticsError(null);
-        const res = await fetch(`/api/rss/podcasts/${selectedPodcastId}/analytics`, {
-          cache: 'no-store',
-        });
-        const json = await readJson<{ success: boolean; data?: unknown; message?: string }>(res);
-        if (!json.success) throw new Error(json.message || 'Failed to load analytics');
-        setAnalyticsData(json.data ?? null);
-      } catch (error) {
-        setAnalyticsError(error instanceof Error ? error.message : 'Failed to load analytics');
-      } finally {
-        setAnalyticsLoading(false);
-      }
-    };
-    void load();
-  }, [activeView, selectedPodcastId]);
-
-  const analyticsSeries = useMemo(() => {
-    const data = analyticsData;
-    if (!data || typeof data !== 'object') return null;
-    const obj = data as Record<string, unknown>;
-    for (const key of ['downloads_by_day', 'daily_downloads', 'downloads', 'series', 'timeline']) {
-      const value = obj[key];
-      if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object') {
-        const rows = value as Array<Record<string, unknown>>;
-        const normalized = rows
-          .map(row => {
-            const date =
-              (row.date as string) ||
-              (row.day as string) ||
-              (row.timestamp as string) ||
-              (row.label as string);
-            const v =
-              (row.downloads as number) ||
-              (row.count as number) ||
-              (row.value as number) ||
-              (row.total as number);
-            if (!date || typeof date !== 'string') return null;
-            const num = typeof v === 'number' ? v : Number(v);
-            if (!Number.isFinite(num)) return null;
-            return { date, downloads: num };
-          })
-          .filter(Boolean) as { date: string; downloads: number }[];
-        if (normalized.length) return normalized;
-      }
-    }
-    return null;
-  }, [analyticsData]);
 
   const uploadAsset = async (
     podcastId: number,
@@ -456,10 +391,7 @@ export function PodcastsContent() {
       if (!json.success) throw new Error(json.message || 'Failed to load ad markers');
       setMidrollsByEpisode(cur => ({ ...cur, [episodeId]: json.data || [] }));
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load ad markers',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to load ad markers');
     } finally {
       setMidrollLoading(cur => ({ ...cur, [episodeId]: false }));
     }
@@ -469,7 +401,7 @@ export function PodcastsContent() {
     if (!selectedPodcastId) return;
     const startTimeMs = parseMarkerTimeToMs(midrollInputs[episodeId] || '');
     if (startTimeMs === null) {
-      setFeedback({ type: 'error', message: 'Use HH:MM:SS or MM:SS for ad marker time.' });
+      toast.error('Use HH:MM:SS or MM:SS for ad marker time.');
       return;
     }
 
@@ -495,12 +427,9 @@ export function PodcastsContent() {
         ),
       }));
       setMidrollInputs(cur => ({ ...cur, [episodeId]: '' }));
-      setFeedback({ type: 'success', message: 'Ad marker added.' });
+      toast.success('Ad marker added.');
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to add ad marker',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to add ad marker');
     } finally {
       setMidrollSaving(cur => ({ ...cur, [episodeId]: false }));
     }
@@ -521,12 +450,9 @@ export function PodcastsContent() {
         ...cur,
         [episodeId]: (cur[episodeId] || []).filter(marker => marker.id !== midrollId),
       }));
-      setFeedback({ type: 'success', message: 'Ad marker removed.' });
+      toast.success('Ad marker removed.');
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to delete ad marker',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete ad marker');
     } finally {
       setMidrollDeleting(cur => ({ ...cur, [episodeId]: null }));
     }
@@ -534,12 +460,11 @@ export function PodcastsContent() {
 
   const handlePodcastSubmit = async () => {
     if (selectedCategories.length === 0) {
-      setFeedback({ type: 'error', message: 'Pick at least one podcast category.' });
+      toast.error('Pick at least one podcast category.');
       return;
     }
     try {
       setIsSubmittingPodcast(true);
-      setFeedback(null);
       const payload: CreateRssPodcastPayload = {
         title: podcastForm.title.trim(),
         description: podcastForm.description.trim(),
@@ -613,16 +538,10 @@ export function PodcastsContent() {
       setPodcastCoverPreview(null);
       setCreateStep(0);
       setSlugManuallyEdited(false);
-      setFeedback({
-        type: 'success',
-        message: `Podcast "${finalPodcast.title}" created successfully.`,
-      });
-      router.push('/dashboard/podcasts?view=episodes');
+      toast.success(`Podcast "${finalPodcast.title}" created successfully.`);
+      router.push(allowPodcastCreation ? '/admin/podcasts?view=episodes' : '/dashboard/podcasts?view=episodes');
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to create podcast',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to create podcast');
     } finally {
       setIsSubmittingPodcast(false);
     }
@@ -631,16 +550,15 @@ export function PodcastsContent() {
   const handleEpisodeSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPodcastId) {
-      setFeedback({ type: 'error', message: 'Select or create a podcast first.' });
+      toast.error('Select a podcast first.');
       return;
     }
     if (!episodeAudio) {
-      setFeedback({ type: 'error', message: 'Select an audio file for the episode.' });
+      toast.error('Select an audio file for the episode.');
       return;
     }
     try {
       setIsSubmittingEpisode(true);
-      setFeedback(null);
       const audioUpload = await uploadAsset(selectedPodcastId, episodeAudio, 'audio');
       let coverUploadId: string | undefined;
       if (episodeCover) {
@@ -672,15 +590,9 @@ export function PodcastsContent() {
       setEpisodeAudio(null);
       setEpisodeCover(null);
       setEpisodeStep(0);
-      setFeedback({
-        type: 'success',
-        message: `Episode "${json.data.title}" published successfully.`,
-      });
+      toast.success(`Episode "${json.data.title}" published successfully.`);
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to create episode',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to create episode');
     } finally {
       setIsSubmittingEpisode(false);
     }
@@ -728,7 +640,7 @@ export function PodcastsContent() {
               }}
               helperText={
                 podcastForm.slug
-                  ? `rss.com/podcasts/${podcastForm.slug}`
+                  ? `Public podcast URL slug: ${podcastForm.slug}`
                   : 'Auto-generated from title'
               }
               InputProps={{
@@ -738,7 +650,7 @@ export function PodcastsContent() {
                     color="text.secondary"
                     sx={{ mr: 0.5, whiteSpace: 'nowrap' }}
                   >
-                    rss.com/podcasts/
+                    podcast/
                   </Typography>
                 ),
               }}
@@ -946,6 +858,17 @@ export function PodcastsContent() {
             fullWidth
             value={episodeForm.title}
             onChange={e => setEpisodeForm(cur => ({ ...cur, title: e.target.value }))}
+          />
+          <TextField
+            label="Episode Notes"
+            required
+            fullWidth
+            multiline
+            minRows={7}
+            value={episodeForm.description}
+            onChange={e => setEpisodeForm(cur => ({ ...cur, description: e.target.value }))}
+            inputProps={{ maxLength: 4000 }}
+            helperText={`${episodeForm.description.length}/4000`}
           />
           <Box
             sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.1fr 0.9fr' }, gap: 2 }}
@@ -1194,27 +1117,21 @@ export function PodcastsContent() {
             sx={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}
           >
             {workspaceSupervisor
-              ? 'Workspace owner: all podcasts under this API key are listed here.'
+              ? 'Workspace owner: all podcast workspaces are listed here.'
               : accessMode === 'owned'
-                ? 'Each account gets one podcast. Create it once, then keep adding episodes.'
-                : 'Shared workspace — create and manage podcasts without separate subscriptions.'}
+                ? 'Select any podcast workspace and upload a new episode.'
+                : 'Shared podcast workspace. Add episodes to available podcasts.'}
           </Typography>
         </Stack>
       </Box>
-
-      {feedback && (
-        <Alert severity={feedback.type} sx={{ mb: 3 }} onClose={() => setFeedback(null)}>
-          {feedback.message}
-        </Alert>
-      )}
 
       {/* Stats row */}
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-          gap: 2,
-          mb: 3,
+          gap: 1.5,
+          mb: 2,
         }}
       >
         <Box
@@ -1223,16 +1140,16 @@ export function PodcastsContent() {
             border: '1px solid',
             borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
             bgcolor: isDark ? '#111827' : '#ffffff',
-            p: 2.25,
+            p: 1.5,
           }}
         >
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ bgcolor: '#4a6cf7', width: 44, height: 44 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ bgcolor: '#4a6cf7', width: 36, height: 36 }}>
               <PodcastIcon />
             </Avatar>
             <Box>
               <Typography
-                sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
+                sx={{ fontWeight: 800, fontSize: '1.15rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
               >
                 {podcasts.length}
               </Typography>
@@ -1254,16 +1171,16 @@ export function PodcastsContent() {
             border: '1px solid',
             borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
             bgcolor: isDark ? '#111827' : '#ffffff',
-            p: 2.25,
+            p: 1.5,
           }}
         >
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ bgcolor: '#f59e0b', width: 44, height: 44 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ bgcolor: '#f59e0b', width: 36, height: 36 }}>
               <MicIcon />
             </Avatar>
             <Box>
               <Typography
-                sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
+                sx={{ fontWeight: 800, fontSize: '1.15rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
               >
                 {episodes.length}
               </Typography>
@@ -1285,16 +1202,16 @@ export function PodcastsContent() {
             border: '1px solid',
             borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
             bgcolor: isDark ? '#111827' : '#ffffff',
-            p: 2.25,
+            p: 1.5,
           }}
         >
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Avatar sx={{ bgcolor: '#10b981', width: 44, height: 44 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ bgcolor: '#10b981', width: 36, height: 36 }}>
               <UploadFileIcon />
             </Avatar>
             <Box>
               <Typography
-                sx={{ fontWeight: 800, fontSize: '1.45rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
+                sx={{ fontWeight: 800, fontSize: '1.15rem', color: isDark ? '#f1f5f9' : '#0f172a' }}
               >
                 {publishedEpisodes}
               </Typography>
@@ -1314,17 +1231,24 @@ export function PodcastsContent() {
 
       {/* ── MY PODCAST VIEW ─────────────────────────────────────────────── */}
       {activeView === 'podcast' && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: canCreatePodcasts ? { xs: '1fr', lg: '1fr 1fr' } : '1fr',
+            gap: 3,
+          }}
+        >
           {/* Left: step form */}
-          <Box
-            sx={{
-              p: { xs: 2.5, md: 3 },
-              borderRadius: '14px',
-              border: '1px solid',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
-              bgcolor: isDark ? '#111827' : '#ffffff',
-            }}
-          >
+          {canCreatePodcasts && (
+            <Box
+              sx={{
+                p: { xs: 2.5, md: 3 },
+                borderRadius: '14px',
+                border: '1px solid',
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+                bgcolor: isDark ? '#111827' : '#ffffff',
+              }}
+            >
             <Stack
               direction="row"
               alignItems="center"
@@ -1357,8 +1281,8 @@ export function PodcastsContent() {
 
             {hasPodcast ? (
               <Alert severity="info">
-                This account already has a linked podcast. Head to <strong>Episodes</strong> in the
-                sidebar to publish new episodes.
+                This account already has a linked podcast. Head to <strong>Upload Episode</strong>{' '}
+                in the sidebar to publish new episodes.
               </Alert>
             ) : (
               <>
@@ -1424,13 +1348,14 @@ export function PodcastsContent() {
                       }
                       onClick={handlePodcastSubmit}
                     >
-                      {isSubmittingPodcast ? 'Creating...' : 'Create Podcast'}
+                      {isSubmittingPodcast ? 'Creating…' : 'Create Podcast'}
                     </Button>
                   )}
                 </Stack>
               </>
             )}
-          </Box>
+            </Box>
+          )}
 
           {/* Right: existing podcasts list */}
           <Box
@@ -1447,15 +1372,14 @@ export function PodcastsContent() {
               fontWeight={700}
               sx={{ mb: 2, color: isDark ? '#f1f5f9' : '#0f172a' }}
             >
-              {podcasts.length > 0 ? 'Your Podcasts' : 'Podcast Preview'}
+              {podcasts.length > 0 ? 'Available Podcasts' : 'No Podcasts Available'}
             </Typography>
             {podcasts.length === 0 ? (
               <Typography
                 variant="body2"
                 sx={{ color: isDark ? 'rgba(255,255,255,0.56)' : 'rgba(15,23,42,0.58)' }}
               >
-                Podcast card appears here after creation. Use the form without losing space to an
-                empty state.
+                No podcasts are available yet. Contact admin.
               </Typography>
             ) : (
               <Stack spacing={2}>
@@ -1470,7 +1394,7 @@ export function PodcastsContent() {
                       borderColor: selectedPodcastId === podcast.id ? 'primary.main' : 'divider',
                       bgcolor: selectedPodcastId === podcast.id ? 'action.selected' : 'transparent',
                       cursor: 'pointer',
-                      transition: 'all 0.15s',
+                      transition: 'border-color 150ms ease, background-color 150ms ease',
                       '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
                     }}
                   >
@@ -1549,10 +1473,9 @@ export function PodcastsContent() {
             </Typography>
 
             {podcasts.length === 0 ? (
-              <Alert severity="warning">Create a podcast first before publishing episodes.</Alert>
+              <Alert severity="warning">No podcasts are available yet. Contact admin.</Alert>
             ) : (
               <>
-                {/* Podcast selector */}
                 <TextField
                   select
                   label="Podcast"
@@ -1562,20 +1485,58 @@ export function PodcastsContent() {
                   sx={{
                     mb: 2.5,
                     '& .MuiSelect-select': {
-                      whiteSpace: 'pre-wrap',
+                      alignItems: 'center',
+                      display: 'flex',
+                      minHeight: 48,
                     },
                   }}
                   SelectProps={{
+                    renderValue: value => {
+                      const podcast = podcasts.find(p => p.id === Number(value)) || selectedPodcast;
+
+                      if (!podcast) return 'Select Podcast';
+
+                      return (
+                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
+                          {podcast.cover_url ? (
+                            <Box
+                              component="img"
+                              src={podcast.cover_url}
+                              alt=""
+                              aria-hidden="true"
+                              width={40}
+                              height={40}
+                              sx={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 1.25,
+                                objectFit: 'cover',
+                                flexShrink: 0,
+                              }}
+                            />
+                          ) : (
+                            <Avatar sx={{ width: 40, height: 40, borderRadius: 1.25, bgcolor: 'primary.dark' }}>
+                              <PodcastIcon />
+                            </Avatar>
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="subtitle2" fontWeight={800} noWrap>
+                              {podcast.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {podcast.language.toUpperCase()}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      );
+                    },
                     MenuProps: {
                       PaperProps: {
                         sx: {
                           '& .MuiMenuItem-root': {
-                            whiteSpace: 'pre-wrap !important',
-                            overflowWrap: 'anywhere',
-                            wordBreak: 'break-word',
                             height: 'auto',
-                            lineHeight: 1.35,
-                            py: 1.25,
+                            minHeight: 64,
+                            py: 1,
                           },
                         },
                       },
@@ -1587,13 +1548,39 @@ export function PodcastsContent() {
                       key={p.id}
                       value={p.id}
                       sx={{
-                        whiteSpace: 'pre-wrap !important',
-                        overflowWrap: 'anywhere',
-                        wordBreak: 'break-word',
-                        height: 'auto',
+                        gap: 1.5,
+                        whiteSpace: 'normal',
                       }}
                     >
-                      {p.title}
+                      {p.cover_url ? (
+                        <Box
+                          component="img"
+                          src={p.cover_url}
+                          alt=""
+                          aria-hidden="true"
+                          width={44}
+                          height={44}
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 1.25,
+                            objectFit: 'cover',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <Avatar sx={{ width: 44, height: 44, borderRadius: 1.25, bgcolor: 'primary.dark' }}>
+                          <PodcastIcon />
+                        </Avatar>
+                      )}
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="subtitle2" fontWeight={800}>
+                          {p.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {p.language.toUpperCase()}
+                        </Typography>
+                      </Box>
                     </MenuItem>
                   ))}
                 </TextField>
@@ -1670,7 +1657,7 @@ export function PodcastsContent() {
                         void handleEpisodeSubmit(syntheticEvent);
                       }}
                     >
-                      {isSubmittingEpisode ? 'Uploading...' : 'Publish Episode'}
+                      {isSubmittingEpisode ? 'Uploading…' : 'Publish Episode'}
                     </Button>
                   )}
                 </Stack>
@@ -1702,7 +1689,7 @@ export function PodcastsContent() {
                 <Chip label={`${episodes.length} total`} size="small" variant="outlined" />
               </Stack>
               <Alert severity="info" sx={{ mb: 2 }}>
-                Ad markers use RSS.com Midrolls. RSS.com must have PAID enabled on the podcast.
+                Ad markers use podcast midrolls. Paid ad insertion must be enabled on the podcast.
               </Alert>
               {episodes.length === 0 ? (
                 <Stack alignItems="center" spacing={2} sx={{ py: 6 }}>
@@ -1805,7 +1792,7 @@ export function PodcastsContent() {
                               disabled={midrollLoading[episode.id]}
                               onClick={() => loadEpisodeMidrolls(episode.id)}
                             >
-                              {midrollLoading[episode.id] ? 'Loading...' : 'Load markers'}
+                              {midrollLoading[episode.id] ? 'Loading…' : 'Load markers'}
                             </Button>
                           </Stack>
                           <Typography variant="caption" color="text.secondary">
@@ -1836,8 +1823,8 @@ export function PodcastsContent() {
         </Box>
       )}
 
-      {/* ── ANALYTICS VIEW ──────────────────────────────────────────────── */}
-      {activeView === 'analytics' && (
+      {/* ── PAYOUTS VIEW ────────────────────────────────────────────────── */}
+      {activeView === 'payouts' && (
         <Paper
           elevation={0}
           sx={{
@@ -1848,10 +1835,15 @@ export function PodcastsContent() {
             bgcolor: 'background.paper',
           }}
         >
-          <Stack spacing={2}>
-            <Typography variant="h6" fontWeight={700}>
-              Podcast Analytics
-            </Typography>
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="h6" fontWeight={800}>
+                Podcast Payouts
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Podcast payout and profit data is not exposed by the current Core API.
+              </Typography>
+            </Box>
             {podcasts.length > 0 && (
               <TextField
                 select
@@ -1868,41 +1860,43 @@ export function PodcastsContent() {
                 ))}
               </TextField>
             )}
-            {analyticsLoading && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                <CircularProgress />
-              </Box>
-            )}
-            {analyticsError && <Alert severity="error">{analyticsError}</Alert>}
-            {!analyticsLoading && !analyticsError && selectedPodcastId && (
-              <Box sx={{ height: 320, width: '100%' }}>
-                {analyticsSeries ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={analyticsSeries}
-                      margin={{ top: 10, right: 20, left: 0, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={24} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <RechartsTooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="downloads"
-                        stroke="#5B8CFF"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <Alert severity="info">
-                    Analytics loaded but response shape not yet recognized. Will map once exact API
-                    payload is available.
-                  </Alert>
-                )}
-              </Box>
-            )}
+            <Alert severity="info" sx={{ borderRadius: 2 }}>
+              Official Core API paths currently cover categories, podcasts, episodes, assets,
+              collaborators, keywords, roles, chapters, transcripts, soundbites, and midrolls. No
+              payout, revenue, earning, monetization, balance, or profit endpoint is available, so
+              this app cannot show podcast profit from the API yet.
+            </Alert>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+                gap: 1.5,
+              }}
+            >
+              {[
+                ['Available API payout', 'Not available'],
+                ['Profit reporting', 'Not available'],
+                ['Status', 'Waiting for API support'],
+              ].map(([label, value]) => (
+                <Box
+                  key={label}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    p: 2,
+                    bgcolor: 'background.default',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" fontWeight={800}>
+                    {label}
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={900} sx={{ mt: 0.5 }}>
+                    {value}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
           </Stack>
         </Paper>
       )}

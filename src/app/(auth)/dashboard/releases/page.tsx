@@ -83,7 +83,7 @@ function ReleasesContent() {
   useEffect(() => {
     const fetchReleases = async () => {
       try {
-        const res = await fetch('/api/releases');
+        const res = await fetch('/api/releases?summary=1');
         const data = await res.json();
         if (data.success) {
           setReleases(data.releases || data.data || []);
@@ -102,6 +102,8 @@ function ReleasesContent() {
   const filteredReleases = currentStatus
     ? releases.filter(r => r.status === currentStatus)
     : releases;
+  const getTrackCount = (release: any) =>
+    Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
 
   const getStatusChip = (status: string) => {
     const map: Record<string, { color: string; bg: string; label: string }> = {
@@ -195,7 +197,7 @@ function ReleasesContent() {
   };
 
   return (
-    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Distribution"
         title="Releases"
@@ -411,7 +413,7 @@ function ReleasesContent() {
               {/* Tracks */}
               <Box sx={{ display: { xs: 'none', md: 'block' } }}>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#e2e8f0' : '#1e293b' }}>
-                  {release.tracks?.length || 0}
+                  {getTrackCount(release)}
                 </Typography>
               </Box>
 
@@ -429,7 +431,7 @@ function ReleasesContent() {
               {/* Mobile: extra info */}
               <Box sx={{ display: { xs: 'flex', md: 'none' }, gap: 2, alignItems: 'center', mt: 0.5 }}>
                 <Typography sx={{ fontSize: '0.72rem', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.45)' }}>
-                  {release.releaseType} · {release.tracks?.length || 0} tracks · {formatDate(release.releaseDate)}
+                  {release.releaseType} · {getTrackCount(release)} tracks · {formatDate(release.releaseDate)}
                 </Typography>
               </Box>
             </Box>

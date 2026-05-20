@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(MAX_LIMIT, Math.max(10, Number(searchParams.get('limit') || 50)));
     const skip = (page - 1) * limit;
     const tab = getUserPublishingTab(searchParams.get('tab'));
+    const query = (searchParams.get('q') || '').trim().toLowerCase();
 
     const releases = await db.collection('releases')
       .find({ $and: [getReleaseOwnerQuery(user), { status: 'approved' }] }, {
@@ -59,9 +60,16 @@ export async function GET(req: NextRequest) {
       .sort({ updatedAt: -1, createdAt: -1 })
       .toArray();
 
-    const rows = normalizeMusicPublishingTracks(releases).filter((row) =>
-      tab === 'approved' ? row.publishingStatus === 'completed' : row.publishingStatus !== 'completed'
-    );
+    const rows = normalizeMusicPublishingTracks(releases)
+      .filter((row) =>
+        tab === 'approved' ? row.publishingStatus === 'completed' : row.publishingStatus !== 'completed'
+      )
+      .filter((row) => {
+        if (!query) return true;
+        return Object.values(row).some((value) =>
+          String(value || '').toLowerCase().includes(query)
+        );
+      });
 
     return NextResponse.json({
       success: true,

@@ -16,13 +16,18 @@ import {
   Tooltip,
   Badge,
   Button,
+  ListItemIcon,
 } from '@mui/material';
 import {
+  AccountBalanceWallet,
   NotificationsOutlined,
   KeyboardArrowDown,
   DarkMode,
   LightMode,
+  Logout,
+  Person as PersonIcon,
   Search as SearchIcon,
+  TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
@@ -53,7 +58,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
   // Initialize client-side state
   useEffect(() => {
     setIsClient(true);
-    setIsAdmin(user?.role === 'admin');
+    setIsAdmin(user?.role === 'admin' || user?.role === 'subadmin');
     setIsDarkMode(theme.palette.mode === 'dark');
   }, [user, theme.palette.mode]);
 
@@ -289,16 +294,21 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
           />
 
           {/* User menu */}
-          <Box
+          <Button
             onClick={handleUserMenuOpen}
+            aria-label="Open profile menu"
+            aria-controls={userMenuAnchor ? 'profile-menu' : undefined}
+            aria-haspopup="menu"
             sx={{
               display: 'flex',
               alignItems: 'center',
               gap: 1,
-              cursor: 'pointer',
               py: 0.5,
               px: 1,
+              minWidth: 0,
               borderRadius: '10px',
+              color: 'inherit',
+              textTransform: 'none',
               transition: 'background 150ms ease',
               '&:hover': {
                 bgcolor: isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.03)',
@@ -331,8 +341,9 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
               </Typography>
             </Box>
             <KeyboardArrowDown sx={{ fontSize: 16, color: isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)' }} />
-          </Box>
+          </Button>
           <Menu
+            id="profile-menu"
             anchorEl={userMenuAnchor}
             open={Boolean(userMenuAnchor)}
             onClose={handleUserMenuClose}
@@ -346,20 +357,70 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                 boxShadow: isDarkMode
                   ? '0 8px 24px rgba(0,0,0,0.3)'
                   : '0 8px 24px rgba(15,23,42,0.08)',
-                minWidth: 180,
+                minWidth: 260,
               },
             }}
           >
+            <Box sx={{ px: 2, py: 1.5, maxWidth: 300 }}>
+              <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', minWidth: 0 }}>
+                <Avatar
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: isDarkMode ? '#1e293b' : '#e2e8f0',
+                    fontSize: '0.9rem',
+                    fontWeight: 800,
+                    color: isDarkMode ? '#94a3b8' : '#475569',
+                    flex: '0 0 auto',
+                  }}
+                >
+                  {user?.name?.[0]?.toUpperCase() || 'U'}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {user?.name || 'User'}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflowWrap: 'anywhere' }}>
+                    {user?.email || 'No email available'}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <Divider sx={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
             <MenuItem
               component={Link}
               href={isAdmin ? '/admin/profile' : '/dashboard/profile'}
               onClick={handleUserMenuClose}
               sx={{ py: 1.25, fontSize: '0.875rem' }}
             >
+              <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
               Profile
             </MenuItem>
+            {!isAdmin && (
+              <MenuItem
+                component={Link}
+                href="/dashboard/royalties"
+                onClick={handleUserMenuClose}
+                sx={{ py: 1.25, fontSize: '0.875rem' }}
+              >
+                <ListItemIcon><TrendingUp fontSize="small" /></ListItemIcon>
+                Royalties
+              </MenuItem>
+            )}
+            {!isAdmin && (
+              <MenuItem
+                component={Link}
+                href="/dashboard/payouts"
+                onClick={handleUserMenuClose}
+                sx={{ py: 1.25, fontSize: '0.875rem' }}
+              >
+                <ListItemIcon><AccountBalanceWallet fontSize="small" /></ListItemIcon>
+                Payouts
+              </MenuItem>
+            )}
             <Divider sx={{ borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
             <MenuItem onClick={logout} sx={{ py: 1.25, fontSize: '0.875rem', color: '#ef4444' }}>
+              <ListItemIcon><Logout fontSize="small" sx={{ color: '#ef4444' }} /></ListItemIcon>
               Logout
             </MenuItem>
           </Menu>

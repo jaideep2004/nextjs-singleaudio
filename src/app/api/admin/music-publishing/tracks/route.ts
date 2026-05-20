@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(MAX_LIMIT, Math.max(10, Number(searchParams.get('limit') || 50)));
     const skip = (page - 1) * limit;
     const stage = asMusicPublishingStage(searchParams.get('stage') || 'pending');
+    const query = (searchParams.get('q') || '').trim().toLowerCase();
 
     const releases = await db.collection('releases')
       .find({ status: 'approved' }, {
@@ -91,7 +92,12 @@ export async function GET(req: NextRequest) {
 
     const rows = normalizeMusicPublishingTracks(releases).filter(
       (row) => row.publishingStatus === stage
-    );
+    ).filter((row) => {
+      if (!query) return true;
+      return Object.values(row).some((value) =>
+        String(value || '').toLowerCase().includes(query)
+      );
+    });
 
     return NextResponse.json({
       success: true,

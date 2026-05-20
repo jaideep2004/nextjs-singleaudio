@@ -15,7 +15,6 @@ import {
   useTheme,
   useMediaQuery,
   IconButton,
-  Avatar,
   Tooltip,
 } from '@mui/material';
 import {
@@ -106,9 +105,8 @@ const menuSections = [
         icon: <PodcastsIcon />,
         path: '/dashboard/podcasts',
         subItems: [
-          { text: 'My Podcast', path: '/dashboard/podcasts' },
-          { text: 'Episodes', path: '/dashboard/podcasts?view=episodes' },
-          { text: 'Analytics', path: '/dashboard/podcasts?view=analytics' },
+          { text: 'Upload Episode', path: '/dashboard/podcasts' },
+          { text: 'Payouts', path: '/dashboard/podcasts?view=payouts' },
         ],
       },
     ],
@@ -287,59 +285,6 @@ export default function UserSidebar() {
             {desktopCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
         </Tooltip>
-      </Box>
-
-      {/* User Profile Mini */}
-      <Box
-        sx={{
-          mx: 2,
-          mb: 2,
-          p: 1.5,
-          display: desktopCollapsed ? 'none' : 'flex',
-          borderRadius: '12px',
-          bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)',
-          border: '1px solid',
-          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-          alignItems: 'center',
-          gap: 1.5,
-        }}
-      >
-        <Avatar
-          sx={{
-            width: 32,
-            height: 32,
-            bgcolor: isDark ? '#1e293b' : '#e2e8f0',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-            color: isDark ? '#94a3b8' : '#475569',
-          }}
-        >
-          {user?.name?.[0]?.toUpperCase() || 'U'}
-        </Avatar>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              fontSize: '0.8rem',
-              color: isDark ? '#e2e8f0' : '#1e293b',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {user?.name || 'Artist'}
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.4)',
-              fontSize: '0.68rem',
-            }}
-          >
-            {user?.email || 'artist@singleaudio.com'}
-          </Typography>
-        </Box>
       </Box>
 
       {/* Navigation Sections */}

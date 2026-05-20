@@ -84,7 +84,7 @@ function DashboardPage() {
         setIsLoading(true);
         const [tracksRes, releasesRes] = await Promise.all([
           trackAPI.getTracks(),
-          releaseAPI.getReleases(),
+          releaseAPI.getReleases({ summary: '1' }),
         ]);
         if (tracksRes?.success) setTracks(Array.isArray(tracksRes.data) ? tracksRes.data : []);
         if (releasesRes?.success) setReleases(Array.isArray(releasesRes.data) ? releasesRes.data : []);
@@ -125,6 +125,8 @@ function DashboardPage() {
 
   const safeTracks = Array.isArray(tracks) ? tracks : [];
   const safeReleases = Array.isArray(releases) ? releases : [];
+  const getReleaseTrackCount = (release: any) =>
+    Number(release?.trackCount ?? (Array.isArray(release?.tracks) ? release.tracks.length : 0));
 
   const approvedTracks = safeTracks.filter(t => t?.status === 'approved').length;
   const pendingTracks = safeTracks.filter(t => t?.status === 'pending').length;
@@ -208,7 +210,7 @@ function DashboardPage() {
   }
 
   return (
-    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Artist Command Center"
         title={`Welcome back, ${user?.artistName || user?.name || 'Artist'}`}
@@ -476,7 +478,7 @@ function DashboardPage() {
                       {release.releaseTitle || release.title || 'Untitled Release'}
                     </Typography>
                     <Typography sx={{ fontSize: '0.72rem', color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(15,23,42,0.4)' }}>
-                      {release.tracks?.length || 0} tracks · {formatDate(release.createdAt)}
+                      {getReleaseTrackCount(release)} tracks · {formatDate(release.createdAt)}
                     </Typography>
                   </Box>
                   {getStatusChip(release.status)}

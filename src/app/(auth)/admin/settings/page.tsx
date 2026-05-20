@@ -10,8 +10,6 @@ import {
   Switch,
   FormControlLabel,
   Divider,
-  Alert,
-  Snackbar,
   Tabs,
   Tab,
   CircularProgress,
@@ -22,6 +20,7 @@ import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import { toast } from 'sonner';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -75,8 +74,6 @@ export default function AdminSettingsPage() {
   const { mode } = useColorMode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     if (isAdmin) {
@@ -109,7 +106,7 @@ export default function AdminSettingsPage() {
       }));
     } catch (error) {
       console.error('Error fetching settings:', error);
-      setError('Failed to load settings');
+      toast.error('Failed to load settings');
     } finally {
       setLoading(false);
     }
@@ -140,7 +137,6 @@ export default function AdminSettingsPage() {
 
     try {
       setSaving(true);
-      setError('');
 
       const writes = [
         ['signupEnabled', signupEnabled],
@@ -159,20 +155,11 @@ export default function AdminSettingsPage() {
         throw new Error('Failed to update one or more settings');
       }
 
-      setSaveSuccess(true);
-
-      // Hide success message after 3 seconds
-      setTimeout(() => {
-        setSaveSuccess(false);
-      }, 3000);
+      toast.success('Settings saved successfully.');
     } catch (error: any) {
       console.error('Error saving settings:', error);
-      setError(error?.message || 'Failed to save settings');
-
-      // Show error message for 5 seconds
-      setTimeout(() => {
-        setError('');
-      }, 5000);
+      const message = error?.message || 'Failed to save settings';
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -427,35 +414,11 @@ export default function AdminSettingsPage() {
               startIcon={saving ? <CircularProgress size={20} /> : <Save />}
               disabled={saving}
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Saving…' : 'Save Changes'}
             </Button>
           </Box>
         </form>
       </Paper>
-
-      <Snackbar
-        open={saveSuccess}
-        autoHideDuration={3000}
-        onClose={() => setSaveSuccess(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert onClose={() => setSaveSuccess(false)} severity="success" sx={{ width: '100%' }}>
-          Settings saved successfully!
-        </Alert>
-      </Snackbar>
-
-      {error && (
-        <Snackbar
-          open={!!error}
-          autoHideDuration={6000}
-          onClose={() => setError('')}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
-            {error}
-          </Alert>
-        </Snackbar>
-      )}
     </Box>
   );
 }

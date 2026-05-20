@@ -4,9 +4,7 @@ import { getCurrentBackendUser } from '@/lib/currentUser';
 import { rssApi, RssApiError } from '@/lib/rssApi';
 import {
   deleteUserPodcastOwnership,
-  deleteUserPodcastOwnershipForPodcast,
   getUserPodcastOwnership,
-  getUserPodcastOwnerships,
   upsertUserPodcastOwnership,
 } from '@/lib/rssOwnership';
 import { CreateRssPodcastPayload } from '@/types/rss';
@@ -25,43 +23,12 @@ export async function GET() {
     const accessMode = getRssPodcastAccessMode();
     const workspaceSupervisor = isRssWorkspaceSupervisor(user.email);
 
-    if (accessMode === 'shared' || workspaceSupervisor) {
-      const podcasts = await rssApi.getPodcasts();
-      return NextResponse.json({
-        success: true,
-        data: podcasts,
-        meta: { accessMode, workspaceSupervisor },
-      });
-    }
-
-    const ownerships = await getUserPodcastOwnerships(user._id);
-
-    if (ownerships.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        meta: { accessMode, workspaceSupervisor: false },
-      });
-    }
-
-    const podcasts = [];
-    for (const ownership of ownerships) {
-      try {
-        podcasts.push(await rssApi.getPodcast(ownership.rssPodcastId));
-      } catch (error) {
-        if (error instanceof RssApiError && error.status === 404) {
-          // Podcast was deleted on RSS.com side; clear stale local assignment.
-          await deleteUserPodcastOwnershipForPodcast(user._id, ownership.rssPodcastId);
-          continue;
-        }
-        throw error;
-      }
-    }
+    const podcasts = await rssApi.getPodcasts();
 
     return NextResponse.json({
       success: true,
       data: podcasts,
-      meta: { accessMode, workspaceSupervisor: false },
+      meta: { accessMode, workspaceSupervisor },
     });
   } catch (error) {
     if (error instanceof RssApiError) {

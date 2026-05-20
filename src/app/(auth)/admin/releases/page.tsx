@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import {
-  Container,
   Typography,
   Paper,
   Table,
@@ -35,17 +34,17 @@ import {
   TrendingUp,
 } from '@mui/icons-material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faApple, 
-  faSpotify, 
-  faYoutube, 
-  faAmazon, 
-  faSoundcloud, 
+import {
+  faApple,
+  faSpotify,
+  faYoutube,
+  faAmazon,
+  faSoundcloud,
   faDeezer,
   faTidal,
   faTiktok,
   faFacebook,
-  faInstagram
+  faInstagram,
 } from '@fortawesome/free-brands-svg-icons';
 import Link from 'next/link';
 import { releaseAPI } from '@/services/api';
@@ -56,16 +55,16 @@ import { useRouter } from 'next/navigation';
 // DSP mapping for better visualization with Font Awesome icons
 const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
   'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
-  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
+  Spotify: { icon: faSpotify, color: '#1db954', name: 'Spotify' },
   'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
   'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
-  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
-  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
-  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
-  'TikTok': { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
-  'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
-  'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
-  'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
+  Tidal: { icon: faTidal, color: '#000000', name: 'Tidal' },
+  Deezer: { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
+  SoundCloud: { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
+  TikTok: { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
+  Facebook: { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
+  Instagram: { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
+  default: { icon: Store, color: '#4a6cf7', name: 'Other' },
 };
 
 interface TabPanelProps {
@@ -85,7 +84,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`releases-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ py: 2.5 }}>{children}</Box>}
     </div>
   );
 }
@@ -132,7 +131,7 @@ export default function AdminReleasesPage() {
     const fetchReleases = async () => {
       try {
         setLoading(true);
-        const response = await releaseAPI.getReleases();
+        const response = await releaseAPI.getReleases({ summary: '1' });
         if (response && response.success) {
           let data = Array.isArray(response.data) ? response.data : [];
           setReleases(data);
@@ -180,10 +179,15 @@ export default function AdminReleasesPage() {
   };
 
   const filteredReleases = getFilteredReleases();
+  const getTrackCount = (release: any) =>
+    Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
   const pendingCount = releases.filter(r => r.status === 'pending').length;
   const approvedCount = releases.filter(r => r.status === 'approved').length;
   const rejectedCount = releases.filter(r => r.status === 'rejected').length;
-  const totalTracks = releases.reduce((sum, release) => sum + (Array.isArray(release.tracks) ? release.tracks.length : 0), 0);
+  const totalTracks = releases.reduce(
+    (sum, release) => sum + getTrackCount(release),
+    0
+  );
   const approvalRate = releases.length ? Math.round((approvedCount / releases.length) * 100) : 0;
   const maxStatusCount = Math.max(pendingCount, approvedCount, rejectedCount, 1);
 
@@ -221,7 +225,11 @@ export default function AdminReleasesPage() {
   // Render DSP chips with icons
   const renderDSPChips = (stores: string[]) => {
     if (!Array.isArray(stores) || stores.length === 0) {
-      return <Typography variant="body2" color="text.secondary">N/A</Typography>;
+      return (
+        <Typography variant="body2" color="text.secondary">
+          N/A
+        </Typography>
+      );
     }
 
     return (
@@ -231,18 +239,19 @@ export default function AdminReleasesPage() {
           let dspKey = store;
           if (!DSP_MAPPING[store]) {
             // Try to find a partial match
-            const matchedKey = Object.keys(DSP_MAPPING).find(key => 
-              store.toLowerCase().includes(key.toLowerCase()) || 
-              key.toLowerCase().includes(store.toLowerCase())
+            const matchedKey = Object.keys(DSP_MAPPING).find(
+              key =>
+                store.toLowerCase().includes(key.toLowerCase()) ||
+                key.toLowerCase().includes(store.toLowerCase())
             );
             dspKey = matchedKey || 'default';
           }
-          
+
           const dsp = DSP_MAPPING[dspKey] || DSP_MAPPING.default;
-          
+
           // Check if it's a Font Awesome icon or MUI icon
           const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');
-          
+
           return (
             <Tooltip key={index} title={dsp.name}>
               <Avatar
@@ -258,12 +267,12 @@ export default function AdminReleasesPage() {
                 }}
               >
                 {isFAIcon ? (
-                  <FontAwesomeIcon 
-                    icon={dsp.icon} 
-                    style={{ 
+                  <FontAwesomeIcon
+                    icon={dsp.icon}
+                    style={{
                       fontSize: '0.75rem',
-                      color: '#fff'
-                    }} 
+                      color: '#fff',
+                    }}
                   />
                 ) : (
                   <Store sx={{ fontSize: '0.75rem', color: '#fff' }} />
@@ -284,7 +293,7 @@ export default function AdminReleasesPage() {
   };
 
   return (
-    <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Admin Review"
         title="Release Management"
@@ -300,10 +309,27 @@ export default function AdminReleasesPage() {
         }}
       >
         {[
-          { label: 'Pipeline Load', value: `${pendingCount} Pending`, accent: '#f5a524', bars: [pendingCount, approvedCount, rejectedCount] },
-          { label: 'Approval Rate', value: `${approvalRate}%`, accent: '#21c58b', bars: [approvedCount, Math.max(releases.length - approvedCount, 0)] },
-          { label: 'Track Volume', value: `${totalTracks} Tracks`, accent: '#5b5ff7', bars: releases.slice(0, 8).map((release) => Array.isArray(release.tracks) ? release.tracks.length : 0) },
-        ].map((metric) => (
+          {
+            label: 'Pipeline Load',
+            value: `${pendingCount} Pending`,
+            accent: '#f5a524',
+            bars: [pendingCount, approvedCount, rejectedCount],
+          },
+          {
+            label: 'Approval Rate',
+            value: `${approvalRate}%`,
+            accent: '#21c58b',
+            bars: [approvedCount, Math.max(releases.length - approvedCount, 0)],
+          },
+          {
+            label: 'Track Volume',
+            value: `${totalTracks} Tracks`,
+            accent: '#5b5ff7',
+            bars: releases
+              .slice(0, 8)
+              .map(release => getTrackCount(release)),
+          },
+        ].map(metric => (
           <Paper
             key={metric.label}
             elevation={0}
@@ -314,7 +340,14 @@ export default function AdminReleasesPage() {
               minHeight: 126,
             }}
           >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 2,
+              }}
+            >
               <Box>
                 <Typography variant="caption" color="text.secondary" fontWeight={850}>
                   {metric.label}
@@ -355,18 +388,19 @@ export default function AdminReleasesPage() {
         ))}
       </Box>
 
-      <Paper 
-        elevation={0} 
-        sx={{ 
+      <Paper
+        elevation={0}
+        sx={{
           ...premiumSurfaceSx(theme),
-          mb: 4
+          mb: 4,
+          padding:"10px"
         }}
       >
         <Tabs
           value={tabValue}
           onChange={handleTabChange}
           aria-label="releases tabs"
-          variant={isMobile ? "scrollable" : "fullWidth"}
+          variant={isMobile ? 'scrollable' : 'fullWidth'}
           scrollButtons="auto"
           sx={{
             px: 1,
@@ -381,7 +415,8 @@ export default function AdminReleasesPage() {
               color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'rgba(15,23,42,0.72)',
               '&.Mui-selected': {
                 color: mode === 'dark' ? '#b7c5ff' : '#2841c6',
-                backgroundColor: mode === 'dark' ? 'rgba(120,141,255,0.14)' : 'rgba(74,108,247,0.10)',
+                backgroundColor:
+                  mode === 'dark' ? 'rgba(120,141,255,0.14)' : 'rgba(74,108,247,0.10)',
               },
             },
             '& .MuiTabs-indicator': {
@@ -392,9 +427,18 @@ export default function AdminReleasesPage() {
           }}
         >
           <Tab label={`All (${releases.length})`} {...a11yProps(0)} />
-          <Tab label={`Pending (${releases.filter(r => r.status === 'pending').length})`} {...a11yProps(1)} />
-          <Tab label={`Approved (${releases.filter(r => r.status === 'approved').length})`} {...a11yProps(2)} />
-          <Tab label={`Rejected (${releases.filter(r => r.status === 'rejected').length})`} {...a11yProps(3)} />
+          <Tab
+            label={`Pending (${releases.filter(r => r.status === 'pending').length})`}
+            {...a11yProps(1)}
+          />
+          <Tab
+            label={`Approved (${releases.filter(r => r.status === 'approved').length})`}
+            {...a11yProps(2)}
+          />
+          <Tab
+            label={`Rejected (${releases.filter(r => r.status === 'rejected').length})`}
+            {...a11yProps(3)}
+          />
         </Tabs>
 
         <TabPanel value={tabValue} index={0}>
@@ -410,7 +454,7 @@ export default function AdminReleasesPage() {
           {renderReleasesTable()}
         </TabPanel>
       </Paper>
-    </Container>
+    </Box>
   );
 
   function renderReleasesTable() {
@@ -441,17 +485,17 @@ export default function AdminReleasesPage() {
             {tabValue === 1
               ? 'There are no pending releases at the moment.'
               : tabValue === 2
-              ? 'No releases have been approved yet.'
-              : tabValue === 3
-              ? 'No releases have been rejected.'
-              : 'No releases match your current filters.'}
+                ? 'No releases have been approved yet.'
+                : tabValue === 3
+                  ? 'No releases have been rejected.'
+                  : 'No releases match your current filters.'}
           </Typography>
         </Box>
       );
     }
 
     return (
-      <Box sx={{ px: { xs: 1, sm: 2 } }}>
+      <Box sx={{ px: 0 }}>
         {/* Stats Summary */}
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
           <Box sx={{ flex: 1 }}>
@@ -460,7 +504,8 @@ export default function AdminReleasesPage() {
               sx={{
                 borderRadius: 2,
                 border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
+                backgroundColor:
+                  mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
               }}
             >
               <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
@@ -479,7 +524,8 @@ export default function AdminReleasesPage() {
               sx={{
                 borderRadius: 2,
                 border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor: mode === 'dark' ? 'rgba(255, 183, 0, 0.1)' : 'rgba(255, 183, 0, 0.1)',
+                backgroundColor:
+                  mode === 'dark' ? 'rgba(255, 183, 0, 0.1)' : 'rgba(255, 183, 0, 0.1)',
               }}
             >
               <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
@@ -498,7 +544,8 @@ export default function AdminReleasesPage() {
               sx={{
                 borderRadius: 2,
                 border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor: mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+                backgroundColor:
+                  mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
               }}
             >
               <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
@@ -517,7 +564,8 @@ export default function AdminReleasesPage() {
               sx={{
                 borderRadius: 2,
                 border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor: mode === 'dark' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(244, 67, 54, 0.1)',
+                backgroundColor:
+                  mode === 'dark' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(244, 67, 54, 0.1)',
               }}
             >
               <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
@@ -552,17 +600,20 @@ export default function AdminReleasesPage() {
                 <TableCell sx={{ fontWeight: 600 }}>DSPs</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Tracks</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Updated</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600 }}>Action</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  Action
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredReleases.map((release) => (
+              {filteredReleases.map(release => (
                 <TableRow
                   key={release._id}
                   sx={{
                     '&:last-child td, &:last-child th': { border: 0 },
                     '&:hover': {
-                      backgroundColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
+                      backgroundColor:
+                        mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)',
                     },
                   }}
                 >
@@ -603,7 +654,7 @@ export default function AdminReleasesPage() {
                   <TableCell>{renderDSPChips(release.stores || [])}</TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {Array.isArray(release.tracks) ? release.tracks.length : 0}
+                      {getTrackCount(release)}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -619,7 +670,8 @@ export default function AdminReleasesPage() {
                       variant="outlined"
                       startIcon={<LinkIcon />}
                       sx={{
-                        borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
+                        borderColor:
+                          mode === 'dark' ? 'rgba(255, 255, 255, 0.23)' : 'rgba(0, 0, 0, 0.23)',
                         minWidth: 'auto',
                         px: 1.5,
                         py: 0.5,

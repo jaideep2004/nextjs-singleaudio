@@ -102,13 +102,41 @@ export async function GET(req: NextRequest) {
     const { db } = await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const requestedUserId = searchParams.get('userId');
+    const summary = searchParams.get('summary') === '1';
     const isAdminLike = user.role === 'admin' || user.role === 'subadmin';
     const query = isAdminLike
       ? requestedUserId
         ? getReleaseOwnerQuery({ _id: requestedUserId })
         : {}
       : getReleaseOwnerQuery(user);
-    const releases = await db.collection('releases').find(query).sort({ createdAt: -1 }).toArray();
+    const releases = summary
+      ? await db.collection('releases').aggregate([
+          { $match: query },
+          { $sort: { createdAt: -1 } },
+          {
+            $project: {
+              releaseTitle: 1,
+              title: 1,
+              releaseType: 1,
+              status: 1,
+              releaseDate: 1,
+              originalReleaseDate: 1,
+              label: 1,
+              upc: 1,
+              ownerName: 1,
+              ownerArtistName: 1,
+              ownerEmail: 1,
+              primaryArtist: 1,
+              artist: 1,
+              artworkUrl: 1,
+              stores: 1,
+              updatedAt: 1,
+              createdAt: 1,
+              trackCount: { $size: { $ifNull: ['$tracks', []] } },
+            },
+          },
+        ]).toArray()
+      : await db.collection('releases').find(query).sort({ createdAt: -1 }).toArray();
     return NextResponse.json({ success: true, releases });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch releases';

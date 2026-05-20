@@ -9,7 +9,7 @@ export function premiumSurfaceSx(theme: Theme): SxProps<Theme> {
     borderRadius: '32px',
     border: '1px solid',
     borderColor: isDark ? 'rgba(247,243,232,0.12)' : 'rgba(17,24,39,0.10)',
-    bgcolor: isDark ? 'rgba(18,26,43,0.92)' : 'rgba(255,255,255,0.92)',
+    bgcolor: isDark ? 'rgba(18,26,43,0.92)' : '#ffffff',
     boxShadow: isDark
       ? '0 24px 70px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.04)'
       : '0 24px 70px rgba(27,39,68,0.10), inset 0 1px 0 rgba(255,255,255,0.86)',

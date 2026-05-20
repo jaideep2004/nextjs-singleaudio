@@ -4,6 +4,7 @@ import { AppContextProvider } from '@/context/AppContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { ColorModeProvider } from '@/context/ColorModeContext';
 import React from 'react';
+import { Toaster } from 'sonner';
 
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -11,6 +12,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
       <NotificationsProvider>
         <ColorModeProvider>
           {children}
+          <Toaster position="top-right" richColors closeButton />
         </ColorModeProvider>
       </NotificationsProvider>
     </AppContextProvider>

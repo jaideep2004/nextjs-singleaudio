@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Container, Typography, Box, Paper, CircularProgress } from '@mui/material';
+import { Typography, Box, Paper, CircularProgress } from '@mui/material';
 import { releaseAPI, trackAPI, adminAPI } from '@/services/api';
 import dynamic from 'next/dynamic';
 import { registerChartElements } from './registerChartElements';
@@ -31,7 +31,7 @@ export default function AnalyticsPage() {
       try {
         setLoading(true);
         const [releasesRes, tracksRes, usersRes] = await Promise.all([
-          releaseAPI.getReleases(),
+          releaseAPI.getReleases({ summary: '1' }),
           trackAPI.getTracks(),
           adminAPI.getUsers(),
         ]);
@@ -68,7 +68,9 @@ export default function AnalyticsPage() {
     return months;
   })();
 
-  const tracksPerRelease = releaseData.map(r => r.tracks?.length || 0);
+  const tracksPerRelease = releaseData.map(r =>
+    Number(r.trackCount ?? (Array.isArray(r.tracks) ? r.tracks.length : 0))
+  );
 
   const chartColors = [
     '#42a5f5',
@@ -84,7 +86,7 @@ export default function AnalyticsPage() {
   const CARD_SIZE = { xs: 320, sm: 380, md: 440 } as const;
 
   return (
-    <Container maxWidth={false} sx={{ py: 1, px: 0 }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Intelligence"
         title="Analytics Dashboard"
@@ -99,7 +101,7 @@ export default function AnalyticsPage() {
       ) : !chartReady ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
           <CircularProgress />
-          <Typography sx={{ ml: 2 }}>Loading charts...</Typography>
+          <Typography sx={{ ml: 2 }}>Loading charts…</Typography>
         </Box>
       ) : (
         <Box
@@ -291,6 +293,6 @@ export default function AnalyticsPage() {
           </Box>
         </Box>
       )}
-    </Container>
+    </Box>
   );
 }

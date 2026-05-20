@@ -2,7 +2,6 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   Autocomplete,
   Avatar,
   Box,
@@ -25,6 +24,7 @@ import { PodcastsContent } from '@/app/(auth)/dashboard/podcasts/page';
 import { useAuth } from '@/context/AppContext';
 import { isFullAdmin } from '@/lib/adminAccess';
 import type { RssPodcast } from '@/types/rss';
+import { toast } from 'sonner';
 
 type AssignmentUser = {
   _id: string;
@@ -73,7 +73,6 @@ function PodcastAssignmentPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [removingKey, setRemovingKey] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const podcastById = useMemo(
     () => new Map(podcasts.map((podcast) => [podcast.id, podcast])),
@@ -123,12 +122,8 @@ function PodcastAssignmentPanel() {
       setUsers(json.data.users);
       setPodcasts(json.data.podcasts);
       setAssignments(json.data.assignments);
-      setFeedback(null);
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load podcast assignments',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to load podcast assignments');
     } finally {
       setLoading(false);
     }
@@ -152,14 +147,11 @@ function PodcastAssignmentPanel() {
       });
       const json = await readJson<{ success: boolean; message?: string }>(response);
       if (!json.success) throw new Error(json.message || 'Failed to assign podcast');
-      setFeedback({ type: 'success', message: json.message || 'Podcast assigned.' });
+      toast.success(json.message || 'Podcast assigned.');
       setSelectedPodcast(null);
       await loadAssignments();
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to assign podcast',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to assign podcast');
     } finally {
       setSaving(false);
     }
@@ -178,13 +170,10 @@ function PodcastAssignmentPanel() {
       });
       const json = await readJson<{ success: boolean; message?: string }>(response);
       if (!json.success) throw new Error(json.message || 'Failed to remove podcast assignment');
-      setFeedback({ type: 'success', message: json.message || 'Podcast assignment removed.' });
+      toast.success(json.message || 'Podcast assignment removed.');
       await loadAssignments();
     } catch (error) {
-      setFeedback({
-        type: 'error',
-        message: error instanceof Error ? error.message : 'Failed to remove podcast assignment',
-      });
+      toast.error(error instanceof Error ? error.message : 'Failed to remove podcast assignment');
     } finally {
       setRemovingKey(null);
     }
@@ -214,7 +203,7 @@ function PodcastAssignmentPanel() {
               Assign Podcast
             </Typography>
             <Typography variant="h6" fontWeight={800}>
-              RSS podcast access
+              Subadmin podcast access
             </Typography>
           </Box>
           <Tooltip title="Refresh assignments">
@@ -226,12 +215,6 @@ function PodcastAssignmentPanel() {
           </Tooltip>
         </Stack>
 
-        {feedback && (
-          <Alert severity={feedback.type} sx={{ mb: 2 }} onClose={() => setFeedback(null)}>
-            {feedback.message}
-          </Alert>
-        )}
-
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr auto' }, gap: 1.5 }}>
           <Autocomplete
             options={users}
@@ -242,7 +225,7 @@ function PodcastAssignmentPanel() {
             }}
             getOptionLabel={(option) => `${option.name || option.email} - ${option.email}`}
             isOptionEqualToValue={(option, value) => option._id === value._id}
-            renderInput={(params) => <TextField {...params} label="User" placeholder="Select user" />}
+            renderInput={(params) => <TextField {...params} label="Subadmin" placeholder="Select subadmin" />}
             renderOption={(props, option) => (
               <Box component="li" {...props} key={option._id}>
                 <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
@@ -267,7 +250,7 @@ function PodcastAssignmentPanel() {
             getOptionDisabled={(option) =>
               assignments.some((assignment) => assignment.rssPodcastId === option.id)
             }
-            renderInput={(params) => <TextField {...params} label="RSS podcast" placeholder="Select podcast" />}
+            renderInput={(params) => <TextField {...params} label="Podcast" placeholder="Select podcast" />}
             disabled={loading || !selectedUser}
           />
 
@@ -330,7 +313,7 @@ function PodcastAssignmentPanel() {
                   </Box>
                   <Box sx={{ minWidth: 0, display: { xs: 'none', md: 'block' } }}>
                     <Typography variant="body2" noWrap>
-                      {podcast?.title || `RSS podcast #${assignment.rssPodcastId}`}
+                      {podcast?.title || `Podcast #${assignment.rssPodcastId}`}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                       ID {assignment.rssPodcastId}
@@ -360,15 +343,15 @@ function PodcastAssignmentPanel() {
 
 export default function AdminPodcastsPage() {
   return (
-    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Supervisor"
         title="Podcast Operations"
-        description="Manage supervised podcast workspaces, publish episodes, and inspect podcast analytics directly."
+        description="Manage supervised podcast workspaces, publish episodes, and review payout API availability."
       />
       <PodcastAssignmentPanel />
       <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress /></Box>}>
-        <PodcastsContent />
+        <PodcastsContent allowPodcastCreation />
       </Suspense>
     </Box>
   );

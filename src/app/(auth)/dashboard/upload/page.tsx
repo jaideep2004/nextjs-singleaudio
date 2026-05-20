@@ -30,7 +30,6 @@ import {
   Fade,
   Slide,
   Avatar,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -41,6 +40,8 @@ import {
   useTheme,
 } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   MusicNote,
   Album,
@@ -219,10 +220,10 @@ const releaseTypes: ReleaseTypeOption[] = [
   {
     value: 'single',
     label: 'Single',
-    description: '1-2 tracks perfect for focused promotion',
+    description: '1 track only for focused promotion',
     icon: <MusicNote sx={{ fontSize: 40 }} />,
     minTracks: 1,
-    maxTracks: 2,
+    maxTracks: 1,
     color: '#1976d2',
   },
   {
@@ -441,6 +442,10 @@ const contributorRoles: { value: ContributorRole; label: string }[] = [
 
 const currentYear = new Date().getFullYear();
 const copyrightYears = Array.from({ length: 80 }, (_, index) => String(currentYear - index));
+const getLocalDateInputValue = (date = new Date()) => {
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 10);
+};
 
 const cloneTrackInfo = (info: TrackInfo): TrackInfo => ({
   ...info,
@@ -483,12 +488,14 @@ const defaultTrackInfo: TrackInfo = {
 
 export default function UploadPage() {
   const theme = useTheme();
+  const router = useRouter();
   // ...existing state
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
   const [releaseTitle, setReleaseTitle] = useState('');
   const [label, setLabel] = useState('');
   const [upc, setUpc] = useState('');
   const [autoGenerateCodes, setAutoGenerateCodes] = useState(true);
+  const [autoGenerateIsrcs, setAutoGenerateIsrcs] = useState(true);
   const [allowedDspKeys, setAllowedDspKeys] = useState<DspKey[] | null>(null);
   const [platformAccessError, setPlatformAccessError] = useState('');
   // ...existing state
@@ -549,8 +556,6 @@ export default function UploadPage() {
   const [artworkUploading, setArtworkUploading] = useState<boolean>(false);
   // Local audio preview URLs for each selected track
   const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
-  // Snackbar for "Apply to all"
-  const [snackOpen, setSnackOpen] = useState(false);
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
 
@@ -645,7 +650,7 @@ export default function UploadPage() {
         copyrightPYear: t.copyrightPYear,
         recordingYear: t.recordingYear,
         duration: t.duration,
-        isrc: t.isrc,
+        isrc: autoGenerateIsrcs ? '' : t.isrc,
         upc: t.upc,
         trackNumber: t.trackNumber,
         discNumber: t.discNumber,
@@ -669,14 +674,16 @@ export default function UploadPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setTimeout(() => setSubmitState('success'), 1200); // Simulate DSP delay
+        setSubmitState('success');
+        toast.success('Release submitted for admin review.');
+        setTimeout(() => router.push('/dashboard/releases'), 700);
       } else {
         setSubmitState('idle');
-        alert('Failed to save release: ' + (data.error || 'Unknown error'));
+        toast.error('Failed to save release: ' + (data.error || 'Unknown error'));
       }
     } catch (e: any) {
       setSubmitState('idle');
-      alert('Failed to save release: ' + e.message);
+      toast.error('Failed to save release: ' + e.message);
     }
   };
 
@@ -768,19 +775,17 @@ export default function UploadPage() {
     delete (shareable as Partial<TrackInfo>).featuring;
     delete (shareable as Partial<TrackInfo>).isrc;
     delete (shareable as Partial<TrackInfo>).upc;
-    delete (shareable as Partial<TrackInfo>).copyrightC;
-    delete (shareable as Partial<TrackInfo>).copyrightP;
-    delete (shareable as Partial<TrackInfo>).copyrightCYear;
-    delete (shareable as Partial<TrackInfo>).copyrightPYear;
     delete (shareable as Partial<TrackInfo>).explicit;
 
     setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
-    setSnackOpen(true);
+    toast.success('Applied to all tracks');
   };
 
   // Validation: all required fields for all tracks
   const selectedReleaseTypeConfig = releaseTypes.find(t => t.value === releaseType);
   const minTracksRequired = selectedReleaseTypeConfig?.minTracks ?? 1;
+  const maxTracksAllowed = selectedReleaseTypeConfig?.maxTracks ?? 50;
+  const todayInputValue = getLocalDateInputValue();
 
   const trackHasListedArtist = (info: TrackInfo) =>
     info.contributors.some(c => c.role === 'artist' && c.name.trim());
@@ -792,6 +797,12 @@ export default function UploadPage() {
       issues.push({
         trackIndex: null,
         message: `Add at least ${minTracksRequired} track${minTracksRequired === 1 ? '' : 's'} for ${selectedReleaseTypeConfig?.label || 'this release type'}.`,
+      });
+    }
+    if (tracks.length > maxTracksAllowed) {
+      issues.push({
+        trackIndex: null,
+        message: `Use no more than ${maxTracksAllowed} track${maxTracksAllowed === 1 ? '' : 's'} for ${selectedReleaseTypeConfig?.label || 'this release type'}.`,
       });
     }
 
@@ -811,10 +822,25 @@ export default function UploadPage() {
       if (!(info.audioLanguage || info.language))
         issues.push({ trackIndex: idx, message: `${label}: audio language is required.` });
       if (!info.genre) issues.push({ trackIndex: idx, message: `${label}: genre is required.` });
+      if (!info.recordingYear)
+        issues.push({ trackIndex: idx, message: `${label}: recording year is required.` });
+      if (!info.copyrightC.trim())
+        issues.push({ trackIndex: idx, message: `${label}: C-line name is required.` });
+      if (!info.copyrightCYear)
+        issues.push({ trackIndex: idx, message: `${label}: C-line year is required.` });
+      if (!info.copyrightP.trim())
+        issues.push({ trackIndex: idx, message: `${label}: P-line name is required.` });
+      if (!info.copyrightPYear)
+        issues.push({ trackIndex: idx, message: `${label}: P-line year is required.` });
     });
 
     if (!releaseDate.trim()) {
       issues.push({ trackIndex: selectedTrackIdx, message: 'Digital release date is required.' });
+    } else if (releaseDate < todayInputValue) {
+      issues.push({
+        trackIndex: selectedTrackIdx,
+        message: 'Digital release date cannot be in the past.',
+      });
     }
 
     return issues;
@@ -828,6 +854,7 @@ export default function UploadPage() {
 
   const isTrackInfoListValid =
     tracks.length >= minTracksRequired &&
+    tracks.length <= maxTracksAllowed &&
     tracks.every((_, idx) => {
       const info = trackInfos[idx];
       if (!info) return false;
@@ -836,10 +863,16 @@ export default function UploadPage() {
         trackHasListedArtist(info) &&
         info.metadataLanguage &&
         (info.audioLanguage || info.language) &&
-        info.genre
+        info.genre &&
+        info.recordingYear &&
+        info.copyrightC.trim() &&
+        info.copyrightCYear &&
+        info.copyrightP.trim() &&
+        info.copyrightPYear
       );
     }) &&
-    releaseDate.trim();
+    releaseDate.trim() &&
+    releaseDate >= todayInputValue;
 
   const handleTracksInfoContinue = () => {
     setTrackValidationAttempted(true);
@@ -1034,7 +1067,7 @@ export default function UploadPage() {
 
     const err = validateTrackFile(file);
     if (err) {
-      alert(err);
+      toast.error(err);
       return;
     }
 
@@ -1457,14 +1490,19 @@ export default function UploadPage() {
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                <Typography variant="body1">Track Range:</Typography>
+                <Typography variant="body1">Track Limit:</Typography>
                 <Typography variant="body1" fontWeight="bold">
-                  {releaseTypes.find(t => t.value === releaseType)?.minTracks} -{' '}
-                  {releaseTypes.find(t => t.value === releaseType)?.maxTracks}
+                  {(() => {
+                    const selected = releaseTypes.find(t => t.value === releaseType);
+                    if (!selected) return '';
+                    return selected.minTracks === selected.maxTracks
+                      ? `${selected.maxTracks} track${selected.maxTracks === 1 ? '' : 's'}`
+                      : `${selected.minTracks} - ${selected.maxTracks} tracks`;
+                  })()}
                 </Typography>
               </Box>
-              <Grid container spacing={3} sx={{ mt: 2.5 }}>
-                <Grid xs={12} md={6}>
+              <Grid container spacing={2.5} sx={{ mt: 2.5, maxWidth: 760 }}>
+                <Grid xs={12} style={{marginBottom:"10px"}}>
                   <TextField
                     label="Release Title"
                     fullWidth
@@ -1474,7 +1512,7 @@ export default function UploadPage() {
                     inputProps={{ 'aria-label': 'Release Title' }}
                   />
                 </Grid>
-                <Grid xs={12} md={3}>
+                <Grid xs={12} style={{marginBottom:"10px"}}>
                   <TextField
                     label="Label"
                     fullWidth
@@ -1483,7 +1521,7 @@ export default function UploadPage() {
                     inputProps={{ 'aria-label': 'Label' }}
                   />
                 </Grid>
-                <Grid xs={12} md={3}>
+                <Grid xs={12}>
                   <TextField
                     label="UPC (optional)"
                     fullWidth
@@ -1714,7 +1752,7 @@ export default function UploadPage() {
                     setArtworkUploadedFilename(filename);
                     handleNext();
                   } catch (e: any) {
-                    alert(e?.message || 'Failed to upload artwork');
+                    toast.error(e?.message || 'Failed to upload artwork');
                   }
                 }}
               >
@@ -1748,7 +1786,7 @@ export default function UploadPage() {
             </Typography>
             <Typography variant="body1" color="text.secondary" paragraph sx={{ maxWidth: 720 }}>
               {selectedTypeLb?.label === 'Single' &&
-                `Need at least ${minTracksRequired} track. Audio cards appear below after you select files.`}
+                'Single releases allow 1 track only. Audio card appears below after you select a file.'}
               {selectedTypeLb?.label === 'EP' &&
                 `Need ${selectedTypeLb.minTracks}–${selectedTypeLb.maxTracks} tracks. Upload multiple files or add more.`}
               {selectedTypeLb?.label === 'Album' && `Up to ${selectedTypeLb.maxTracks} tracks.`}
@@ -2564,13 +2602,19 @@ export default function UploadPage() {
                             fullWidth
                             required
                             InputLabelProps={{ shrink: true }}
+                            inputProps={{ min: todayInputValue }}
                             value={releaseDate}
                             onChange={e => setReleaseDate(e.target.value)}
-                            error={trackValidationAttempted && !releaseDate.trim()}
+                            error={
+                              trackValidationAttempted &&
+                              (!releaseDate.trim() || releaseDate < todayInputValue)
+                            }
                             helperText={
                               trackValidationAttempted && !releaseDate.trim()
                                 ? 'Digital release date is required.'
-                                : 'Date stores should go live.'
+                                : trackValidationAttempted && releaseDate < todayInputValue
+                                  ? 'Digital release date cannot be in the past.'
+                                  : 'Date stores should go live.'
                             }
                           />
                         </Box>
@@ -2586,6 +2630,7 @@ export default function UploadPage() {
                             select
                             label="Recording Year"
                             fullWidth
+                            required
                             value={trackInfos[selectedTrackIdx]?.recordingYear || ''}
                             onChange={e =>
                               handleTrackInfoChange(
@@ -2593,6 +2638,16 @@ export default function UploadPage() {
                                 'recordingYear',
                                 e.target.value
                               )
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.recordingYear
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.recordingYear
+                                ? 'Recording year is required.'
+                                : ''
                             }
                           >
                             <MenuItem value="">Not set</MenuItem>
@@ -2617,7 +2672,35 @@ export default function UploadPage() {
                             onChange={e =>
                               handleTrackInfoChange(selectedTrackIdx, 'isrc', e.target.value)
                             }
-                            helperText="Leave blank for IN-9SN yearly sequence assignment."
+                            disabled={autoGenerateIsrcs}
+                            helperText={
+                              autoGenerateIsrcs
+                                ? 'System assigns ISRC during admin approval.'
+                                : 'Enter an existing ISRC.'
+                            }
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <FormControlLabel
+                                    sx={{
+                                      mr: 0,
+                                      '& .MuiFormControlLabel-label': {
+                                        fontSize: 12,
+                                        whiteSpace: 'nowrap',
+                                      },
+                                    }}
+                                    control={
+                                      <Checkbox
+                                        size="small"
+                                        checked={autoGenerateIsrcs}
+                                        onChange={e => setAutoGenerateIsrcs(e.target.checked)}
+                                      />
+                                    }
+                                    label="Auto"
+                                  />
+                                </InputAdornment>
+                              ),
+                            }}
                           />
                         </Box>
                       </Box>
@@ -2629,23 +2712,16 @@ export default function UploadPage() {
                         <Box
                           sx={{
                             display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', md: '1fr 120px ' },
+                            gridTemplateColumns: { xs: '1fr', md: '120px 1fr' },
                             gap: 2,
                             mt: 1,
                           }}
                         >
                           <TextField
-                            label="C-line name"
-                            fullWidth
-                            value={trackInfos[selectedTrackIdx]?.copyrightC || ''}
-                            onChange={e =>
-                              handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)
-                            }
-                          />
-                          <TextField
                             select
                             label="Year"
                             fullWidth
+                            required
                             value={
                               trackInfos[selectedTrackIdx]?.copyrightCYear || String(currentYear)
                             }
@@ -2655,6 +2731,67 @@ export default function UploadPage() {
                                 'copyrightCYear',
                                 e.target.value
                               )
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightCYear
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightCYear
+                                ? 'Required'
+                                : ' '
+                            }
+                          >
+                            {copyrightYears.map(year => (
+                              <MenuItem key={year} value={year}>
+                                {year}
+                              </MenuItem>
+                            ))}
+                          </TextField>
+                          <TextField
+                            label="C-line name"
+                            fullWidth
+                            required
+                            value={trackInfos[selectedTrackIdx]?.copyrightC || ''}
+                            onChange={e =>
+                              handleTrackInfoChange(selectedTrackIdx, 'copyrightC', e.target.value)
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightC?.trim()
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightC?.trim()
+                                ? 'C-line name is required.'
+                                : ' '
+                            }
+                          />
+                          <TextField
+                            select
+                            label="Year"
+                            fullWidth
+                            required
+                            value={
+                              trackInfos[selectedTrackIdx]?.copyrightPYear || String(currentYear)
+                            }
+                            onChange={e =>
+                              handleTrackInfoChange(
+                                selectedTrackIdx,
+                                'copyrightPYear',
+                                e.target.value
+                              )
+                            }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightPYear
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightPYear
+                                ? 'Required'
+                                : ' '
                             }
                           >
                             {copyrightYears.map(year => (
@@ -2666,32 +2803,22 @@ export default function UploadPage() {
                           <TextField
                             label="P-line name"
                             fullWidth
+                            required
                             value={trackInfos[selectedTrackIdx]?.copyrightP || ''}
                             onChange={e =>
                               handleTrackInfoChange(selectedTrackIdx, 'copyrightP', e.target.value)
                             }
+                            error={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightP?.trim()
+                            }
+                            helperText={
+                              trackValidationAttempted &&
+                              !trackInfos[selectedTrackIdx]?.copyrightP?.trim()
+                                ? 'P-line name is required.'
+                                : ' '
+                            }
                           />
-                          <TextField
-                            select
-                            label="Year"
-                            fullWidth
-                            value={
-                              trackInfos[selectedTrackIdx]?.copyrightPYear || String(currentYear)
-                            }
-                            onChange={e =>
-                              handleTrackInfoChange(
-                                selectedTrackIdx,
-                                'copyrightPYear',
-                                e.target.value
-                              )
-                            }
-                          >
-                            {copyrightYears.map(year => (
-                              <MenuItem key={year} value={year}>
-                                {year}
-                              </MenuItem>
-                            ))}
-                          </TextField>
                         </Box>
                       </Box>
 
@@ -2777,13 +2904,6 @@ export default function UploadPage() {
                     </Box>
                   </Box>
                 )}
-                <Snackbar
-                  open={snackOpen}
-                  autoHideDuration={2000}
-                  onClose={() => setSnackOpen(false)}
-                  message="Applied to all tracks"
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-                />
               </Box>
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4, gap: 2 }}>

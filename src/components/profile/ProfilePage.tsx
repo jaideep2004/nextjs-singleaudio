@@ -18,9 +18,10 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { AccountBalance, Badge, Business, LockOutlined, Mail, Person, Save, Shield } from '@mui/icons-material';
+import { AccountBalance, Badge, Business, LocationOn, LockOutlined, Mail, Person, Save, Shield } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { useAuth } from '@/context/AppContext';
+import { toast } from 'sonner';
 
 interface ProfilePageProps {
   audience: 'admin' | 'dashboard';
@@ -35,8 +36,15 @@ const roleLabel = (role?: string) => {
     .join(' ');
 };
 
-const displayValue = (value: unknown) => {
+const displayValue = (value: unknown): string => {
   if (value === undefined || value === null || String(value).trim() === '') return '-';
+  if (Array.isArray(value)) return value.map(displayValue).filter(item => item !== '-').join(', ') || '-';
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined && item !== null && String(item).trim() !== '')
+      .map(([key, item]) => `${roleLabel(key)}: ${displayValue(item)}`)
+      .join(', ') || '-';
+  }
   return String(value);
 };
 
@@ -62,12 +70,11 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
   const [displayName, setDisplayName] = useState('');
   const [artistName, setArtistName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
 
   const onboarding = user?.onboarding || {};
   const payoutMethod = user?.payoutMethod || onboarding?.payoutMethod;
   const payoutDetails = payoutMethod?.details || {};
+  const location = onboarding?.location || {};
   const isLabel = user?.accountType === 'label' || user?.role === 'label';
 
   const initials = useMemo(() => {
@@ -88,28 +95,28 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
   const handleSave = async () => {
     try {
       setSaving(true);
-      setSuccess('');
-      setError('');
       await axios.put('/auth/me', {
         name: displayName.trim(),
         ...(audience === 'dashboard' ? { artistName: artistName.trim() } : {}),
       });
-      setSuccess('Profile saved.');
+      toast.success('Profile saved.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save profile');
+      toast.error(err instanceof Error ? err.message : 'Failed to save profile');
     } finally {
       setSaving(false);
     }
   };
 
   const tabs = [
-    { label: 'User Info', icon: <Person fontSize="small" /> },
-    ...(audience === 'dashboard' && isLabel ? [{ label: 'Company Info', icon: <Business fontSize="small" /> }] : []),
-    ...(audience === 'dashboard' ? [{ label: 'Bank Details', icon: <AccountBalance fontSize="small" /> }] : []),
+    { key: 'user', label: 'User Info', icon: <Person fontSize="small" /> },
+    ...(audience === 'dashboard' ? [
+      { key: 'address', label: 'Address', icon: <LocationOn fontSize="small" /> },
+      { key: 'verification', label: 'Verification', icon: <Shield fontSize="small" /> },
+    ] : []),
+    ...(audience === 'dashboard' && isLabel ? [{ key: 'company', label: 'Company Info', icon: <Business fontSize="small" /> }] : []),
+    ...(audience === 'dashboard' ? [{ key: 'bank', label: 'Bank Details', icon: <AccountBalance fontSize="small" /> }] : []),
   ];
-
-  const companyTabIndex = audience === 'dashboard' && isLabel ? 1 : -1;
-  const bankTabIndex = audience === 'dashboard' ? tabs.length - 1 : -1;
+  const activeTabKey = tabs[tab]?.key || 'user';
 
   const profileSummary = (
     <Paper
@@ -187,7 +194,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
           </Tabs>
 
           <Box sx={{ p: { xs: 2.5, md: 3.5 } }}>
-            {tab === 0 && (
+            {activeTabKey === 'user' && (
               <Stack spacing={2.5}>
                 <Box>
                   <Typography variant="h6" fontWeight={900}>User Info</Typography>
@@ -212,8 +219,18 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
                 )}
                 <TextField label="Email" value={user?.email || ''} fullWidth disabled helperText="Email changes require admin support." InputProps={{ startAdornment: <Mail sx={{ mr: 1, color: 'text.secondary' }} /> }} />
                 <TextField label="Role" value={roleLabel(user?.role)} fullWidth disabled />
-                {success && <Alert severity="success">{success}</Alert>}
-                {error && <Alert severity="error">{error}</Alert>}
+                {audience === 'dashboard' && (
+                  <DetailGrid
+                    items={[
+                      ['Account Type', onboarding.accountType || user?.accountType],
+                      ['Region', onboarding.region],
+                      ['Legal Name', onboarding.legalName || onboarding.labelLegalName],
+                      ['Phone Number', onboarding.phoneNumber || user?.verification?.phoneNumber],
+                      ['Number Of Tracks', onboarding.numberOfTracks],
+                      ['Number Of Releases', onboarding.numberOfReleases],
+                    ]}
+                  />
+                )}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                   <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave} disabled={saving || !displayName.trim()}>
                     {saving ? 'Saving…' : 'Save Profile'}
@@ -225,7 +242,50 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
               </Stack>
             )}
 
-            {tab === companyTabIndex && (
+            {activeTabKey === 'address' && (
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="h6" fontWeight={900}>Address</Typography>
+                  <Typography variant="body2" color="text.secondary">Address submitted during KYC.</Typography>
+                </Box>
+                <Divider />
+                <DetailGrid
+                  items={[
+                    ['Country', location.country],
+                    ['State', location.state],
+                    ['City', location.city],
+                    ['Pincode', location.pincode],
+                    ['Address', location.address || onboarding.legalAddress],
+                  ]}
+                />
+              </Stack>
+            )}
+
+            {activeTabKey === 'verification' && (
+              <Stack spacing={2.5}>
+                <Box>
+                  <Typography variant="h6" fontWeight={900}>Verification</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    KYC review status and identity numbers. Document images stay hidden.
+                  </Typography>
+                </Box>
+                <Divider />
+                <DetailGrid
+                  items={[
+                    ['KYC Status', user?.verification?.status],
+                    ['Aadhaar Number', onboarding.aadhaarNumber],
+                    ['PAN Number', onboarding.panNumber],
+                    ['Consent', user?.verification?.consent ? 'Yes' : 'No'],
+                    ['Submitted', user?.verification?.submittedAt ? new Date(user.verification.submittedAt).toLocaleString() : undefined],
+                    ['Reviewed', user?.verification?.reviewedAt ? new Date(user.verification.reviewedAt).toLocaleString() : undefined],
+                    ['Rejection Reason', user?.verification?.rejectionReason],
+                    ['Notes', user?.verification?.notes],
+                  ]}
+                />
+              </Stack>
+            )}
+
+            {activeTabKey === 'company' && (
               <Stack spacing={2.5}>
                 <Box>
                   <Typography variant="h6" fontWeight={900}>Company Info</Typography>
@@ -241,15 +301,17 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
                     ['Company Type', onboarding.companyType],
                     ['Total Artists', onboarding.totalArtists],
                     ['Catalog Size', onboarding.catalogSize],
+                    ['Total Revenue', onboarding.totalRevenue],
                     ['Rights Type', onboarding.rightsType],
                     ['Website', onboarding.companyWebsite],
+                    ['Social Links', onboarding.socialLinks],
                     ['Address', onboarding.location?.address || onboarding.legalAddress],
                   ]}
                 />
               </Stack>
             )}
 
-            {tab === bankTabIndex && (
+            {activeTabKey === 'bank' && (
               <Stack spacing={2.5}>
                 <Box>
                   <Stack direction="row" spacing={1} alignItems="center">

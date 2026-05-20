@@ -108,7 +108,7 @@ function AnalyticsContent() {
   const maxVal = Math.max(...currentData);
 
   return (
-    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Performance"
         title="Analytics"

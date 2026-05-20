@@ -9,7 +9,9 @@ import {
   Chip,
   CircularProgress,
   FormControl,
+  InputAdornment,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -27,7 +29,7 @@ import {
   Tabs,
   useTheme,
 } from '@mui/material';
-import { Download, LibraryMusic, PlaylistAddCheck, SelectAll } from '@mui/icons-material';
+import { Download, LibraryMusic, PlaylistAddCheck, Search, SelectAll } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
 type TrackMetadataRow = Record<string, string>;
@@ -212,6 +214,8 @@ export default function AdminMusicPublishingPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectCount, setSelectCount] = useState(25);
   const [activeTab, setActiveTab] = useState<AdminPublishingTab>('pending');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState('');
@@ -224,18 +228,29 @@ export default function AdminMusicPublishingPage() {
   const allPageSelected = rows.length > 0 && rows.every(row => selectedIds.includes(row.id));
 
   useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     async function loadTracks() {
       setLoading(true);
       setError('');
       try {
-        const response = await fetch(
-          `/api/admin/music-publishing/tracks?stage=${activeTab}&page=${page + 1}&limit=${rowsPerPage}`,
-          {
-            signal: controller.signal,
-          }
-        );
+        const params = new URLSearchParams({
+          stage: activeTab,
+          page: String(page + 1),
+          limit: String(rowsPerPage),
+        });
+        if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+        const response = await fetch(`/api/admin/music-publishing/tracks?${params.toString()}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.error || 'Failed to load track metadata');
@@ -255,7 +270,7 @@ export default function AdminMusicPublishingPage() {
 
     loadTracks();
     return () => controller.abort();
-  }, [activeTab, page, rowsPerPage]);
+  }, [activeTab, debouncedSearchQuery, page, rowsPerPage]);
 
   const handleTabChange = (_event: SyntheticEvent, value: AdminPublishingTab) => {
     setActiveTab(value);
@@ -303,10 +318,15 @@ export default function AdminMusicPublishingPage() {
     anchor.remove();
     URL.revokeObjectURL(url);
 
+    if (activeTab === 'completed') {
+      setSelectedIds([]);
+      return;
+    }
+
     try {
       setActionLoading(true);
       setError('');
-      const updatedIds = await updateSelectedTracks('mark_approved');
+      const updatedIds = await updateSelectedTracks('mark_completed');
       setRows(current => current.filter(row => !updatedIds.includes(row.id)));
       setTotal(current => Math.max(0, current - updatedIds.length));
       setSelectedIds([]);
@@ -322,7 +342,7 @@ export default function AdminMusicPublishingPage() {
     try {
       setActionLoading(true);
       setError('');
-      const updatedIds = await updateSelectedTracks('mark_completed');
+      const updatedIds = await updateSelectedTracks('mark_approved');
       setRows(current => current.filter(row => !updatedIds.includes(row.id)));
       setTotal(current => Math.max(0, current - updatedIds.length));
       setSelectedIds([]);
@@ -334,7 +354,7 @@ export default function AdminMusicPublishingPage() {
   };
 
   return (
-    <Box sx={{ px: 0, py: 1, maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Admin Publishing"
         title="Music Publishing"
@@ -403,7 +423,28 @@ export default function AdminMusicPublishingPage() {
             }}
           >
             <TextField
+              label="Search Tracks"
+              name="musicPublishingSearch"
+              placeholder="Name, ISRC, UPC, artist…"
+              size="small"
+              value={searchQuery}
+              onChange={event => {
+                setSearchQuery(event.target.value);
+                setPage(0);
+              }}
+              autoComplete="off"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ width: { xs: '100%', md: 360 } }}
+            />
+            <TextField
               label="Select Count"
+              name="musicPublishingSelectCount"
               type="number"
               size="small"
               value={selectCount}
@@ -424,21 +465,28 @@ export default function AdminMusicPublishingPage() {
             </Button>
             <Button
               variant="contained"
-              startIcon={<Download />}
-              onClick={handleExport}
+              startIcon={<PlaylistAddCheck />}
+              onClick={handleApprove}
               disabled={activeTab !== 'pending' || !selectedRows.length || actionLoading}
               sx={{ display: activeTab === 'pending' ? 'inline-flex' : 'none' }}
             >
-              {actionLoading ? 'Exporting…' : 'Export Excel'}
+              {actionLoading ? 'Approving…' : 'Approve'}
             </Button>
             <Button
               variant="contained"
-              startIcon={<PlaylistAddCheck />}
-              onClick={handleApprove}
-              disabled={activeTab !== 'approved' || !selectedRows.length || actionLoading}
-              sx={{ display: activeTab === 'approved' ? 'inline-flex' : 'none' }}
+              startIcon={<Download />}
+              onClick={handleExport}
+              disabled={
+                (activeTab !== 'approved' && activeTab !== 'completed') ||
+                !selectedRows.length ||
+                actionLoading
+              }
+              sx={{
+                display:
+                  activeTab === 'approved' || activeTab === 'completed' ? 'inline-flex' : 'none',
+              }}
             >
-              {actionLoading ? 'Approving…' : 'Approve'}
+              {actionLoading ? 'Exporting…' : 'Export Excel'}
             </Button>
           </Stack>
         </Stack>
@@ -454,9 +502,13 @@ export default function AdminMusicPublishingPage() {
         elevation={0}
         sx={{ ...premiumSurfaceSx(theme), maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
       >
+        {loading && <LinearProgress />}
         {loading ? (
-          <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 360 }}>
+          <Box sx={{ display: 'grid', placeItems: 'center', gap: 1.5, minHeight: 360 }}>
             <CircularProgress />
+            <Typography variant="body2" color="text.secondary">
+              Loading {publishingTabs.find(tab => tab.value === activeTab)?.label.toLowerCase()} tracks…
+            </Typography>
           </Box>
         ) : (
           <>
@@ -496,7 +548,11 @@ export default function AdminMusicPublishingPage() {
               >
                 <TableHead>
                   <TableRow>
-                    <TableCell padding="checkbox" sx={{ width: checkboxColumnWidth }} style={{padding:"0 24px 0 16px"}}>
+                    <TableCell
+                      padding="checkbox"
+                      sx={{ width: checkboxColumnWidth }}
+                      style={{ padding: '0 24px 0 16px' }}
+                    >
                       <Checkbox
                         checked={allPageSelected}
                         indeterminate={selectedIds.length > 0 && !allPageSelected}
@@ -530,9 +586,9 @@ export default function AdminMusicPublishingPage() {
                           <Typography fontWeight={800}>No track metadata found</Typography>
                           <Typography variant="body2" color="text.secondary">
                             {activeTab === 'pending'
-                              ? 'Submitted release tracks awaiting export appear here.'
+                              ? 'Submitted release tracks awaiting approval appear here.'
                               : activeTab === 'approved'
-                                ? 'Exported tracks awaiting admin approval appear here.'
+                                ? 'Approved tracks ready for Excel export appear here.'
                                 : 'Completed publishing tracks appear here.'}
                           </Typography>
                         </Box>
@@ -543,11 +599,7 @@ export default function AdminMusicPublishingPage() {
                       const checked = selectedIds.includes(row.id);
                       return (
                         <TableRow key={row.id} hover selected={checked}>
-                          <TableCell
-                            padding="checkbox"
-                            sx={{ width: checkboxColumnWidth }}
-                            
-                          >
+                          <TableCell padding="checkbox" sx={{ width: checkboxColumnWidth }}>
                             <Checkbox
                               checked={checked}
                               onChange={() => handleSelectRow(row.id)}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -20,6 +19,7 @@ import { Notifications, Palette, Person, Save, Security } from "@mui/icons-mater
 import { PremiumHeader, premiumSurfaceSx } from "@/components/premium/PremiumSurface";
 import { useAuth } from "@/context/AppContext";
 import { useColorMode } from "@/context/ColorModeContext";
+import { toast } from "sonner";
 
 export default function SettingsPage() {
   const theme = useTheme();
@@ -28,8 +28,6 @@ export default function SettingsPage() {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     setDisplayName(user?.name || "");
@@ -39,12 +37,10 @@ export default function SettingsPage() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      setSuccess("");
-      setError("");
       await axios.put("/auth/me", { name: displayName });
-      setSuccess("Settings saved.");
+      toast.success("Settings saved.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      toast.error(err instanceof Error ? err.message : "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -154,11 +150,8 @@ export default function SettingsPage() {
               </Typography>
             </Paper>
 
-            {success && <Alert severity="success">{success}</Alert>}
-            {error && <Alert severity="error">{error}</Alert>}
-
             <Button variant="contained" size="large" startIcon={<Save />} onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving…" : "Save Changes"}
             </Button>
           </Stack>
         </Paper>

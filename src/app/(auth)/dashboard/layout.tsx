@@ -45,9 +45,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           sx={{ 
             flexGrow: 1,
             width: '100%',
-            pt: { xs: 2, sm: 3 },
+            pt: { xs: 2, sm: 2.5 },
             pb: { xs: 4, lg: 5 },
-            px: { xs: 2, sm: 3, lg: 4 },
+            px: { xs: 1.5, sm: 2.5, lg: 3 },
             maxWidth: 1680,
             mx: 'auto',
           }}

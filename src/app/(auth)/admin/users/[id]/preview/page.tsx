@@ -34,11 +34,11 @@ export default function UserPreviewPage() {
         if (!response.success) throw new Error(response.message || 'Failed to load user');
         setUser(response.data);
         void fetch(`/api/admin/users/${params.id}/preview-audit`, { method: 'POST' });
-        const releaseResponse = await fetch(`/api/releases?userId=${encodeURIComponent(params.id)}`, { cache: 'no-store' });
+        const releaseResponse = await fetch(`/api/releases?userId=${encodeURIComponent(params.id)}&summary=1`, { cache: 'no-store' });
         const releasePayload = await releaseResponse.json().catch(() => null);
         let allReleases = Array.isArray(releasePayload?.releases) ? releasePayload.releases : [];
         if (allReleases.length === 0) {
-          const fallbackResponse = await fetch('/api/releases', { cache: 'no-store' });
+          const fallbackResponse = await fetch('/api/releases?summary=1', { cache: 'no-store' });
           const fallbackPayload = await fallbackResponse.json().catch(() => null);
           allReleases = Array.isArray(fallbackPayload?.releases) ? fallbackPayload.releases : [];
         }
@@ -62,7 +62,7 @@ export default function UserPreviewPage() {
   if (error) return <Alert severity="error">{error}</Alert>;
 
   return (
-    <Box sx={{ width: '100%', py: { xs: 0.5, sm: 1 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <Alert
         severity="info"
         icon={<Lock />}

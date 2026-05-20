@@ -23,9 +23,8 @@ const canManagePodcastAssignments = (user: CurrentBackendUser) =>
   user.role === 'admin';
 
 const getPodcastLimitForRole = (role: string) => {
-  if (role === 'admin') return Number.POSITIVE_INFINITY;
   if (role === 'subadmin') return 2;
-  return 1;
+  return 0;
 };
 
 const toAssignmentUser = (user: Record<string, unknown>): AssignmentUser => ({
@@ -45,7 +44,7 @@ async function getAssignableUsers(): Promise<AssignmentUser[]> {
   const users = await db
     .collection('users')
     .find(
-      {},
+      { role: 'subadmin' },
       {
         projection: {
           password: 0,
@@ -78,7 +77,8 @@ async function getAssignableUser(userId: string): Promise<AssignmentUser | null>
     }
   );
 
-  return user ? toAssignmentUser(user) : null;
+  if (!user || user.role !== 'subadmin') return null;
+  return toAssignmentUser(user);
 }
 
 async function requirePodcastAssignmentAccess() {
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     const targetUser = await getAssignableUser(userId);
     if (!targetUser) {
-      return NextResponse.json({ success: false, message: 'Selected user was not found.' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Select a valid subadmin user.' }, { status: 404 });
     }
 
     const existingAssignments = await listPodcastOwnerships();
@@ -175,8 +175,8 @@ export async function POST(request: NextRequest) {
           success: false,
           message:
             targetUser.role === 'subadmin'
-              ? 'Subadmins can manage up to 2 RSS podcasts.'
-              : 'This user can manage only 1 RSS podcast.',
+              ? 'Subadmins can manage up to 2 podcasts.'
+              : 'Only subadmins can be assigned podcasts.',
         },
         { status: 409 }
       );

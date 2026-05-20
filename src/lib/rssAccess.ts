@@ -1,5 +1,3 @@
-import { getUserPodcastOwnerships } from '@/lib/rssOwnership';
-
 export type RssPodcastAccessMode = 'shared' | 'owned';
 
 function normalizeRssEmail(email: string): string {
@@ -7,7 +5,7 @@ function normalizeRssEmail(email: string): string {
 }
 
 /**
- * Comma- or semicolon-separated emails that own the RSS.com API key / workspace.
+ * Comma- or semicolon-separated emails that own the podcast API key / workspace.
  * Those users bypass per-tenant ownership: list all podcasts, open any podcast’s episodes/uploads.
  * Example: RSS_WORKSPACE_SUPERVISOR_EMAILS=admin@singleaudio.com
  */
@@ -25,27 +23,18 @@ export function isRssWorkspaceSupervisor(email: string): boolean {
   return getRssWorkspaceSupervisorEmails().has(normalizeRssEmail(email));
 }
 
-/** Default `owned`: one podcast per user, list/API filtered by Mongo `rssPodcastOwnership`. Set `RSS_PODCAST_ACCESS_MODE=shared` for a single RSS.com workspace shared by all app users (legacy). */
+/** Default `owned`: legacy per-user assignment mode. The app now lists the shared podcast workspace to all approved users. */
 export function getRssPodcastAccessMode(): RssPodcastAccessMode {
   return process.env.RSS_PODCAST_ACCESS_MODE === 'shared' ? 'shared' : 'owned';
 }
 
 /**
- * - `shared` mode: any authenticated user may use any podcast id (single shared workspace).
- * - `owned` mode: user must have `rssPodcastOwnership` for that id, unless they are in `RSS_WORKSPACE_SUPERVISOR_EMAILS`.
+ * Any authenticated, KYC-approved podcast user may upload episodes into any workspace podcast.
+ * Admin assignment now only scopes subadmin operations, not artist/label episode uploads.
  */
 export async function userCanAccessPodcast(
   user: { _id: string; email: string },
   podcastId: number
 ): Promise<boolean> {
-  if (getRssPodcastAccessMode() === 'shared') {
-    return true;
-  }
-
-  if (isRssWorkspaceSupervisor(user.email)) {
-    return true;
-  }
-
-  const ownerships = await getUserPodcastOwnerships(user._id);
-  return ownerships.some((ownership) => ownership.rssPodcastId === podcastId);
+  return Number.isInteger(podcastId) && podcastId > 0 && Boolean(user._id || user.email);
 }

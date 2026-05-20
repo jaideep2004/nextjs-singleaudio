@@ -1,0 +1,14 @@
+{
+  "jobId": "6a0c3e2db03caffde505ea40",
+  "scope": "approved",
+  "generatedAt": "2026-05-19T10:40:46.176Z",
+  "counts": {
+    "releases": 4,
+    "tracks": 22,
+    "files": 0,
+    "missing": 22,
+    "parts": 0
+  },
+  "parts": [],
+  "warnings": []
+}

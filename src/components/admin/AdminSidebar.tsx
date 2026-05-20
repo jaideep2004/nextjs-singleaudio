@@ -36,6 +36,7 @@ import {
   Podcasts as PodcastsIcon,
   LibraryMusic,
   VideoLibrary,
+  FileDownload,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { hasAdminPermission, isFullAdmin, isSubadmin, type AdminPermission } from '@/lib/adminAccess';
@@ -109,9 +110,9 @@ const menuSections = [
         path: '/admin/podcasts',
         permission: 'podcasts' as AdminPermission,
         subItems: [
-          { text: 'My Podcast', path: '/admin/podcasts' },
-          { text: 'Episodes', path: '/admin/podcasts?view=episodes' },
-          { text: 'Analytics', path: '/admin/podcasts?view=analytics' },
+          { text: 'Manage Podcasts', path: '/admin/podcasts' },
+          { text: 'Upload Episode', path: '/admin/podcasts?view=episodes' },
+          { text: 'Payouts', path: '/admin/podcasts?view=payouts' },
         ],
       },
     ],
@@ -141,6 +142,11 @@ const menuSections = [
         icon: <SettingsIcon />,
         path: '/admin/settings',
         permission: 'settings' as AdminPermission,
+      },
+      {
+        text: 'Export',
+        icon: <FileDownload />,
+        path: '/admin/export',
       },
     ],
   },

@@ -183,7 +183,7 @@ export default function AdminDashboard() {
       }
 
       try {
-        const releasesResponse = await releaseAPI.getReleases();
+        const releasesResponse = await releaseAPI.getReleases({ summary: '1' });
         if (releasesResponse.success && Array.isArray(releasesResponse.data)) {
           const releases = releasesResponse.data as DashboardRelease[];
           setAllReleases(releases);
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
     <Container
       maxWidth={false}
       disableGutters
-      sx={{ py: { xs: 0.5, sm: 1 }, pl: { xs: 0, lg: 0 }, pr: 0 }}
+      sx={{ py: 0, pl: 0, pr: 0 }}
     >
       <PremiumHeader
         eyebrow="Admin Command Center"

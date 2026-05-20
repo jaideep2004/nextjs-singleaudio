@@ -110,7 +110,7 @@ function TracksContent() {
   };
 
   return (
-    <Box sx={{ width: '100%', py: { xs: 1, sm: 2 } }}>
+    <Box sx={{ width: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Catalog"
         title="Tracks"
