@@ -181,6 +181,8 @@ export default function AdminReleasesPage() {
   const filteredReleases = getFilteredReleases();
   const getTrackCount = (release: any) =>
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
+  const getReleaseArtwork = (release: any) =>
+    release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
   const pendingCount = releases.filter(r => r.status === 'pending').length;
   const approvedCount = releases.filter(r => r.status === 'approved').length;
   const rejectedCount = releases.filter(r => r.status === 'rejected').length;
@@ -620,6 +622,8 @@ export default function AdminReleasesPage() {
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <Avatar
+                        src={getReleaseArtwork(release) || undefined}
+                        alt={release.releaseTitle || release.title || 'Release artwork'}
                         variant="rounded"
                         sx={{
                           width: 40,

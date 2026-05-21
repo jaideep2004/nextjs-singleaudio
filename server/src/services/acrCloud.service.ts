@@ -3,7 +3,14 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { spawn } from 'child_process';
-import Track from '../models/track.model';
+import { updateReleaseTrackAcrCloudByFileId } from '../repositories/release.repository';
+import {
+  findCanonicalTracksByAcrCloudFileId,
+  updateCanonicalTrackLegacyAcrCloudByFileId,
+  updateStandaloneTrackAcrCloudByFileId,
+  updateTrackAcrCloudById,
+} from '../repositories/track.repository';
+import { upsertAcrCloudFingerprintsForTracks } from '../repositories/fingerprint.repository';
 import {
   AcrCloudAiDetection,
   AcrCloudDataType,
@@ -395,7 +402,7 @@ export async function startTrackAcrCloudScan(trackId: string, audioPath: string,
       trackId,
       requiredEnv: ['ACRCLOUD_CONSOLE_TOKEN', 'ACRCLOUD_FS_REGION', 'ACRCLOUD_FS_CONTAINER_ID'],
     });
-    await Track.findByIdAndUpdate(trackId, {
+    await updateTrackAcrCloudById(trackId, {
       'acrCloud.scanState': 'not_configured',
       'acrCloud.lastError': 'ACRCloud 30-second file scanning is not configured',
       'acrCloud.checkedAt': new Date(),
@@ -405,14 +412,14 @@ export async function startTrackAcrCloudScan(trackId: string, audioPath: string,
 
   try {
     console.log('[ACRCloud] Track scan starting', { trackId, name, audioPath });
-    await Track.findByIdAndUpdate(trackId, {
+    await updateTrackAcrCloudById(trackId, {
       'acrCloud.scanState': 'pending',
       'acrCloud.lastError': undefined,
       'acrCloud.checkedAt': new Date(),
     });
 
     const scan = await uploadFirstThirtySecondsForScan(audioPath, name, 'audio');
-    await Track.findByIdAndUpdate(trackId, {
+    await updateTrackAcrCloudById(trackId, {
       'acrCloud.fileId': scan.fileId,
       'acrCloud.scanState': scan.state,
       'acrCloud.aiDetection': scan.aiDetection,
@@ -431,7 +438,7 @@ export async function startTrackAcrCloudScan(trackId: string, audioPath: string,
       name,
       error: error instanceof Error ? error.message : error,
     });
-    await Track.findByIdAndUpdate(trackId, {
+    await updateTrackAcrCloudById(trackId, {
       'acrCloud.scanState': 'error',
       'acrCloud.lastError': error instanceof Error ? error.message : 'ACRCloud scan failed',
       'acrCloud.checkedAt': new Date(),
@@ -446,39 +453,12 @@ export async function persistScanResult(fileId: string, scan: AcrCloudScanSummar
     aiDetections: scan.aiDetection.length,
     fingerprintMatches: scan.fingerprintMatches.length,
   });
-  await Track.findOneAndUpdate(
-    { 'acrCloud.fileId': fileId },
-    {
-      'acrCloud.scanState': scan.state,
-      'acrCloud.aiDetection': scan.aiDetection,
-      'acrCloud.fingerprintMatches': scan.fingerprintMatches,
-      'acrCloud.rawResult': scan.rawResult,
-      'acrCloud.lastError': undefined,
-      'acrCloud.checkedAt': new Date(),
-    }
-  );
+  await updateStandaloneTrackAcrCloudByFileId(fileId, scan);
 
-  const releasesCollection = Track.db.db?.collection('releases');
-  if (releasesCollection) {
-    await releasesCollection.updateMany(
-      { 'tracks.acrCloud.fileId': fileId },
-      {
-        $set: {
-          'tracks.$[track].acrCloud.scanState': scan.state,
-          'tracks.$[track].acrCloud.state': scan.state,
-          'tracks.$[track].acrCloud.aiDetection': scan.aiDetection,
-          'tracks.$[track].acrCloud.fingerprintMatches': scan.fingerprintMatches,
-          'tracks.$[track].acrCloud.rawResult': scan.rawResult,
-          'tracks.$[track].acrCloud.checkedAt': new Date().toISOString(),
-          updatedAt: new Date(),
-        },
-        $unset: {
-          'tracks.$[track].acrCloud.lastError': '',
-        },
-      },
-      {
-        arrayFilters: [{ 'track.acrCloud.fileId': fileId }],
-      }
-    );
-  }
+  await updateCanonicalTrackLegacyAcrCloudByFileId(fileId, scan);
+
+  const canonicalTracks = await findCanonicalTracksByAcrCloudFileId(fileId);
+  await upsertAcrCloudFingerprintsForTracks(canonicalTracks as Array<{ _id: unknown; releaseId?: unknown }>, fileId, scan);
+
+  await updateReleaseTrackAcrCloudByFileId(fileId, scan);
 }

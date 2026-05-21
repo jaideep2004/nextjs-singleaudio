@@ -11,7 +11,7 @@ import {
 } from '../services/acrCloud.service';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { LOCAL_FFMPEG_ENABLED, UserRole } from '../config/constants';
-import Track from '../models/track.model';
+import { findTrackByAcrCloudFileId } from '../repositories/track.repository';
 
 export async function analyzeAudioHandler(req: Request, res: Response) {
   try {
@@ -102,7 +102,7 @@ export async function scanWithAcrCloudHandler(req: Request, res: Response) {
 export async function getAcrCloudScanResultHandler(req: Request, res: Response) {
   try {
     const authReq = req as AuthRequest;
-    const track = await Track.findOne({ 'acrCloud.fileId': req.params.fileId });
+    const track = await findTrackByAcrCloudFileId(req.params.fileId);
     if (track && authReq.user?.role !== UserRole.ADMIN && track.artistId.toString() !== authReq.user?._id?.toString()) {
       return errorResponse(res, 'Not authorized to access this ACRCloud scan', undefined, 403);
     }

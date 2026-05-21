@@ -18,6 +18,7 @@ import {
   useTheme,
   Tooltip,
   Button,
+  Chip,
 } from '@mui/material';
 import {
   Notifications as NotificationsIcon,
@@ -27,9 +28,12 @@ import {
   DarkMode,
   LightMode,
   Search as SearchIcon,
+  Shield as ShieldIcon,
 } from '@mui/icons-material';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useColorMode } from '@/context/ColorModeContext';
+import { useAuth } from '@/context/AppContext';
+import { isSubadmin } from '@/lib/adminAccess';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -37,6 +41,7 @@ export default function AdminHeader() {
   const theme = useTheme();
   const { notifications, unreadCount, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications();
   const { mode, toggleColorMode } = useColorMode();
+  const { user } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationsAnchor, setNotificationsAnchor] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -333,6 +338,26 @@ export default function AdminHeader() {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
+        <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
+          <Chip
+            icon={<ShieldIcon sx={{ fontSize: 14 }} />}
+            label={isSubadmin(user) ? 'Subadmin Access' : 'Administrator'}
+            size="small"
+            sx={{
+              width: '100%',
+              justifyContent: 'flex-start',
+              bgcolor: isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.06)',
+              color: isDark ? '#fca5a5' : '#dc2626',
+              border: '1px solid',
+              borderColor: isDark ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.14)',
+              fontWeight: 700,
+              '& .MuiChip-icon': {
+                color: isDark ? '#fca5a5' : '#dc2626',
+              },
+            }}
+          />
+        </Box>
+        <Divider sx={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
         <MenuItem onClick={() => router.push('/admin/profile')} sx={{ py: 1.25 }}>
           <ListItemIcon>
             <PersonIcon fontSize="small" />

@@ -35,6 +35,7 @@ import {
   LibraryMusic,
   VideoLibrary,
   LockOutlined,
+  YouTube,
 } from '@mui/icons-material';
 
 import { useAuth } from '@/context/AppContext';
@@ -72,6 +73,21 @@ const menuSections = [
         text: 'Analytics',
         icon: <AnalyticsIcon />,
         path: '/dashboard/analytics',
+      },
+      {
+        text: 'Music Publishing',
+        icon: <LibraryMusic />,
+        path: '/dashboard/music-publishing',
+      },
+      {
+        text: 'Vevo Video Distribution',
+        icon: <VideoLibrary />,
+        path: '/dashboard/vevo-video-distribution',
+      },
+      {
+        text: 'YouTube Network',
+        icon: <YouTube />,
+        path: '/dashboard/youtube-network',
       },
     ],
   },
@@ -118,16 +134,6 @@ const menuSections = [
         text: 'Profile',
         icon: <PersonIcon />,
         path: '/dashboard/profile',
-      },
-      {
-        text: 'Music Publishing',
-        icon: <LibraryMusic />,
-        path: '/dashboard/music-publishing',
-      },
-      {
-        text: 'Vevo Video Distribution',
-        icon: <VideoLibrary />,
-        path: '/dashboard/vevo-video-distribution',
       },
       {
         text: 'Settings',

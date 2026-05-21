@@ -35,6 +35,13 @@ export interface ITrack extends Document {
   };
   stores: string[];
   status: ReleaseStatus;
+  source?: 'release_embed' | 'standalone_upload';
+  releaseId?: mongoose.Types.ObjectId;
+  ownerUserId?: mongoose.Types.ObjectId | string;
+  organizationId?: mongoose.Types.ObjectId;
+  releaseTrackIndex?: number;
+  legacyTrackKey?: string;
+  legacyMetadata?: Record<string, unknown>;
   rejectionReason?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -178,6 +185,33 @@ const TrackSchema: Schema = new Schema(
       type: String,
       enum: Object.values(ReleaseStatus),
       default: ReleaseStatus.PENDING
+    },
+    source: {
+      type: String,
+      enum: ['release_embed', 'standalone_upload'],
+      default: 'standalone_upload',
+      index: true
+    },
+    releaseId: {
+      type: Schema.Types.ObjectId,
+      index: true
+    },
+    ownerUserId: {
+      type: Schema.Types.Mixed,
+      index: true
+    },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      index: true
+    },
+    releaseTrackIndex: {
+      type: Number
+    },
+    legacyTrackKey: {
+      type: String
+    },
+    legacyMetadata: {
+      type: Schema.Types.Mixed
     },
     rejectionReason: {
       type: String

@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AdminPermission, JWT_SECRET, UserRole } from '../config/constants';
 import { ApiError } from './errorHandler.middleware';
-import User from '../models/user.model';
+import User from '../repositories/user.repository';
 
 // Extended Request interface to include user property
 export interface AuthRequest extends Request {

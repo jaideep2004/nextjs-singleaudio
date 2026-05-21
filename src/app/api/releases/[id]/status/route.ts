@@ -6,6 +6,12 @@ import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
 import { generateUpcA } from '@/lib/upc';
 import { createReleaseDeliveryShellJobs } from '@/lib/dspDeliveryShell';
 import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
+import {
+  findReleaseByIdRaw,
+  releasesCollection,
+  withOptionalLegacyTrackSnapshot,
+} from '@/lib/repositories/releases';
+import { replaceReleaseCanonicalTracks } from '@/lib/repositories/tracks';
 
 export async function PATCH(
   req: NextRequest,
@@ -39,7 +45,7 @@ export async function PATCH(
     if (status === 'rejected') update.rejectReason = reason || '';
     if (status !== 'rejected') update.rejectReason = undefined;
 
-    const existing = await db.collection('releases').findOne({ _id });
+    const existing = await findReleaseByIdRaw(db, _id);
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
     }
@@ -59,8 +65,9 @@ export async function PATCH(
       });
 
       update.upc = releaseUpc;
-      update.tracks = assignedTracks;
+      Object.assign(update, withOptionalLegacyTrackSnapshot({}, assignedTracks));
       update.codesAssignedAt = existing.codesAssignedAt || new Date();
+      await replaceReleaseCanonicalTracks(db, existing, assignedTracks);
       await markIsrcsAssigned(
         db,
         assignedTracks.map((track: any) => track.isrc).filter(Boolean),
@@ -68,7 +75,7 @@ export async function PATCH(
       );
     }
 
-    const res = await db.collection('releases').findOneAndUpdate(
+    const res = await releasesCollection(db).findOneAndUpdate(
       { _id },
       { $set: update },
       { returnDocument: 'after' }

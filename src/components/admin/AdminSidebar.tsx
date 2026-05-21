@@ -15,7 +15,6 @@ import {
   useTheme,
   useMediaQuery,
   IconButton,
-  Chip,
   Tooltip,
 } from '@mui/material';
 import {
@@ -31,15 +30,14 @@ import {
   ChevronRight as ChevronRightIcon,
   Album,
   TrendingUp,
-  Shield as ShieldIcon,
   CloudUpload as CloudUploadIcon,
   Podcasts as PodcastsIcon,
   LibraryMusic,
   VideoLibrary,
-  FileDownload,
+  YouTube,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
-import { hasAdminPermission, isFullAdmin, isSubadmin, type AdminPermission } from '@/lib/adminAccess';
+import { hasAdminPermission, isFullAdmin, type AdminPermission } from '@/lib/adminAccess';
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -74,6 +72,7 @@ const menuSections = [
           { text: 'Pending', path: '/admin/releases?status=pending' },
           { text: 'Approved', path: '/admin/releases?status=approved' },
           { text: 'Rejected', path: '/admin/releases?status=rejected' },
+          { text: 'Export Catalog', path: '/admin/export' },
         ],
       },
       {
@@ -88,6 +87,24 @@ const menuSections = [
         path: '/admin/analytics',
         permission: 'analytics' as AdminPermission,
       },
+      {
+        text: 'Music Publishing',
+        icon: <LibraryMusic />,
+        path: '/admin/music-publishing',
+        permission: 'settings' as AdminPermission,
+      },
+      {
+        text: 'Vevo Video Distribution',
+        icon: <VideoLibrary />,
+        path: '/admin/vevo-video-distribution',
+        permission: 'settings' as AdminPermission,
+      },
+      {
+        text: 'YouTube Network',
+        icon: <YouTube />,
+        path: '/admin/youtube-network',
+        permission: 'settings' as AdminPermission,
+      },
     ],
   },
   {
@@ -97,6 +114,12 @@ const menuSections = [
         text: 'Payouts',
         icon: <PaymentIcon />,
         path: '/admin/payouts',
+        permission: 'payouts' as AdminPermission,
+      },
+      {
+        text: 'Royalties',
+        icon: <TrendingUp />,
+        path: '/admin/royalties',
         permission: 'payouts' as AdminPermission,
       },
     ],
@@ -126,27 +149,10 @@ const menuSections = [
         path: '/admin/profile',
       },
       {
-        text: 'Music Publishing',
-        icon: <LibraryMusic />,
-        path: '/admin/music-publishing',
-        permission: 'settings' as AdminPermission,
-      },
-      {
-        text: 'Vevo Video Distribution',
-        icon: <VideoLibrary />,
-        path: '/admin/vevo-video-distribution',
-        permission: 'settings' as AdminPermission,
-      },
-      {
         text: 'Settings',
         icon: <SettingsIcon />,
         path: '/admin/settings',
         permission: 'settings' as AdminPermission,
-      },
-      {
-        text: 'Export',
-        icon: <FileDownload />,
-        path: '/admin/export',
       },
     ],
   },
@@ -178,6 +184,9 @@ export default function AdminSidebar() {
     if (pathname.startsWith('/admin/releases')) {
       setOpenSubMenu('/admin/releases');
     }
+    if (pathname.startsWith('/admin/export')) {
+      setOpenSubMenu('/admin/releases');
+    }
     if (pathname.startsWith('/admin/podcasts')) {
       setOpenSubMenu('/admin/podcasts');
     }
@@ -199,6 +208,9 @@ export default function AdminSidebar() {
   const isActive = (path: string) => {
     if (path === '/admin/dashboard') {
       return pathname === path;
+    }
+    if (path === '/admin/releases') {
+      return pathname.startsWith('/admin/releases') || pathname.startsWith('/admin/export');
     }
     return pathname.startsWith(path);
   };
@@ -288,29 +300,6 @@ export default function AdminSidebar() {
             {desktopCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
           </IconButton>
         </Tooltip>
-      </Box>
-
-      {/* Admin Badge */}
-      <Box sx={{ mx: 2, mb: 2, display: desktopCollapsed ? 'none' : 'block' }}>
-        <Chip
-          icon={<ShieldIcon sx={{ fontSize: 14 }} />}
-          label={isSubadmin(user) ? 'Subadmin Access' : 'Administrator'}
-          size="small"
-          sx={{
-            width: '100%',
-            justifyContent: 'flex-start',
-            bgcolor: isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.06)',
-            color: isDark ? '#fca5a5' : '#dc2626',
-            border: '1px solid',
-            borderColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.12)',
-            fontWeight: 600,
-            fontSize: '0.75rem',
-            height: 32,
-            '& .MuiChip-icon': {
-              color: isDark ? '#fca5a5' : '#dc2626',
-            },
-          }}
-        />
       </Box>
 
       {/* Navigation Sections */}

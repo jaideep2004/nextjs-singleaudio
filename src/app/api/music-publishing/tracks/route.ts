@@ -3,6 +3,7 @@ import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 import { getReleaseOwnerQuery, normalizeMusicPublishingTracks } from '@/lib/musicPublishing';
+import { listReleasesWithTracks } from '@/lib/repositories/releases';
 
 const MAX_LIMIT = 250;
 
@@ -35,30 +36,11 @@ export async function GET(req: NextRequest) {
     const tab = getUserPublishingTab(searchParams.get('tab'));
     const query = (searchParams.get('q') || '').trim().toLowerCase();
 
-    const releases = await db.collection('releases')
-      .find({ $and: [getReleaseOwnerQuery(user), { status: 'approved' }] }, {
-        projection: {
-          releaseTitle: 1,
-          title: 1,
-          releaseType: 1,
-          status: 1,
-          releaseDate: 1,
-          originalReleaseDate: 1,
-          label: 1,
-          upc: 1,
-          ownerName: 1,
-          ownerArtistName: 1,
-          ownerEmail: 1,
-          primaryArtist: 1,
-          territories: 1,
-          stores: 1,
-          tracks: 1,
-          updatedAt: 1,
-          createdAt: 1,
-        },
-      })
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .toArray();
+    const releases = await listReleasesWithTracks(
+      db,
+      { $and: [getReleaseOwnerQuery(user), { status: 'approved' }] },
+      { summary: true }
+    );
 
     const rows = normalizeMusicPublishingTracks(releases)
       .filter((row) =>

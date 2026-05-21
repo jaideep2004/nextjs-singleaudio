@@ -3,6 +3,12 @@ import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
+import {
+  findReleaseByIdRaw,
+  releasesCollection,
+  withOptionalLegacyTrackSnapshot,
+} from '@/lib/repositories/releases';
+import { replaceReleaseCanonicalTracks } from '@/lib/repositories/tracks';
 
 function getClientKey(req: NextRequest) {
   return (
@@ -38,7 +44,7 @@ export async function DELETE(
       windowMs: 60 * 1000,
     });
 
-    const release = await db.collection('releases').findOne({ _id });
+    const release = await findReleaseByIdRaw(db, _id);
     if (!release) {
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
     }
@@ -66,17 +72,21 @@ export async function DELETE(
       reason: typeof body?.reason === 'string' ? body.reason.slice(0, 500) : '',
     };
 
-    const result = await db.collection('releases').findOneAndUpdate(
-      { _id },
-      {
-        $set: {
-          tracks,
-          updatedAt: new Date(),
-        },
-        $push: {
-          adminActions: auditEntry,
-        },
+    await replaceReleaseCanonicalTracks(db, release, tracks);
+
+    const update = {
+      $set: {
+        ...withOptionalLegacyTrackSnapshot({}, tracks),
+        updatedAt: new Date(),
       },
+      $push: {
+        adminActions: auditEntry,
+      },
+    };
+
+    const result = await releasesCollection(db).findOneAndUpdate(
+      { _id },
+      update as any,
       { returnDocument: 'after' }
     );
 

@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import Track from '../../models/track.model';
 import DspProvider from '../../models/dspProvider.model';
 import DeliveryJob, { IDeliveryJob } from '../../models/deliveryJob.model';
 import DspWebhookEvent from '../../models/dspWebhookEvent.model';
@@ -10,6 +9,7 @@ import { dspRegistry } from './dspRegistry';
 import { applyMetadataRules } from './rules/metadataRuleEngine';
 import { releaseVersionService } from './releaseVersion.service';
 import { evaluateDspReadiness, getDspRequirement } from './dspProviderRequirements';
+import { findTrackById } from '../../repositories/track.repository';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const ALLOWED_WEBHOOK_STATES: DspDeliveryState[] = [
@@ -222,7 +222,7 @@ class DspDeliveryService {
     if (!provider) throw new Error(`Provider ${providerKey} is not active`);
     if (provider.maintenanceMode) throw new Error(`Provider ${providerKey} is in maintenance mode`);
 
-    const track = await Track.findById(trackId);
+    const track = await findTrackById(trackId);
     if (!track) throw new Error('Track not found');
 
     const payload = this.buildTrackPayload(track);
@@ -346,7 +346,16 @@ class DspDeliveryService {
       return DeliveryJob.findById(jobId);
     }
 
-    const track = await Track.findById(job.trackId);
+    if (!job.trackId) {
+      await DeliveryJob.findByIdAndUpdate(jobId, {
+        state: 'failed',
+        errorMessage: 'Track id missing',
+        $push: { events: { state: 'failed', message: 'Track id missing', source: 'system' } },
+      });
+      return DeliveryJob.findById(jobId);
+    }
+
+    const track = await findTrackById(job.trackId.toString());
     if (!track) {
       await DeliveryJob.findByIdAndUpdate(jobId, {
         state: 'failed',

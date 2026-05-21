@@ -1,9 +1,7 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import path from 'path';
-import fs from 'fs';
-import mongoose from 'mongoose';
 import { AuthRequest } from '../middleware/auth.middleware';
-import Track, { ITrack } from '../models/track.model';
+import { ITrack } from '../models/track.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { getFileUrl, deleteFile } from '../utils/fileUpload';
@@ -11,6 +9,13 @@ import { ReleaseStatus, TRACKS_DIR, ARTWORK_DIR, UserRole } from '../config/cons
 import * as notificationService from '../services/notification.service';
 import { startTrackAcrCloudScan } from '../services/acrCloud.service';
 import { assignTrackIsrc, markTrackIsrcAssigned, normalizeIsrc } from '../services/isrc.service';
+import {
+  createStandaloneTrack,
+  deleteTrackDocument,
+  findTrackById,
+  listStandaloneTracks,
+  saveTrack,
+} from '../repositories/track.repository';
 
 /**
  * Upload a new track
@@ -64,7 +69,7 @@ export const uploadTrack = async (req: AuthRequest, res: Response): Promise<void
     });
 
     // Create track
-    const track = await Track.create({
+    const track = await createStandaloneTrack({
       title,
       artistId: user._id,
       artistName: user.artistName || user.name,
@@ -137,11 +142,13 @@ export const getTracks = async (req: AuthRequest, res: Response): Promise<void> 
     // Filter tracks based on user role
     if (user.role === UserRole.ADMIN) {
       // Admins can see all tracks
-      const statusFilter = req.query.status ? { status: req.query.status } : {};
-      tracks = await Track.find(statusFilter).sort({ createdAt: -1 });
+      const statusFilter = req.query.status
+        ? { status: req.query.status, source: { $ne: 'release_embed' } }
+        : { source: { $ne: 'release_embed' } };
+      tracks = await listStandaloneTracks(statusFilter);
     } else {
       // Artists can only see their own tracks
-      tracks = await Track.find({ artistId: user._id }).sort({ createdAt: -1 });
+      tracks = await listStandaloneTracks({ artistId: user._id });
     }
 
     // Generate file URLs for each track
@@ -169,7 +176,7 @@ export const getTrackById = async (req: AuthRequest, res: Response): Promise<voi
     const { id } = req.params;
     const user = req.user;
 
-    const track = await Track.findById(id);
+    const track = await findTrackById(id);
 
     if (!track) {
       notFoundResponse(res, 'Track not found');
@@ -210,7 +217,7 @@ export const updateTrack = async (req: AuthRequest, res: Response): Promise<void
     const { title, genre, releaseDate, isrc, stores } = req.body;
     const user = req.user;
 
-    const track = await Track.findById(id);
+    const track = await findTrackById(id);
 
     if (!track) {
       notFoundResponse(res, 'Track not found');
@@ -257,7 +264,7 @@ export const updateTrack = async (req: AuthRequest, res: Response): Promise<void
       track.rejectionReason = undefined;
     }
 
-    await track.save();
+    await saveTrack(track);
     if (assignedIsrc) await markTrackIsrcAssigned(assignedIsrc, track._id.toString());
 
     // Generate file URLs
@@ -288,7 +295,7 @@ export const deleteTrack = async (req: AuthRequest, res: Response): Promise<void
     const { id } = req.params;
     const user = req.user;
 
-    const track = await Track.findById(id);
+    const track = await findTrackById(id);
 
     if (!track) {
       notFoundResponse(res, 'Track not found');
@@ -308,7 +315,7 @@ export const deleteTrack = async (req: AuthRequest, res: Response): Promise<void
     deleteFile(artworkPath);
 
     // Delete the track from the database
-    await track.deleteOne();
+    await deleteTrackDocument(track);
 
     successResponse(res, null, 'Track deleted successfully');
   } catch (error) {
@@ -327,7 +334,7 @@ export const updateTrackStatus = async (req: AuthRequest, res: Response): Promis
     const { status, rejectionReason } = req.body;
 
     // Cast the track to ITrack to ensure type safety
-    const track = await Track.findById(id) as ITrack;
+    const track = await findTrackById(id) as ITrack;
 
     if (!track) {
       notFoundResponse(res, 'Track not found');
@@ -344,7 +351,7 @@ export const updateTrackStatus = async (req: AuthRequest, res: Response): Promis
       track.rejectionReason = undefined;
     }
 
-    await track.save();
+    await saveTrack(track);
 
     // Send notification to artist
     if (status === ReleaseStatus.APPROVED) {

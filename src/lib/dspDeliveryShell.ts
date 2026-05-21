@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 import { Db, ObjectId } from 'mongodb';
 import { validateReleaseAssetsForDelivery } from './dspAssetReadiness';
+import { hydrateReleasesWithCanonicalTracks } from '@/lib/repositories/tracks';
+import { releasesCollection } from '@/lib/repositories/releases';
 
 type ReleaseDoc = Record<string, any> & {
   _id: ObjectId;
@@ -110,6 +112,8 @@ function evaluateNativeProviderReadiness(provider: any) {
 }
 
 export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc, createdBy?: string) {
+  const [releaseForDelivery] = await hydrateReleasesWithCanonicalTracks(db, [release]);
+  release = releaseForDelivery;
   const rawStores = Array.isArray(release.stores) ? release.stores : [];
   const providerKeys = Array.from(new Set(rawStores.map(toProviderKey).filter(Boolean)));
   if (providerKeys.length === 0) {
@@ -117,7 +121,7 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
   }
 
   const assetReadiness = await validateReleaseAssetsForDelivery(release);
-  await db.collection('releases').updateOne(
+  await releasesCollection(db).updateOne(
     { _id: release._id },
     {
       $set: {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
-import { ObjectId } from 'mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
+import { findReleaseByIdWithTracks } from '@/lib/repositories/releases';
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -26,8 +26,7 @@ export async function GET(
   try {
     const user = await getCurrentBackendUser();
     const { db } = await connectToDatabase();
-    const _id = new ObjectId(id);
-    const release = await db.collection('releases').findOne({ _id });
+    const release = await findReleaseByIdWithTracks(db, id);
     if (!release) {
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
     }

@@ -1,4 +1,4 @@
-import User from '../models/user.model';
+import User from '../repositories/user.repository';
 import { NotificationType, UserRole } from '../config/constants';
 import { sendEmailMessage } from './otp.service';
 import { createNotification } from './notification.service';

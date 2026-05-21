@@ -3,6 +3,11 @@ import { connectToDatabase } from '@/utils/mongodb';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
+import {
+  createRelease,
+  getReleaseOwnerQuery,
+  listReleasesWithTracks,
+} from '@/lib/repositories/releases';
 
 function getClientKey(req: NextRequest) {
   return (
@@ -10,31 +15,6 @@ function getClientKey(req: NextRequest) {
     req.headers.get('x-real-ip') ||
     'unknown'
   );
-}
-
-function getReleaseOwnerQuery(user: { _id: string; name?: string; artistName?: string; email?: string }) {
-  const userId = String(user._id);
-  const legacyNames = [user.artistName, user.name]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .map((value) => value.trim());
-
-  return {
-    $or: [
-      { userId },
-      { artistId: userId },
-      { ownerId: userId },
-      { createdBy: userId },
-      ...legacyNames.flatMap((name) => [
-        { primaryArtist: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-        { artist: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-        { label: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-      ]),
-    ],
-  };
-}
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // POST: Save a new release
@@ -56,18 +36,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // Insert the release into the 'releases' collection
-    const result = await db.collection('releases').insertOne({
-      ...body,
-      userId: String(user._id),
-      artistId: String(user._id),
-      ownerEmail: user.email,
-      ownerName: user.name,
-      ownerArtistName: user.artistName || user.name,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      status: 'pending',
-    });
+    const result = await createRelease(db, body, user);
 
     void sendUserAndAdminEmail(
       db,
@@ -109,34 +78,7 @@ export async function GET(req: NextRequest) {
         ? getReleaseOwnerQuery({ _id: requestedUserId })
         : {}
       : getReleaseOwnerQuery(user);
-    const releases = summary
-      ? await db.collection('releases').aggregate([
-          { $match: query },
-          { $sort: { createdAt: -1 } },
-          {
-            $project: {
-              releaseTitle: 1,
-              title: 1,
-              releaseType: 1,
-              status: 1,
-              releaseDate: 1,
-              originalReleaseDate: 1,
-              label: 1,
-              upc: 1,
-              ownerName: 1,
-              ownerArtistName: 1,
-              ownerEmail: 1,
-              primaryArtist: 1,
-              artist: 1,
-              artworkUrl: 1,
-              stores: 1,
-              updatedAt: 1,
-              createdAt: 1,
-              trackCount: { $size: { $ifNull: ['$tracks', []] } },
-            },
-          },
-        ]).toArray()
-      : await db.collection('releases').find(query).sort({ createdAt: -1 }).toArray();
+    const releases = await listReleasesWithTracks(db, query, { summary });
     return NextResponse.json({ success: true, releases });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch releases';

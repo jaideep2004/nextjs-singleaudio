@@ -8,6 +8,8 @@ import { ObjectId, type Db } from 'mongodb';
 import path from 'path';
 import { connectToDatabase } from '@/utils/mongodb';
 import { asString } from '@/lib/musicPublishing';
+import { hydrateReleasesWithCanonicalTracks } from '@/lib/repositories/tracks';
+import { releasesCollection } from '@/lib/repositories/releases';
 
 export type CatalogExportState =
   | 'queued'
@@ -589,8 +591,7 @@ export async function processCatalogExportJob(jobId: string) {
       );
     };
 
-    const releases = db
-      .collection('releases')
+    const releases = releasesCollection(db)
       .find(
         { status: 'approved' },
         {
@@ -618,7 +619,8 @@ export async function processCatalogExportJob(jobId: string) {
       .sort({ _id: 1 })
       .batchSize(getBatchSize());
 
-    for await (const release of releases) {
+    for await (const rawRelease of releases) {
+      const [release] = await hydrateReleasesWithCanonicalTracks(db, [rawRelease as Record<string, any> & { _id: ObjectId }]);
       counts.releases += 1;
       releaseBook.worksheet.addRow(releaseRow(release)).commit();
 

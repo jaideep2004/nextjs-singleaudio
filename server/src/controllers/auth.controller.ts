@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.middleware';
-import User from '../models/user.model';
+import User from '../repositories/user.repository';
 import PendingSignup from '../models/pendingSignup.model';
 import SettingsModel from '../models/settings.model';
 import generateToken from '../utils/generateToken';

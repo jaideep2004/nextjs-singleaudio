@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { AuthRequest } from '../middleware/auth.middleware';
 import Royalty from '../models/royalty.model';
-import Track from '../models/track.model';
+import { findTrackById } from '../repositories/track.repository';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { UserRole } from '../config/constants';
@@ -17,7 +17,7 @@ export const createRoyalty = async (req: AuthRequest, res: Response): Promise<vo
     const { trackId, artistId, store, amount, currency, reportingDate, streamCount } = req.body;
 
     // Verify track exists
-    const track = await Track.findById(trackId);
+    const track = await findTrackById(trackId);
     if (!track) {
       throw new ApiError('Track not found', 404);
     }

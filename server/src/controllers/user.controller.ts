@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import User from '../models/user.model';
+import User from '../repositories/user.repository';
 import AuditLog from '../models/auditLog.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';

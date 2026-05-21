@@ -1,0 +1,21 @@
+{
+  "jobId": "6a0ee26857e8e61c1fc2a2d5",
+  "scope": "approved",
+  "generatedAt": "2026-05-21T10:46:02.479Z",
+  "counts": {
+    "releases": 1,
+    "tracks": 7,
+    "files": 7,
+    "missing": 0,
+    "parts": 1
+  },
+  "parts": [
+    {
+      "name": "catalog-tracks-part-0001.zip",
+      "type": "tracks",
+      "size": 20100136,
+      "trackCount": 7
+    }
+  ],
+  "warnings": []
+}

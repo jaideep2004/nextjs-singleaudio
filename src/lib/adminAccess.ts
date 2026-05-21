@@ -28,9 +28,11 @@ const ADMIN_ROUTE_RULES: Array<{ prefix: string; access: AdminRouteAccess }> = [
   { prefix: '/admin/dsp-deliveries', access: { kind: 'permission', permission: 'dsp_delivery' } },
   { prefix: '/admin/analytics', access: { kind: 'permission', permission: 'analytics' } },
   { prefix: '/admin/payouts', access: { kind: 'permission', permission: 'payouts' } },
+  { prefix: '/admin/royalties', access: { kind: 'permission', permission: 'payouts' } },
   { prefix: '/admin/podcasts', access: { kind: 'permission', permission: 'podcasts' } },
   { prefix: '/admin/music-publishing', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/vevo-video-distribution', access: { kind: 'permission', permission: 'settings' } },
+  { prefix: '/admin/youtube-network', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/settings', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/export', access: { kind: 'admin' } },
 ];

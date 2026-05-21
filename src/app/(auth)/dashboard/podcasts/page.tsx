@@ -156,27 +156,26 @@ const toOptionalNullableUrl = (value: string) => {
 const CREATE_STEPS = ['Basics & Cover', 'Details'];
 const EPISODE_STEPS = ['Episode setup', 'Metadata', 'Publish'];
 const PODCAST_DESTINATIONS = [
-  { name: 'Apple Podcasts', mark: 'AP', color: '#7c3aed' },
-  { name: 'Spotify', mark: 'S', color: '#16a34a' },
-  { name: 'Amazon Music', mark: 'AM', color: '#2563eb' },
-  { name: 'Podcast Index', mark: 'PI', color: '#f97316' },
-  { name: 'Listen Notes', mark: 'LN', color: '#dc2626' },
-  { name: 'Podcast Community', mark: 'PC', color: '#f97316' },
-  { name: 'Castamatic', mark: 'CA', color: '#0891b2' },
-  { name: 'Castbox', mark: 'CB', color: '#ef4444' },
-  { name: 'Castro', mark: 'C', color: '#4338ca' },
-  { name: 'Curiocaster', mark: 'CU', color: '#0f766e' },
-  { name: 'Overcast', mark: 'O', color: '#fb923c' },
-  { name: 'Pocket Casts', mark: 'PC', color: '#e11d48' },
-  { name: 'Podcast Addict', mark: 'PA', color: '#2563eb' },
-  { name: 'Podcast Guru', mark: 'PG', color: '#7c2d12' },
-  { name: 'PodLP', mark: 'PL', color: '#4f46e5' },
-  { name: 'Podverse', mark: 'PV', color: '#9333ea' },
-  { name: 'Deezer', mark: 'D', color: '#0f172a' },
-  { name: 'iHeartRadio', mark: 'IH', color: '#dc2626' },
-  { name: 'Pandora', mark: 'P', color: '#0284c7' },
-  { name: 'Tune In', mark: 'TI', color: '#14b8a6' },
-  { name: 'YouTube', mark: 'YT', color: '#dc2626' },
+  { name: 'Apple Podcasts', mark: 'AP', color: '#7c3aed', logoSrc: '/images/podcast-logos/apple-podcasts.svg' },
+  { name: 'Spotify', mark: 'S', color: '#16a34a', logoSrc: '/images/podcast-logos/spotify.svg' },
+  { name: 'Amazon Music', mark: 'AM', color: '#2563eb', logoSrc: '/images/podcast-logos/amazon-music.svg' },
+  { name: 'Podcast Index', mark: 'PI', color: '#f97316', logoSrc: '/images/podcast-logos/podcast-index.svg' },
+  { name: 'Listen Notes', mark: 'LN', color: '#dc2626', logoSrc: '/images/podcast-logos/listen-notes.svg' },
+  { name: 'Podcast Community', mark: 'PC', color: '#f97316', logoSrc: '/images/podcast-logos/podcast-community.svg' },
+  { name: 'Castamatic', mark: 'CA', color: '#0891b2', logoSrc: '/images/podcast-logos/castamatic.svg' },
+  { name: 'Castbox', mark: 'CB', color: '#ef4444', logoSrc: '/images/podcast-logos/castbox.svg' },
+  { name: 'Castro', mark: 'C', color: '#4338ca', logoSrc: '/images/podcast-logos/castro.svg' },
+  { name: 'Curiocaster', mark: 'CU', color: '#0f766e', logoSrc: '/images/podcast-logos/curiocaster.svg' },
+  { name: 'Overcast', mark: 'O', color: '#fb923c', logoSrc: '/images/podcast-logos/overcast.svg' },
+  { name: 'Pocket Casts', mark: 'PC', color: '#e11d48', logoSrc: '/images/podcast-logos/pocket-casts.svg' },
+  { name: 'Podcast Addict', mark: 'PA', color: '#2563eb', logoSrc: '/images/podcast-logos/podcast-addict.svg' },
+  { name: 'Podcast Guru', mark: 'PG', color: '#7c2d12', logoSrc: '/images/podcast-logos/podcast-guru.svg' },
+  { name: 'PodLP', mark: 'PL', color: '#4f46e5', logoSrc: '/images/podcast-logos/podlp.svg' },
+  { name: 'Podverse', mark: 'PV', color: '#9333ea', logoSrc: '/images/podcast-logos/podverse.svg' },
+  { name: 'Deezer', mark: 'D', color: '#0f172a', logoSrc: '/images/podcast-logos/deezer.svg' },
+  { name: 'iHeartRadio', mark: 'IH', color: '#dc2626', logoSrc: '/images/podcast-logos/iheart-radio.svg' },
+  { name: 'Pandora', mark: 'P', color: '#0284c7', logoSrc: '/images/podcast-logos/pandora.svg' },
+  { name: 'Tune In', mark: 'TI', color: '#14b8a6', logoSrc: '/images/podcast-logos/tune-in.svg' },
 ];
 
 // ─── Podcast step 1 validation ───────────────────────────────────────────────
@@ -1065,17 +1064,43 @@ export function PodcastsContent({ allowPodcastCreation = false }: { allowPodcast
                 minWidth: 0,
               }}
             >
-              <Avatar
+              <Box
                 sx={{
                   width: 34,
                   height: 34,
+                  borderRadius: '50%',
                   bgcolor: destination.color,
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  color: '#fff',
                   fontSize: 12,
                   fontWeight: 800,
                 }}
               >
                 {destination.mark}
-              </Avatar>
+                <Box
+                  component="img"
+                  src={destination.logoSrc}
+                  alt=""
+                  aria-hidden="true"
+                  width={34}
+                  height={34}
+                  loading="lazy"
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                  sx={{
+                    position: 'absolute',
+                    width: 34,
+                    height: 34,
+                    objectFit: 'cover',
+                    display: 'block',
+                  }}
+                />
+              </Box>
               <Typography variant="body2" fontWeight={700} sx={{ color: wizardTextColor }} noWrap>
                 {destination.name}
               </Typography>
@@ -1478,7 +1503,7 @@ export function PodcastsContent({ allowPodcastCreation = false }: { allowPodcast
               <>
                 <TextField
                   select
-                  label="Podcast"
+                  label="Select Category"
                   value={selectedPodcastId ?? ''}
                   onChange={e => setSelectedPodcastId(Number(e.target.value))}
                   fullWidth

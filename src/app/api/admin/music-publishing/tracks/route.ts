@@ -4,10 +4,16 @@ import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 import {
+  findReleaseByIdRaw,
+  releasesCollection,
+  withOptionalLegacyTrackSnapshot,
+} from '@/lib/repositories/releases';
+import { replaceReleaseCanonicalTracks } from '@/lib/repositories/tracks';
+import { listPublishingRows } from '@/lib/repositories/publishing';
+import {
   PublishingStage,
   asMusicPublishingStage,
   getMusicPublishingTrackKey,
-  normalizeMusicPublishingTracks,
 } from '@/lib/musicPublishing';
 
 const MAX_LIMIT = 250;
@@ -65,47 +71,15 @@ export async function GET(req: NextRequest) {
     const stage = asMusicPublishingStage(searchParams.get('stage') || 'pending');
     const query = (searchParams.get('q') || '').trim().toLowerCase();
 
-    const releases = await db.collection('releases')
-      .find({ status: 'approved' }, {
-        projection: {
-          releaseTitle: 1,
-          title: 1,
-          releaseType: 1,
-          status: 1,
-          releaseDate: 1,
-          originalReleaseDate: 1,
-          label: 1,
-          upc: 1,
-          ownerName: 1,
-          ownerArtistName: 1,
-          ownerEmail: 1,
-          primaryArtist: 1,
-          territories: 1,
-          stores: 1,
-          tracks: 1,
-          updatedAt: 1,
-          createdAt: 1,
-        },
-      })
-      .sort({ updatedAt: -1, createdAt: -1 })
-      .toArray();
-
-    const rows = normalizeMusicPublishingTracks(releases).filter(
-      (row) => row.publishingStatus === stage
-    ).filter((row) => {
-      if (!query) return true;
-      return Object.values(row).some((value) =>
-        String(value || '').toLowerCase().includes(query)
-      );
-    });
+    const { rows, total } = await listPublishingRows(db, { stage, query, skip, limit });
 
     return NextResponse.json({
       success: true,
       data: {
-        tracks: rows.slice(skip, skip + limit),
+        tracks: rows,
         page,
         limit,
-        total: rows.length,
+        total,
       },
     });
   } catch (error) {
@@ -162,10 +136,7 @@ export async function PATCH(req: NextRequest) {
         continue;
       }
 
-      const release = await db.collection('releases').findOne(
-        { _id },
-        { projection: { tracks: 1 } }
-      );
+      const release = await findReleaseByIdRaw(db, _id);
       const tracks = Array.isArray(release?.tracks) ? release.tracks : [];
       const changedIds: string[] = [];
       const nextTracks = tracks.map((track: Record<string, any>, index: number) => {
@@ -186,12 +157,15 @@ export async function PATCH(req: NextRequest) {
 
       if (!changedIds.length) continue;
       updatedIds.push(...changedIds);
+      if (!release) continue;
 
-      await db.collection('releases').updateOne(
+      await replaceReleaseCanonicalTracks(db, release, nextTracks);
+
+      await releasesCollection(db).updateOne(
         { _id },
         {
           $set: {
-            tracks: nextTracks,
+            ...withOptionalLegacyTrackSnapshot({}, nextTracks),
             updatedAt: now,
           },
           $push: {

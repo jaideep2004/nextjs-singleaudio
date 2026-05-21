@@ -1,4 +1,6 @@
 import { Db, MongoServerError, ObjectId } from 'mongodb';
+import { releasesCollection } from '@/lib/repositories/releases';
+import { tracksCollection } from '@/lib/repositories/tracks';
 
 const AUDIO_COUNTRY_CODE = 'IN';
 const AUDIO_REGISTRANT_CODE = '9SN';
@@ -62,16 +64,19 @@ async function ensureIsrcIndexes(db: Db) {
 
 async function isAlreadyUsed(db: Db, isrc: string, context: AllocationContext = {}) {
   const releaseQuery: Record<string, unknown> = { 'tracks.isrc': isrc };
+  const trackQuery: Record<string, unknown> = { isrc, deletedAt: { $exists: false } };
   const allocationQuery: Record<string, unknown> = { isrc };
   if (context.releaseId) {
-    releaseQuery._id = { $ne: ObjectId.isValid(context.releaseId) ? new ObjectId(context.releaseId) : context.releaseId };
+    const releaseObjectId = ObjectId.isValid(context.releaseId) ? new ObjectId(context.releaseId) : context.releaseId;
+    releaseQuery._id = { $ne: releaseObjectId };
+    trackQuery.releaseId = { $ne: releaseObjectId };
     allocationQuery.$or = [{ releaseId: { $exists: false } }, { releaseId: { $ne: context.releaseId } }];
   }
 
   const [allocation, release, track] = await Promise.all([
     db.collection('isrcAllocations').findOne(allocationQuery, { projection: { _id: 1 } }),
-    db.collection('releases').findOne(releaseQuery, { projection: { _id: 1 } }),
-    db.collection('tracks').findOne({ isrc }, { projection: { _id: 1 } }),
+    releasesCollection(db).findOne(releaseQuery, { projection: { _id: 1 } }),
+    tracksCollection(db).findOne(trackQuery, { projection: { _id: 1 } }),
   ]);
 
   return Boolean(allocation || release || track);
