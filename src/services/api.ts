@@ -137,7 +137,7 @@ export const authAPI = {
         `/auth/check-artist-name?name=${encodeURIComponent(name)}`
       );
       return response.data.data ?? { available: false };
-    } catch (error) {
+    } catch {
       throw new Error('Unable to verify artist name availability. Please try again.');
     }
   },
@@ -186,7 +186,7 @@ export const trackAPI = {
     try {
       const response = await api.get<ApiResponse<Track>>(`/tracks/${id}`);
       return response.data;
-    } catch (error) {
+    } catch {
       console.warn(`Track with ID ${id} not found, using mock data`);
       return {
         success: true,
@@ -423,6 +423,151 @@ export const notificationAPI = {
   markAllAsRead: async () => {
     try {
       const response = await api.patch<ApiResponse<any>>('/notifications/read-all');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+};
+
+export type SupportTicketStatus = 'open' | 'in_review' | 'waiting_for_user' | 'resolved' | 'closed';
+export type SupportTicketCategory =
+  | 'kyc_verification'
+  | 'release_rejection'
+  | 'copyright_issue'
+  | 'dsp_delivery'
+  | 'royalties_payments'
+  | 'technical_issue'
+  | 'account_support';
+export type SupportTicketPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type SupportTicketSort = 'latest' | 'oldest' | 'priority' | 'status';
+
+export const SUPPORT_CATEGORIES: Array<{ value: SupportTicketCategory; label: string }> = [
+  { value: 'kyc_verification', label: 'KYC Verification' },
+  { value: 'release_rejection', label: 'Release Rejection' },
+  { value: 'copyright_issue', label: 'Copyright Issue' },
+  { value: 'dsp_delivery', label: 'DSP Delivery' },
+  { value: 'royalties_payments', label: 'Royalties / Payments' },
+  { value: 'technical_issue', label: 'Technical Issue' },
+  { value: 'account_support', label: 'Account Support' },
+];
+
+export const SUPPORT_PRIORITIES: Array<{ value: SupportTicketPriority; label: string }> = [
+  { value: 'low', label: 'Low' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'high', label: 'High' },
+  { value: 'urgent', label: 'Urgent' },
+];
+
+export const supportAPI = {
+  getTickets: async (params: Record<string, string | number> = {}) => {
+    try {
+      const response = await api.get<ApiResponse<any>>('/support/tickets', { params });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  createTicket: async (payload: {
+    subject: string;
+    category: SupportTicketCategory;
+    priority?: SupportTicketPriority;
+    message: string;
+    related?: { releaseId?: string; trackId?: string };
+  }) => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/support/tickets', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  getTicket: async (id: string) => {
+    try {
+      const response = await api.get<ApiResponse<any>>(`/support/tickets/${id}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  addMessage: async (id: string, body: string) => {
+    try {
+      const response = await api.post<ApiResponse<any>>(`/support/tickets/${id}/messages`, { body });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  uploadAttachment: async (id: string, file: File, body?: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('attachment', file);
+      if (body) formData.append('body', body);
+      const response = await api.post<ApiResponse<any>>(`/support/tickets/${id}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  closeTicket: async (id: string) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/support/tickets/${id}/close`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+};
+
+export const adminSupportAPI = {
+  getTickets: async (params: Record<string, string | number> = {}) => {
+    try {
+      const response = await api.get<ApiResponse<any>>('/admin/support/tickets', { params });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  getTicket: supportAPI.getTicket,
+
+  assignTicket: async (id: string, assigneeId: string) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/admin/support/tickets/${id}/assign`, { assigneeId });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  updateStatus: async (id: string, status: SupportTicketStatus, reason?: string) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/admin/support/tickets/${id}/status`, { status, reason });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  addMessage: async (id: string, body: string) => {
+    try {
+      const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/messages`, { body });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  addInternalNote: async (id: string, body: string) => {
+    try {
+      const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/internal-notes`, { body });
       return response.data;
     } catch (error) {
       return handleApiError(error);

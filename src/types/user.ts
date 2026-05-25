@@ -12,6 +12,7 @@ export interface User {
   role: UserRole;
   adminPreset?: string;
   permissions?: string[];
+  supportCategories?: string[];
   artistName?: string;
   bio?: string;
   profilePicture?: string;

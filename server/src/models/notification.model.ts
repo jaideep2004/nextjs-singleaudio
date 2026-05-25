@@ -38,7 +38,7 @@ const NotificationSchema: Schema = new Schema(
     },
     refModel: {
       type: String,
-      enum: ['Track', 'Payout'],
+      enum: ['Track', 'Payout', 'SupportTicket'],
       default: 'Track'
     }
   },
@@ -52,4 +52,4 @@ NotificationSchema.index({ userId: 1 });
 NotificationSchema.index({ isRead: 1 });
 NotificationSchema.index({ createdAt: -1 });
 
-export default mongoose.model<INotification>('Notification', NotificationSchema); 
+export default mongoose.model<INotification>('Notification', NotificationSchema);

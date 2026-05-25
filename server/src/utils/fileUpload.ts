@@ -7,14 +7,17 @@ import {
   TRACKS_DIR, 
   ARTWORK_DIR,
   REGISTRATION_DIR,
+  SUPPORT_ATTACHMENT_DIR,
   MAX_FILE_SIZE,
   ALLOWED_AUDIO_TYPES,
-  ALLOWED_IMAGE_TYPES
+  ALLOWED_IMAGE_TYPES,
+  ALLOWED_SUPPORT_ATTACHMENT_TYPES,
+  SUPPORT_ATTACHMENT_MAX_FILE_SIZE
 } from '../config/constants';
 import { ApiError } from '../middleware/errorHandler.middleware';
 
 // Ensure upload directories exist
-[TRACKS_DIR, ARTWORK_DIR, REGISTRATION_DIR].forEach(dir => {
+[TRACKS_DIR, ARTWORK_DIR, REGISTRATION_DIR, SUPPORT_ATTACHMENT_DIR].forEach(dir => {
   try {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -162,6 +165,39 @@ export const uploadRegistrationFiles = multer({
   { name: 'nationalIdBackFile', maxCount: 1 },
 ]);
 
+const supportAttachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, SUPPORT_ATTACHMENT_DIR);
+  },
+  filename: (_req, file, cb) => {
+    cb(null, createUniqueFilename(file));
+  },
+});
+
+const supportAttachmentFileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (ALLOWED_SUPPORT_ATTACHMENT_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+    return;
+  }
+
+  cb(
+    new ApiError(
+      `Invalid file type. Allowed types: ${ALLOWED_SUPPORT_ATTACHMENT_TYPES.join(', ')}`,
+      400
+    )
+  );
+};
+
+export const uploadSupportAttachment = multer({
+  storage: supportAttachmentStorage,
+  limits: { fileSize: SUPPORT_ATTACHMENT_MAX_FILE_SIZE },
+  fileFilter: supportAttachmentFileFilter,
+});
+
 // Delete file
 export const deleteFile = (filePath: string): void => {
   try {
@@ -174,8 +210,8 @@ export const deleteFile = (filePath: string): void => {
 };
 
 // Get file URL (in a real app, this would be a CDN or S3 URL)
-export const getFileUrl = (filename: string, type: 'audio' | 'image'): string => {
+export const getFileUrl = (filename: string, type: 'audio' | 'image' | 'support'): string => {
   const baseUrl = process.env.API_URL || 'http://localhost:5000';
-  const directory = type === 'audio' ? 'tracks' : 'artwork';
+  const directory = type === 'audio' ? 'tracks' : type === 'image' ? 'artwork' : 'support';
   return `${baseUrl}/uploads/${directory}/${filename}`;
 }; 

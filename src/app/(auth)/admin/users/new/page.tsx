@@ -24,7 +24,7 @@ import {
 } from '@mui/material';
 import { Save, ArrowBack, Visibility, VisibilityOff } from '@mui/icons-material';
 import Link from 'next/link';
-import { adminAPI } from '@/services/api';
+import { adminAPI, SUPPORT_CATEGORIES } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 
 export default function NewUserPage() {
@@ -40,6 +40,7 @@ export default function NewUserPage() {
     accountType: 'artist',
     adminPreset: 'users',
     permissions: [] as string[],
+    supportCategories: [] as string[],
   });
   
   const [loading, setLoading] = useState(false);
@@ -53,6 +54,9 @@ export default function NewUserPage() {
       ...prev,
       [name]: value,
       ...(name === 'role' && (value === 'artist' || value === 'label') ? { accountType: value } : {}),
+      ...(name === 'adminPreset' && value === 'support' && prev.supportCategories.length === 0
+        ? { supportCategories: SUPPORT_CATEGORIES.map((category) => category.value) }
+        : {}),
     }));
     
     // Auto-fill artist name if empty when name changes
@@ -70,6 +74,18 @@ export default function NewUserPage() {
       permissions: prev.permissions.includes(permission)
         ? prev.permissions.filter((item) => item !== permission)
         : [...prev.permissions, permission],
+      ...(permission === 'support' && !prev.permissions.includes(permission) && prev.supportCategories.length === 0
+        ? { supportCategories: SUPPORT_CATEGORIES.map((category) => category.value) }
+        : {}),
+    }));
+  };
+
+  const handleSupportCategoryChange = (category: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      supportCategories: prev.supportCategories.includes(category)
+        ? prev.supportCategories.filter((item) => item !== category)
+        : [...prev.supportCategories, category],
     }));
   };
 
@@ -103,6 +119,7 @@ export default function NewUserPage() {
           accountType: 'artist',
           adminPreset: 'users',
           permissions: [],
+          supportCategories: [],
         });
         
         // Redirect after a short delay
@@ -245,7 +262,7 @@ export default function NewUserPage() {
                 onChange={handleChange}
                 disabled={loading}
               >
-                {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics'].map((preset) => (
+                {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics', 'support'].map((preset) => (
                   <MenuItem key={preset} value={preset}>
                     {preset.replace('-', ' ')}
                   </MenuItem>
@@ -254,7 +271,7 @@ export default function NewUserPage() {
               <FormControl component="fieldset" sx={{ mt: 2 }}>
                 <FormLabel component="legend">Extra Permissions</FormLabel>
                 <FormGroup row>
-                  {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics'].map((permission) => (
+                  {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics', 'support'].map((permission) => (
                     <FormControlLabel
                       key={permission}
                       control={
@@ -268,6 +285,25 @@ export default function NewUserPage() {
                   ))}
                 </FormGroup>
               </FormControl>
+              {(formData.adminPreset === 'support' || formData.permissions.includes('support')) && (
+                <FormControl component="fieldset" sx={{ mt: 2 }}>
+                  <FormLabel component="legend">Support Categories</FormLabel>
+                  <FormGroup row>
+                    {SUPPORT_CATEGORIES.map((category) => (
+                      <FormControlLabel
+                        key={category.value}
+                        control={
+                          <Checkbox
+                            checked={formData.supportCategories.includes(category.value)}
+                            onChange={() => handleSupportCategoryChange(category.value)}
+                          />
+                        }
+                        label={category.label}
+                      />
+                    ))}
+                  </FormGroup>
+                </FormControl>
+              )}
             </Box>
           )}
           

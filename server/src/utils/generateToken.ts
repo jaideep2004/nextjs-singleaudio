@@ -20,6 +20,7 @@ const generateToken = (user: IUser): string => {
     accountType: user.accountType,
     adminPreset: user.adminPreset,
     permissions: user.permissions || [],
+    supportCategories: user.supportCategories,
     verification: user.verification,
   };
 

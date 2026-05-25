@@ -5,9 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Box, CircularProgress } from '@mui/material';
 import AdminHeader from '@/components/admin/AdminHeader';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import FloatingSupportButton from '@/components/support/FloatingSupportButton';
 import { useTheme } from '@mui/material/styles';
 import { useAuth } from '@/context/AppContext';
-import { canAccessAdminPath, getFirstAllowedAdminPath, isAdminLike } from '@/lib/adminAccess';
+import { canAccessAdminPath, getFirstAllowedAdminPath, hasAdminPermission, isAdminLike } from '@/lib/adminAccess';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
@@ -15,6 +16,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
   const canAccessPath = !!user && canAccessAdminPath(user, pathname);
+  const canUseSupport = !!user && hasAdminPermission(user, 'support');
 
   useEffect(() => {
     if (isLoading) return;
@@ -83,6 +85,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           {children}
         </Box>
+        {canUseSupport && <FloatingSupportButton href="/admin/support" label="Open support queue" />}
       </Box>
     </Box>
   );

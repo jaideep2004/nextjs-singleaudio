@@ -13,6 +13,13 @@ node_modules/
 /.next/
 /out/
 
+# generated knowledge graph cache
+/graphify-out/cache/
+
+# runtime uploads
+/uploads/
+/server/uploads/
+
 # production
 /build
 /server/dist

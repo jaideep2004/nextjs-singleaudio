@@ -7,6 +7,7 @@ export interface CurrentBackendUser {
   role: 'artist' | 'label' | 'admin' | 'subadmin';
   artistName?: string;
   permissions?: string[];
+  supportCategories?: string[];
   verification?: {
     status?: 'pending' | 'submitted' | 'approved' | 'rejected';
   };

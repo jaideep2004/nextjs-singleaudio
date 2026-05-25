@@ -16,7 +16,7 @@ export const createNotification = async (
   message: string,
   type: NotificationType,
   relatedId?: mongoose.Types.ObjectId | string,
-  refModel?: 'Track' | 'Payout'
+  refModel?: 'Track' | 'Payout' | 'SupportTicket'
 ): Promise<any> => {
   try {
     const notification = await Notification.create({
@@ -125,4 +125,4 @@ export const notifyPayoutRejected = async (
     payoutId,
     'Payout'
   );
-}; 
+};

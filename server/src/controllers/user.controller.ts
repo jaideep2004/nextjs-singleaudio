@@ -1,11 +1,12 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import User from '../repositories/user.repository';
 import AuditLog from '../models/auditLog.model';
 import { successResponse, errorResponse, notFoundResponse } from '../utils/apiResponse';
 import { ApiError } from '../middleware/errorHandler.middleware';
-import { AdminPermission, SUBADMIN_PERMISSION_PRESETS, UserRole } from '../config/constants';
+import { AdminPermission, SUBADMIN_PERMISSION_PRESETS, SupportTicketCategory, UserRole } from '../config/constants';
 import { buildDashboardUrl, sendUserAndAdminEmail } from '../services/emailNotification.service';
+import { createKycRejectionTicket } from '../services/support.service';
 
 const resolveAdminPermissions = (role: string, preset?: string, overrides?: AdminPermission[]) => {
   if (role === UserRole.ADMIN) {
@@ -18,6 +19,32 @@ const resolveAdminPermissions = (role: string, preset?: string, overrides?: Admi
   return Array.from(new Set([...(presetPermissions || []), ...(overrides || [])]));
 };
 
+const normalizeSupportCategories = (value: unknown): SupportTicketCategory[] | undefined => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(
+      value.filter((item): item is SupportTicketCategory =>
+        Object.values(SupportTicketCategory).includes(item as SupportTicketCategory)
+      )
+    )
+  );
+};
+
+const resolveSupportCategories = (
+  role: string,
+  permissions?: AdminPermission[],
+  nextCategories?: unknown,
+  currentCategories?: SupportTicketCategory[]
+) => {
+  if (role !== UserRole.SUBADMIN || !permissions?.includes(AdminPermission.SUPPORT)) {
+    return undefined;
+  }
+
+  if (nextCategories === undefined) return currentCategories;
+  return normalizeSupportCategories(nextCategories);
+};
+
 /**
  * Create a new user (admin only)
  * @route POST /api/users
@@ -25,13 +52,15 @@ const resolveAdminPermissions = (role: string, preset?: string, overrides?: Admi
  */
 export const createUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role, artistName, bio, socialLinks, accountType, adminPreset, permissions } = req.body;
+    const { name, email, password, role, artistName, bio, socialLinks, accountType, adminPreset, permissions, supportCategories } = req.body;
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
       throw new ApiError('User already exists with this email', 400);
     }
+
+    const resolvedPermissions = resolveAdminPermissions(role, adminPreset, permissions);
 
     // Create user
     const user = await User.create({
@@ -41,7 +70,8 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
       role,
       accountType: role === UserRole.LABEL ? 'label' : role === UserRole.ARTIST ? 'artist' : accountType,
       adminPreset: role === UserRole.SUBADMIN ? adminPreset : undefined,
-      permissions: resolveAdminPermissions(role, adminPreset, permissions),
+      permissions: resolvedPermissions,
+      supportCategories: resolveSupportCategories(role, resolvedPermissions, supportCategories),
       artistName: artistName || name,
       bio,
       socialLinks,
@@ -75,7 +105,8 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
         artistName: user.artistName,
         accountType: user.accountType,
         adminPreset: user.adminPreset,
-        permissions: user.permissions || []
+        permissions: user.permissions || [],
+        supportCategories: user.supportCategories
       },
       'User created successfully',
       201
@@ -98,7 +129,7 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<void> =
     const skip = (page - 1) * limit;
 
     // Apply filters
-    let query: any = {};
+    const query: any = {};
     
     if (req.query.role) {
       query.role = req.query.role;
@@ -174,7 +205,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, role, artistName, bio, socialLinks, isActive, verification, accountType, adminPreset, permissions } = req.body;
+    const { name, email, role, artistName, bio, socialLinks, isActive, verification, accountType, adminPreset, permissions, supportCategories } = req.body;
 
     const user = await User.findById(id);
 
@@ -192,7 +223,21 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     if (accountType) user.accountType = accountType;
     if (adminPreset !== undefined) user.adminPreset = adminPreset;
     if (role || adminPreset !== undefined || permissions) {
-      user.permissions = resolveAdminPermissions(user.role, adminPreset ?? user.adminPreset, permissions) as any;
+      const resolvedPermissions = resolveAdminPermissions(user.role, adminPreset ?? user.adminPreset, permissions);
+      user.permissions = resolvedPermissions as any;
+      user.supportCategories = resolveSupportCategories(
+        user.role,
+        resolvedPermissions,
+        supportCategories,
+        user.supportCategories as any
+      ) as any;
+    } else if (supportCategories !== undefined) {
+      user.supportCategories = resolveSupportCategories(
+        user.role,
+        user.permissions,
+        supportCategories,
+        user.supportCategories as any
+      ) as any;
     }
     if (artistName) user.artistName = artistName;
     if (bio !== undefined) user.bio = bio;
@@ -292,6 +337,14 @@ export const reviewUserVerification = async (req: AuthRequest, res: Response): P
     };
 
     await user.save();
+
+    if (status === 'rejected') {
+      void createKycRejectionTicket({
+        userId: String(user._id),
+        reviewedBy: String(req.user._id),
+        reason: rejectionReason || 'KYC verification was rejected',
+      }).catch((error) => console.warn('KYC support ticket skipped:', error));
+    }
 
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },

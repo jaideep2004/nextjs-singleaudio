@@ -5,16 +5,17 @@ const DEFAULT_BACKEND_URL = 'http://localhost:5000';
 
 type ProxyOptions = {
   requireAuth?: boolean;
+  authToken?: string | null;
 };
 
 type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
-const getBackendBaseUrl = () =>
+export const getBackendBaseUrl = () =>
   (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_URL)
     .replace(/\/api\/?$/, '')
     .replace(/\/$/, '');
 
-const getAuthToken = async () => {
+export const getAuthToken = async () => {
   const cookieStore = await cookies();
   return cookieStore.get('token')?.value ?? null;
 };
@@ -32,13 +33,16 @@ export async function fetchBackend(
   init: RequestInit = {},
   options: ProxyOptions = {}
 ) {
-  const { requireAuth = true } = options;
+  const { requireAuth = true, authToken } = options;
   const headers = new Headers(init.headers);
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
 
-  headers.set('Content-Type', 'application/json');
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
 
   if (requireAuth) {
-    const token = await getAuthToken();
+    const token = authToken || await getAuthToken();
 
     if (!token) {
       return {
@@ -73,6 +77,14 @@ export async function fetchBackend(
         data: null,
       } satisfies JsonValue),
   };
+}
+
+export function getRequestAuthToken(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+  return null;
 }
 
 export async function proxyBackend(

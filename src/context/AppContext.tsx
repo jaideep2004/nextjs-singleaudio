@@ -15,6 +15,7 @@ interface User {
   accountType?: 'artist' | 'label';
   adminPreset?: string;
   permissions?: string[];
+  supportCategories?: string[];
   verification?: {
     status?: 'pending' | 'submitted' | 'approved' | 'rejected';
     mobileProvider?: string;
@@ -86,6 +87,7 @@ interface AuthResponse {
     accountType?: 'artist' | 'label';
     adminPreset?: string;
     permissions?: string[];
+    supportCategories?: string[];
     verification?: User['verification'];
     onboarding?: User['onboarding'];
     payoutMethod?: User['payoutMethod'];
@@ -102,6 +104,7 @@ interface UserPayload {
   accountType?: 'artist' | 'label';
   adminPreset?: string;
   permissions?: string[];
+  supportCategories?: string[];
   verification?: User['verification'];
   onboarding?: User['onboarding'];
   payoutMethod?: User['payoutMethod'];
@@ -117,6 +120,7 @@ interface DecodedToken {
   accountType?: 'artist' | 'label';
   adminPreset?: string;
   permissions?: string[];
+  supportCategories?: string[];
   verification?: User['verification'];
   onboarding?: User['onboarding'];
   payoutMethod?: User['payoutMethod'];
@@ -182,6 +186,7 @@ const toUser = (payload: UserPayload): User => ({
   accountType: payload.accountType,
   adminPreset: payload.adminPreset,
   permissions: payload.permissions || [],
+  supportCategories: payload.supportCategories,
   verification: payload.verification,
   onboarding: payload.onboarding,
   payoutMethod: payload.payoutMethod,
@@ -229,7 +234,11 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         if (response.data?.data) {
           setUser(toUser(response.data.data));
         }
-      } catch {
+      } catch (error) {
+        if (axios.isAxiosError(error) && [401, 404].includes(error.response?.status || 0)) {
+          logout();
+          return;
+        }
         // Fall back to token data if the profile refresh request fails.
       }
     } catch {

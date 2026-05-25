@@ -89,33 +89,6 @@ const menuSections = [
         icon: <YouTube />,
         path: '/dashboard/youtube-network',
       },
-    ],
-  },
-  {
-    label: 'Earnings',
-    items: [
-      {
-        text: 'Royalties',
-        icon: <TrendingUp />,
-        path: '/dashboard/royalties',
-        subItems: [
-          { text: 'Statement', path: '/dashboard/royalties?view=statement' },
-          { text: 'Report', path: '/dashboard/royalties?view=report' },
-        ],
-      },
-      {
-        text: 'Payouts',
-        icon: <AccountBalanceWallet />,
-        path: '/dashboard/payouts',
-        subItems: [
-          { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
-        ],
-      },
-    ],
-  },
-  {
-    label: 'Podcasts',
-    items: [
       {
         text: 'Podcasts',
         icon: <PodcastsIcon />,
@@ -140,6 +113,23 @@ const menuSections = [
         icon: <SettingsIcon />,
         path: '/dashboard/settings',
       },
+      {
+        text: 'Royalties',
+        icon: <TrendingUp />,
+        path: '/dashboard/royalties',
+        subItems: [
+          { text: 'Statement', path: '/dashboard/royalties?view=statement' },
+          { text: 'Report', path: '/dashboard/royalties?view=report' },
+        ],
+      },
+      {
+        text: 'Payouts',
+        icon: <AccountBalanceWallet />,
+        path: '/dashboard/payouts',
+        subItems: [
+          { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
+        ],
+      }, 
     ],
   },
 ];
@@ -216,7 +206,7 @@ export default function UserSidebar() {
 
   const isUnlockedDuringReview = (path: string) => {
     const [basePath] = path.split('?');
-    return basePath === '/dashboard' || basePath === '/dashboard/profile';
+    return basePath === '/dashboard' || basePath === '/dashboard/profile' || basePath === '/dashboard/support';
   };
 
   const drawer = (

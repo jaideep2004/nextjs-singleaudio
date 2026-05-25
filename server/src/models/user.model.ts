@@ -1,6 +1,6 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { AdminPermission, UserRole } from '../config/constants';
+import { AdminPermission, SupportTicketCategory, UserRole } from '../config/constants';
 
 export interface IArtistOnboarding {
   region?: 'india' | 'international';
@@ -64,6 +64,7 @@ export interface IUser extends Document {
   accountType?: 'artist' | 'label';
   adminPreset?: string;
   permissions?: AdminPermission[];
+  supportCategories?: SupportTicketCategory[];
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   isActive?: boolean;
@@ -152,6 +153,11 @@ const UserSchema: Schema = new Schema(
       enum: Object.values(AdminPermission),
       default: undefined,
     },
+    supportCategories: {
+      type: [String],
+      enum: Object.values(SupportTicketCategory),
+      default: undefined,
+    },
     resetPasswordToken: String,
     resetPasswordExpires: Date,
     isActive: {
@@ -223,6 +229,7 @@ UserSchema.pre<IUser>('save', async function (next) {
 });
 
 UserSchema.index({ 'verification.phoneNumber': 1 }, { sparse: true });
+UserSchema.index({ role: 1, permissions: 1, supportCategories: 1 });
 
 // Compare password method
 UserSchema.methods.comparePassword = async function (

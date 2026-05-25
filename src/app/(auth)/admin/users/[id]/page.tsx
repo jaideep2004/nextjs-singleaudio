@@ -31,7 +31,7 @@ import {
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
 import Link from 'next/link';
-import { adminAPI } from '@/services/api';
+import { adminAPI, SUPPORT_CATEGORIES } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { useColorMode } from '@/context/ColorModeContext';
 import ViewUser from './components/ViewUser';
@@ -86,6 +86,7 @@ export default function EditUserPage() {
     accountType: 'artist',
     adminPreset: 'users',
     permissions: [] as string[],
+    supportCategories: [] as string[],
     isActive: true,
   });
   
@@ -131,6 +132,9 @@ export default function EditUserPage() {
       
       if (response.success && response.data) {
         const userData = response.data;
+        const permissions = Array.isArray(userData.permissions) ? userData.permissions : [];
+        const hasSupportAccess =
+          userData.role === 'subadmin' && (permissions.includes('support') || userData.adminPreset === 'support');
         setUser(userData);
         setFormData({
           name: userData.name || '',
@@ -139,7 +143,12 @@ export default function EditUserPage() {
           artistName: userData.artistName || '',
           accountType: userData.accountType || (userData.role === 'label' ? 'label' : 'artist'),
           adminPreset: userData.adminPreset || 'users',
-          permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
+          permissions,
+          supportCategories: Array.isArray(userData.supportCategories)
+            ? userData.supportCategories
+            : hasSupportAccess
+              ? SUPPORT_CATEGORIES.map((category) => category.value)
+              : [],
           isActive: userData.isActive !== undefined ? userData.isActive : true,
         });
       } else {
@@ -161,6 +170,9 @@ export default function EditUserPage() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
       ...(name === 'role' && (value === 'artist' || value === 'label') ? { accountType: value } : {}),
+      ...(name === 'adminPreset' && value === 'support' && prev.supportCategories.length === 0
+        ? { supportCategories: SUPPORT_CATEGORIES.map((category) => category.value) }
+        : {}),
     }));
   };
 
@@ -174,6 +186,18 @@ export default function EditUserPage() {
       permissions: prev.permissions.includes(permission)
         ? prev.permissions.filter((item) => item !== permission)
         : [...prev.permissions, permission],
+      ...(permission === 'support' && !prev.permissions.includes(permission) && prev.supportCategories.length === 0
+        ? { supportCategories: SUPPORT_CATEGORIES.map((category) => category.value) }
+        : {}),
+    }));
+  };
+
+  const handleSupportCategoryChange = (category: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      supportCategories: prev.supportCategories.includes(category)
+        ? prev.supportCategories.filter((item) => item !== category)
+        : [...prev.supportCategories, category],
     }));
   };
 
@@ -394,7 +418,7 @@ export default function EditUserPage() {
                     onChange={handleChange}
                     disabled={loading}
                   >
-                    {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics'].map((preset) => (
+                    {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics', 'support'].map((preset) => (
                       <MenuItem key={preset} value={preset}>
                         {preset.replace('_', ' ')}
                       </MenuItem>
@@ -403,7 +427,7 @@ export default function EditUserPage() {
                   <FormControl component="fieldset">
                     <FormLabel component="legend">Permissions</FormLabel>
                     <FormGroup row>
-                      {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics'].map((permission) => (
+                      {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics', 'support'].map((permission) => (
                         <FormControlLabel
                           key={permission}
                           control={
@@ -417,6 +441,25 @@ export default function EditUserPage() {
                       ))}
                     </FormGroup>
                   </FormControl>
+                  {(formData.adminPreset === 'support' || formData.permissions.includes('support')) && (
+                    <FormControl component="fieldset">
+                      <FormLabel component="legend">Support Categories</FormLabel>
+                      <FormGroup row>
+                        {SUPPORT_CATEGORIES.map((category) => (
+                          <FormControlLabel
+                            key={category.value}
+                            control={
+                              <Checkbox
+                                checked={formData.supportCategories.includes(category.value)}
+                                onChange={() => handleSupportCategoryChange(category.value)}
+                              />
+                            }
+                            label={category.label}
+                          />
+                        ))}
+                      </FormGroup>
+                    </FormControl>
+                  )}
                 </Stack>
               </Paper>
             )}

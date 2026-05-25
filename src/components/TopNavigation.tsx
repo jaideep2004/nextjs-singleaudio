@@ -27,6 +27,7 @@ import {
   Logout,
   Person as PersonIcon,
   Search as SearchIcon,
+  Settings as SettingsIcon,
   TrendingUp,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
@@ -396,6 +397,17 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
               <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
               Profile
             </MenuItem>
+            {!isAdmin && (
+              <MenuItem
+                component={Link}
+                href="/dashboard/settings"
+                onClick={handleUserMenuClose}
+                sx={{ py: 1.25, fontSize: '0.875rem' }}
+              >
+                <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                Settings
+              </MenuItem>
+            )}
             {!isAdmin && (
               <MenuItem
                 component={Link}

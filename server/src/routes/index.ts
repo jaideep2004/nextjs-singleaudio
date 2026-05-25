@@ -12,6 +12,7 @@ import territoryRoutes from './territory.routes';
 import rightsRoutes from './rights.routes';
 import uploadRoutes from './upload.routes';
 import dspRoutes from './dsp.routes';
+import supportRoutes from './support.routes';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use(`${API_PREFIX}/territory`, territoryRoutes);
 router.use(`${API_PREFIX}/rights`, rightsRoutes);
 router.use(`${API_PREFIX}/uploads`, uploadRoutes);
 router.use(`${API_PREFIX}/dsp`, dspRoutes);
+router.use(`${API_PREFIX}/support`, supportRoutes);
 
 export default router;

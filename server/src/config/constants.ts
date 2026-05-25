@@ -28,7 +28,8 @@ export enum AdminPermission {
   DSP_DELIVERY = 'dsp_delivery',
   PODCASTS = 'podcasts',
   SETTINGS = 'settings',
-  ANALYTICS = 'analytics'
+  ANALYTICS = 'analytics',
+  SUPPORT = 'support'
 }
 
 export const SUBADMIN_PERMISSION_PRESETS: Record<string, AdminPermission[]> = {
@@ -39,6 +40,7 @@ export const SUBADMIN_PERMISSION_PRESETS: Record<string, AdminPermission[]> = {
   podcasts: [AdminPermission.PODCASTS],
   settings: [AdminPermission.SETTINGS],
   analytics: [AdminPermission.ANALYTICS],
+  support: [AdminPermission.SUPPORT],
 };
 
 // File Upload
@@ -79,9 +81,60 @@ export enum NotificationType {
   RELEASE_REJECTED = 'release_rejected',
   PAYOUT_APPROVED = 'payout_approved',
   PAYOUT_REJECTED = 'payout_rejected',
+  SUPPORT_TICKET_CREATED = 'support_ticket_created',
+  SUPPORT_TICKET_UPDATED = 'support_ticket_updated',
+  SUPPORT_TICKET_REPLY = 'support_ticket_reply',
   EMAIL = 'email',
   SYSTEM = 'system'
 }
+
+export enum SupportTicketStatus {
+  OPEN = 'open',
+  IN_REVIEW = 'in_review',
+  WAITING_FOR_USER = 'waiting_for_user',
+  RESOLVED = 'resolved',
+  CLOSED = 'closed'
+}
+
+export enum SupportTicketCategory {
+  KYC_VERIFICATION = 'kyc_verification',
+  RELEASE_REJECTION = 'release_rejection',
+  COPYRIGHT_ISSUE = 'copyright_issue',
+  DSP_DELIVERY = 'dsp_delivery',
+  ROYALTIES_PAYMENTS = 'royalties_payments',
+  TECHNICAL_ISSUE = 'technical_issue',
+  ACCOUNT_SUPPORT = 'account_support'
+}
+
+export enum SupportTicketPriority {
+  LOW = 'low',
+  NORMAL = 'normal',
+  HIGH = 'high',
+  URGENT = 'urgent'
+}
+
+export enum SupportMessageVisibility {
+  PUBLIC = 'public',
+  INTERNAL = 'internal'
+}
+
+export enum SupportTicketSource {
+  USER = 'user',
+  ADMIN = 'admin',
+  ACRCLOUD = 'acrcloud',
+  KYC = 'kyc',
+  SYSTEM = 'system'
+}
+
+export const SUPPORT_ATTACHMENT_DIR = path.join(UPLOAD_DIR, 'support');
+export const SUPPORT_ATTACHMENT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+export const ALLOWED_SUPPORT_ATTACHMENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'application/pdf',
+  'text/plain',
+  'application/zip'
+];
 
 // Payment methods
 export enum PaymentMethod {

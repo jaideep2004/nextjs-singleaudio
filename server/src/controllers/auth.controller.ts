@@ -54,6 +54,7 @@ const authPayload = (user: any) => ({
   accountType: user.accountType,
   adminPreset: user.adminPreset,
   permissions: user.permissions || [],
+  supportCategories: user.supportCategories,
   verification: user.verification,
   token: generateToken(user),
 });
@@ -437,6 +438,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       accountType: user.accountType,
       adminPreset: user.adminPreset,
       permissions: user.permissions || [],
+      supportCategories: user.supportCategories,
       verification: user.verification,
       token
     }, 'Login successful');
@@ -520,6 +522,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
       accountType: user.accountType,
       adminPreset: user.adminPreset,
       permissions: user.permissions || [],
+      supportCategories: user.supportCategories,
       verification: user.verification || { status: 'pending' },
       bio: user.bio,
       socialLinks: user.socialLinks,

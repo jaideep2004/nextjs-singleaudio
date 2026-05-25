@@ -190,6 +190,9 @@ export default function AdminSidebar() {
     if (pathname.startsWith('/admin/podcasts')) {
       setOpenSubMenu('/admin/podcasts');
     }
+    if (pathname.startsWith('/admin/support')) {
+      setOpenSubMenu(null);
+    }
   }, [pathname]);
 
   const handleDrawerToggle = () => {

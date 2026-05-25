@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
-import { ObjectId } from 'mongodb';
+import { Db, ObjectId } from 'mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
+import { getGs1DatakartApprovalErrorMessage, Gs1DatakartError } from '@/lib/gs1Datakart';
 import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
-import { generateUpcA } from '@/lib/upc';
+import { assignReleaseUpcWithGs1 } from '@/lib/releaseCodeAssignment';
 import { createReleaseDeliveryShellJobs } from '@/lib/dspDeliveryShell';
-import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
+import {
+  appUrl,
+  getAdminRecipients,
+  sendActionEmail,
+  sendUserAndAdminEmail,
+} from '@/lib/emailNotifications';
+import { auditLogsCollection } from '@/lib/repositories/audit';
 import {
   findReleaseByIdRaw,
   releasesCollection,
@@ -18,8 +25,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  let dbForFailure: Db | null = null;
+  let releaseForFailure: Record<string, any> | null = null;
+  let actorEmail = '';
   try {
     const user = await getCurrentBackendUser();
+    actorEmail = user.email || '';
     const permissions = Array.isArray(user.permissions) ? user.permissions : [];
     if (user.role !== 'admin' && !(user.role === 'subadmin' && permissions.includes('review'))) {
       return NextResponse.json({ success: false, error: 'Review permission is required' }, { status: 403 });
@@ -40,33 +51,43 @@ export async function PATCH(
     }
 
     const { db } = await connectToDatabase();
+    dbForFailure = db;
 
     const update: any = { status, updatedAt: new Date() };
+    const unset: Record<string, ''> = {};
     if (status === 'rejected') update.rejectReason = reason || '';
-    if (status !== 'rejected') update.rejectReason = undefined;
+    if (status !== 'rejected') unset.rejectReason = '';
 
     const existing = await findReleaseByIdRaw(db, _id);
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
     }
+    releaseForFailure = existing;
+
+    let upcAuditDetails: Record<string, unknown> | null = null;
 
     if (status === 'approved') {
-      const releaseUpc = existing.upc || generateUpcA();
       const tracks = Array.isArray(existing.tracks) ? existing.tracks : [];
-      const tracksWithUpc = tracks.map((track: any) => ({
-        ...track,
-        upc: track?.upc || releaseUpc,
-      }));
-
-      const assignedTracks = await assignIsrcsToTracks(db, tracksWithUpc, {
+      const tracksWithIsrcs = await assignIsrcsToTracks(db, tracks, {
         releaseTitle: existing.releaseTitle,
         source: 'release',
         releaseId: id,
       });
+      const codeAssignment = await assignReleaseUpcWithGs1(db, existing, id, tracksWithIsrcs);
+      const assignedTracks = codeAssignment.tracksWithUpc;
+      const assignment = codeAssignment.releaseUpdate.upcAssignment;
 
-      update.upc = releaseUpc;
+      Object.assign(update, codeAssignment.releaseUpdate);
       Object.assign(update, withOptionalLegacyTrackSnapshot({}, assignedTracks));
       update.codesAssignedAt = existing.codesAssignedAt || new Date();
+      unset.upcAssignmentLock = '';
+      upcAuditDetails = {
+        provider: assignment.provider,
+        action: assignment.action,
+        gtin: assignment.gtin,
+        recordStatus: assignment.recordStatus,
+        isComplete: assignment.isComplete,
+      };
       await replaceReleaseCanonicalTracks(db, existing, assignedTracks);
       await markIsrcsAssigned(
         db,
@@ -77,12 +98,61 @@ export async function PATCH(
 
     const res = await releasesCollection(db).findOneAndUpdate(
       { _id },
-      { $set: update },
+      {
+        $set: update,
+        ...(Object.keys(unset).length ? { $unset: unset } : {}),
+      },
       { returnDocument: 'after' }
     );
 
     if (!res.value) {
       return NextResponse.json({ success: false, error: 'Release not found' }, { status: 404 });
+    }
+
+    if (upcAuditDetails) {
+      await auditLogsCollection(db)
+        .insertOne({
+          event: 'release.upc.assigned',
+          releaseId: id,
+          actorUserId: String(user._id),
+          details: upcAuditDetails,
+          createdAt: new Date(),
+        })
+        .catch((error) =>
+          console.warn(
+            'Release UPC audit skipped:',
+            error instanceof Error ? error.message : error
+          )
+        );
+
+      void getAdminRecipients(db)
+        .then((admins) =>
+          sendActionEmail(
+            admins,
+            {
+              subject: 'GS1 UPC Assigned',
+              title: 'GS1 UPC Assigned',
+              intro: 'GS1 DataKart assigned and validated a UPC for a release.',
+              details: {
+                Release: existing.releaseTitle || existing.title || 'Untitled release',
+                UPC: String(upcAuditDetails.gtin || ''),
+                Provider: String(upcAuditDetails.provider || ''),
+                Action: String(upcAuditDetails.action || ''),
+                Status: String(upcAuditDetails.recordStatus || 'validated'),
+                ReviewedBy: user.email,
+              },
+              actionLabel: 'Open Release',
+              actionUrl: appUrl(`/admin/releases/${id}`),
+            },
+            db
+          )
+        )
+        .catch((error) =>
+          console.warn(
+            'GS1 UPC notification skipped:',
+            error instanceof Error ? error.message : error
+          )
+        );
     }
 
     let deliveryShell = null;
@@ -103,6 +173,8 @@ export async function PATCH(
           details: {
             Release: existing.releaseTitle || existing.title || 'Untitled release',
             Status: status,
+            UPC: status === 'approved' ? String(res.value.upc || '') : undefined,
+            UPCProvider: status === 'approved' ? String(res.value.upcProvider || '') : undefined,
             Reason: reason,
             ReviewedBy: user.email,
           },
@@ -114,7 +186,56 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, release: res.value, deliveryShell });
   } catch (e: any) {
-    return NextResponse.json({ success: false, error: e?.message || 'Failed to update status' }, { status: 500 });
+    let responseStatus = 500;
+    if (e instanceof Gs1DatakartError) {
+      responseStatus = e.statusCode >= 500 && e.details !== undefined ? 502 : e.statusCode;
+    } else if (typeof e?.statusCode === 'number' && e.statusCode >= 400 && e.statusCode <= 599) {
+      responseStatus = e.statusCode;
+    }
+
+    const responseMessage =
+      e instanceof Gs1DatakartError
+        ? getGs1DatakartApprovalErrorMessage(e)
+        : e?.message || 'Failed to update status';
+    if (e instanceof Gs1DatakartError && dbForFailure) {
+      console.warn('GS1 UPC assignment blocked approval:', {
+        statusCode: e.statusCode,
+        message: e.message,
+        details: e.details,
+        releaseId: id,
+      });
+      void getAdminRecipients(dbForFailure)
+        .then((admins) =>
+          sendActionEmail(
+            admins,
+            {
+              subject: 'GS1 UPC Assignment Failed',
+              title: 'GS1 UPC Assignment Failed',
+              intro: 'Release approval was blocked before UPC was saved.',
+              details: {
+                Release: releaseForFailure?.releaseTitle || releaseForFailure?.title || id,
+                Provider: 'gs1-datakart',
+                Error: responseMessage,
+                ProviderError: responseMessage === e.message ? undefined : e.message,
+                ReviewedBy: actorEmail,
+              },
+              actionLabel: 'Open Release',
+              actionUrl: appUrl(`/admin/releases/${id}`),
+            },
+            dbForFailure || undefined
+          )
+        )
+        .catch((error) =>
+          console.warn(
+            'GS1 UPC failure notification skipped:',
+            error instanceof Error ? error.message : error
+          )
+        );
+    }
+    return NextResponse.json(
+      { success: false, error: responseMessage },
+      { status: responseStatus }
+    );
   }
 }
 

@@ -63,6 +63,8 @@ const DetailGrid = ({ items }: { items: Array<[string, unknown]> }) => (
   </Box>
 );
 
+const LockedChip = () => <Chip icon={<LockOutlined />} label="Locked" size="small" color="info" />;
+
 export default function ProfilePage({ audience }: ProfilePageProps) {
   const theme = useTheme();
   const { user } = useAuth();
@@ -165,7 +167,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent={{ xs: 'center', sm: 'flex-end' }}>
           <Chip icon={<Shield />} label={roleLabel(user?.role)} size="small" />
-          {user?.accountType && <Chip icon={<Badge />} label={roleLabel(user.accountType)} size="small" variant="outlined" />}
+          {user?.accountType && user.accountType !== user?.role && <Chip icon={<Badge />} label={roleLabel(user.accountType)} size="small" variant="outlined" />}
           {user?.verification?.status && <Chip label={`KYC ${user.verification.status}`} size="small" color={user.verification.status === 'approved' ? 'success' : user.verification.status === 'rejected' ? 'error' : 'warning'} />}
         </Stack>
       </Stack>
@@ -180,7 +182,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
         description={
           audience === 'admin'
             ? 'Manage administrator identity and account details.'
-            : 'Manage profile, company, and payout readiness.'
+            : undefined
         }
         action={profileSummary}
       />
@@ -189,7 +191,23 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
         <Paper elevation={0} sx={{ ...premiumSurfaceSx(theme), borderRadius: 3, overflow: 'hidden' }}>
           <Tabs value={tab} onChange={(_event, value) => setTab(value)} variant="scrollable" allowScrollButtonsMobile sx={{ px: 1, pt: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
             {tabs.map((item, index) => (
-              <Tab key={item.label} icon={item.icon} iconPosition="start" label={item.label} value={index} sx={{ textTransform: 'none', fontWeight: 850, minHeight: 54 }} />
+              <Tab
+                key={item.label}
+                icon={item.icon}
+                iconPosition="start"
+                label={
+                  audience === 'dashboard' && item.key !== 'user'
+                    ? (
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <span>{item.label}</span>
+                          <LockedChip />
+                        </Stack>
+                      )
+                    : item.label
+                }
+                value={index}
+                sx={{ textTransform: 'none', fontWeight: 850, minHeight: 54 }}
+              />
             ))}
           </Tabs>
 
@@ -245,7 +263,10 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
             {activeTabKey === 'address' && (
               <Stack spacing={2.5}>
                 <Box>
-                  <Typography variant="h6" fontWeight={900}>Address</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="h6" fontWeight={900}>Address</Typography>
+                    <LockedChip />
+                  </Stack>
                   <Typography variant="body2" color="text.secondary">Address submitted during KYC.</Typography>
                 </Box>
                 <Divider />
@@ -264,7 +285,10 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
             {activeTabKey === 'verification' && (
               <Stack spacing={2.5}>
                 <Box>
-                  <Typography variant="h6" fontWeight={900}>Verification</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="h6" fontWeight={900}>Verification</Typography>
+                    <LockedChip />
+                  </Stack>
                   <Typography variant="body2" color="text.secondary">
                     KYC review status and identity numbers. Document images stay hidden.
                   </Typography>
@@ -288,7 +312,10 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
             {activeTabKey === 'company' && (
               <Stack spacing={2.5}>
                 <Box>
-                  <Typography variant="h6" fontWeight={900}>Company Info</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="h6" fontWeight={900}>Company Info</Typography>
+                    <LockedChip />
+                  </Stack>
                   <Typography variant="body2" color="text.secondary">Label and company details from KYC onboarding.</Typography>
                 </Box>
                 <Divider />
@@ -316,7 +343,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
                 <Box>
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Typography variant="h6" fontWeight={900}>Bank Details</Typography>
-                    {payoutMethod?.method && <Chip icon={<LockOutlined />} label="Locked" size="small" color="info" />}
+                    <LockedChip />
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
                     Saved payout details are read-only. Contact admin to change payout method or bank details.

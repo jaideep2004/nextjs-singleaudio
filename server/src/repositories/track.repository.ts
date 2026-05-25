@@ -75,6 +75,6 @@ export function updateCanonicalTrackLegacyAcrCloudByFileId(
 export function findCanonicalTracksByAcrCloudFileId(fileId: string) {
   return Track.collection
     .find({ source: 'release_embed', 'legacyMetadata.acrCloud.fileId': fileId })
-    .project({ _id: 1, releaseId: 1 })
+    .project({ _id: 1, releaseId: 1, ownerUserId: 1, artistId: 1, title: 1 })
     .toArray();
 }

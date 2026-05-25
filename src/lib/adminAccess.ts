@@ -7,7 +7,8 @@ export type AdminPermission =
   | 'dsp_delivery'
   | 'podcasts'
   | 'settings'
-  | 'analytics';
+  | 'analytics'
+  | 'support';
 
 export type AdminAccessUser = {
   role?: UserRole | 'admin' | 'subadmin' | string;
@@ -30,6 +31,7 @@ const ADMIN_ROUTE_RULES: Array<{ prefix: string; access: AdminRouteAccess }> = [
   { prefix: '/admin/payouts', access: { kind: 'permission', permission: 'payouts' } },
   { prefix: '/admin/royalties', access: { kind: 'permission', permission: 'payouts' } },
   { prefix: '/admin/podcasts', access: { kind: 'permission', permission: 'podcasts' } },
+  { prefix: '/admin/support', access: { kind: 'permission', permission: 'support' } },
   { prefix: '/admin/music-publishing', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/vevo-video-distribution', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/youtube-network', access: { kind: 'permission', permission: 'settings' } },
@@ -45,6 +47,7 @@ const FIRST_ALLOWED_PATH_BY_PERMISSION: Record<AdminPermission, string> = {
   payouts: '/admin/payouts',
   podcasts: '/admin/podcasts',
   settings: '/admin/settings',
+  support: '/admin/support',
 };
 
 const SUBADMIN_PERMISSION_ORDER: AdminPermission[] = [
@@ -54,6 +57,7 @@ const SUBADMIN_PERMISSION_ORDER: AdminPermission[] = [
   'analytics',
   'payouts',
   'podcasts',
+  'support',
   'settings',
 ];
 

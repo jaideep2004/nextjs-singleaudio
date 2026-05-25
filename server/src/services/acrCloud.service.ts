@@ -11,6 +11,7 @@ import {
   updateTrackAcrCloudById,
 } from '../repositories/track.repository';
 import { upsertAcrCloudFingerprintsForTracks } from '../repositories/fingerprint.repository';
+import { createAcrCloudIssueTicket, hasAcrCloudIssue } from './support.service';
 import {
   AcrCloudAiDetection,
   AcrCloudDataType,
@@ -453,7 +454,7 @@ export async function persistScanResult(fileId: string, scan: AcrCloudScanSummar
     aiDetections: scan.aiDetection.length,
     fingerprintMatches: scan.fingerprintMatches.length,
   });
-  await updateStandaloneTrackAcrCloudByFileId(fileId, scan);
+  const standaloneTrack = await updateStandaloneTrackAcrCloudByFileId(fileId, scan);
 
   await updateCanonicalTrackLegacyAcrCloudByFileId(fileId, scan);
 
@@ -461,4 +462,26 @@ export async function persistScanResult(fileId: string, scan: AcrCloudScanSummar
   await upsertAcrCloudFingerprintsForTracks(canonicalTracks as Array<{ _id: unknown; releaseId?: unknown }>, fileId, scan);
 
   await updateReleaseTrackAcrCloudByFileId(fileId, scan);
+
+  if (hasAcrCloudIssue(scan)) {
+    const canonicalTrack = canonicalTracks[0] as any;
+    const ownerId =
+      standaloneTrack?.ownerUserId?.toString?.() ||
+      standaloneTrack?.artistId?.toString?.() ||
+      canonicalTrack?.ownerUserId?.toString?.() ||
+      canonicalTrack?.artistId?.toString?.();
+
+    await createAcrCloudIssueTicket({
+      ownerId,
+      trackId: (standaloneTrack?._id || canonicalTrack?._id)?.toString?.(),
+      releaseId: (standaloneTrack?.releaseId || canonicalTrack?.releaseId)?.toString?.(),
+      fileId,
+      summary: [
+        `ACRCloud flagged uploaded audio file ${fileId}.`,
+        `AI detections: ${scan.aiDetection.length}.`,
+        `Fingerprint matches: ${scan.fingerprintMatches.length}.`,
+        'Admin review is required before release approval or delivery.',
+      ].join(' '),
+    });
+  }
 }

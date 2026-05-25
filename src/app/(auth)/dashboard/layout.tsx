@@ -8,6 +8,7 @@ import { useTheme } from '@mui/material/styles';
 import TopNavigation from '@/components/TopNavigation';
 import UserSidebar from '@/components/UserSidebar';
 import KycGate, { userKycUnderReview, userNeedsKyc } from '@/components/kyc/KycGate';
+import FloatingSupportButton from '@/components/support/FloatingSupportButton';
 import { useAuth } from '@/context/AppContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +17,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user } = useAuth();
   const needsKycForm = userNeedsKyc(user);
   const underReview = userKycUnderReview(user);
-  const reviewAllowed = pathname === '/dashboard' || pathname.startsWith('/dashboard/profile');
+  const reviewAllowed = pathname === '/dashboard' || pathname.startsWith('/dashboard/profile') || pathname.startsWith('/dashboard/support');
   
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -84,6 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <KycGate>{children}</KycGate>
           )}
         </Box>
+        {!needsKycForm && <FloatingSupportButton />}
       </Box>
     </Box>
   );
