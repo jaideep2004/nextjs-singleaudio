@@ -1,5 +1,6 @@
 import { Db } from 'mongodb';
 import type { CurrentBackendUser } from '@/lib/currentUser';
+import { hasYoutubeAnalyticsScope } from '@/lib/services/youtubeAuthService';
 import {
   isYoutubeCmsStatus,
   isYoutubeVerificationStatus,
@@ -66,6 +67,13 @@ export async function saveSelectedYoutubeChannel(
     accessTokenEncrypted: session.accessTokenEncrypted,
     refreshTokenEncrypted: session.refreshTokenEncrypted,
     tokenExpiresAt: session.tokenExpiresAt,
+    grantedScopes: session.grantedScopes || [],
+    analyticsAccessStatus: !session.refreshTokenEncrypted
+      ? 'missing_refresh_token'
+      : hasYoutubeAnalyticsScope(session.grantedScopes)
+        ? 'active'
+        : 'reauthorization_required',
+    analyticsSyncStatus: 'never_synced',
   });
 
   await deleteYoutubeOAuthSession(db, session._id);

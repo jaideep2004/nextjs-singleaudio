@@ -2,6 +2,10 @@ import { Db, ObjectId } from 'mongodb';
 import {
   getYoutubeWorkflowLabel,
   getYoutubeWorkflowStatus,
+  isYoutubeAnalyticsAccessStatus,
+  isYoutubeAnalyticsSyncStatus,
+  type YoutubeAnalyticsAccessStatus,
+  type YoutubeAnalyticsSyncStatus,
   type YoutubeChannelCandidate,
   type YoutubeChannelView,
   type YoutubeCmsStatus,
@@ -18,6 +22,12 @@ export interface YoutubeChannelDocument extends YoutubeChannelCandidate {
   cmsStatus: YoutubeCmsStatus;
   connectedAt: Date;
   lastSyncedAt: Date;
+  lastAnalyticsSyncedAt?: Date;
+  nextAnalyticsSyncAt?: Date;
+  analyticsAccessStatus?: YoutubeAnalyticsAccessStatus;
+  analyticsSyncStatus?: YoutubeAnalyticsSyncStatus;
+  analyticsError?: string;
+  grantedScopes?: string[];
   createdAt: Date;
   updatedAt: Date;
   tokenExpiresAt?: Date;
@@ -57,6 +67,7 @@ export interface YoutubeOAuthSessionDocument {
   accessTokenEncrypted: string | null;
   refreshTokenEncrypted: string | null;
   tokenExpiresAt?: Date;
+  grantedScopes?: string[];
   createdAt: Date;
   expiresAt: Date;
 }
@@ -94,6 +105,8 @@ export async function ensureYoutubeChannelIndexes(db: Db) {
       collection.createIndex({ connectedAt: -1 }),
       collection.createIndex({ channelId: 1 }),
       collection.createIndex({ googleAccountEmail: 1 }),
+      collection.createIndex({ analyticsSyncStatus: 1, nextAnalyticsSyncAt: 1 }),
+      collection.createIndex({ analyticsAccessStatus: 1, verificationStatus: 1, cmsStatus: 1 }),
     ]).then(() => undefined);
   }
 
@@ -178,6 +191,9 @@ export async function upsertYoutubeChannel(
         tokenExpiresAt: input.tokenExpiresAt,
         accessTokenEncrypted: input.accessTokenEncrypted,
         refreshTokenEncrypted: input.refreshTokenEncrypted,
+        grantedScopes: input.grantedScopes || [],
+        analyticsAccessStatus: input.analyticsAccessStatus,
+        analyticsSyncStatus: input.analyticsSyncStatus || 'never_synced',
         updatedAt: now,
       },
       $setOnInsert: {
@@ -185,6 +201,7 @@ export async function upsertYoutubeChannel(
         channelId: input.channelId,
         verificationStatus: 'pending',
         cmsStatus: 'not_started',
+        nextAnalyticsSyncAt: now,
         connectedAt: now,
         createdAt: now,
       },
@@ -192,7 +209,52 @@ export async function upsertYoutubeChannel(
     { upsert: true, returnDocument: 'after' }
   );
 
-  return result.value;
+  return ((result as { value?: YoutubeChannelDocument | null }).value ?? result) as YoutubeChannelDocument | null;
+}
+
+export async function findYoutubeChannelByObjectId(db: Db, channelObjectId: string | ObjectId) {
+  await ensureYoutubeChannelIndexes(db);
+  const _id = toObjectId(channelObjectId);
+  if (!_id) return null;
+  return youtubeChannelsCollection(db).findOne({ _id });
+}
+
+export async function updateYoutubeChannelTokens(
+  db: Db,
+  channelObjectId: ObjectId,
+  input: {
+    accessTokenEncrypted?: string | null;
+    refreshTokenEncrypted?: string | null;
+    tokenExpiresAt?: Date;
+  }
+) {
+  await ensureYoutubeChannelIndexes(db);
+  const set: Partial<YoutubeChannelDocument> = { updatedAt: new Date() };
+  if (input.accessTokenEncrypted !== undefined) set.accessTokenEncrypted = input.accessTokenEncrypted;
+  if (input.refreshTokenEncrypted !== undefined) set.refreshTokenEncrypted = input.refreshTokenEncrypted;
+  if (input.tokenExpiresAt !== undefined) set.tokenExpiresAt = input.tokenExpiresAt;
+  await youtubeChannelsCollection(db).updateOne({ _id: channelObjectId }, { $set: set });
+}
+
+export async function updateYoutubeChannelAnalyticsState(
+  db: Db,
+  channelObjectId: ObjectId,
+  input: {
+    analyticsAccessStatus?: YoutubeAnalyticsAccessStatus;
+    analyticsSyncStatus?: YoutubeAnalyticsSyncStatus;
+    lastAnalyticsSyncedAt?: Date;
+    nextAnalyticsSyncAt?: Date;
+    analyticsError?: string | null;
+  }
+) {
+  await ensureYoutubeChannelIndexes(db);
+  const set: Partial<YoutubeChannelDocument> = { updatedAt: new Date() };
+  Object.entries(input).forEach(([key, value]) => {
+    if (value !== undefined) {
+      (set as Record<string, unknown>)[key] = value;
+    }
+  });
+  await youtubeChannelsCollection(db).updateOne({ _id: channelObjectId }, { $set: set });
 }
 
 export async function listUserYoutubeChannels(db: Db, userId: string | ObjectId) {
@@ -337,6 +399,12 @@ export function serializeYoutubeChannel(
 
   const verificationStatus = channel.verificationStatus || 'pending';
   const cmsStatus = channel.cmsStatus || 'not_started';
+  const analyticsAccessStatus = isYoutubeAnalyticsAccessStatus(channel.analyticsAccessStatus)
+    ? channel.analyticsAccessStatus
+    : 'reauthorization_required';
+  const analyticsSyncStatus = isYoutubeAnalyticsSyncStatus(channel.analyticsSyncStatus)
+    ? channel.analyticsSyncStatus
+    : 'never_synced';
   const user = channel.user;
 
   return {
@@ -350,10 +418,15 @@ export function serializeYoutubeChannel(
     videos: Number(channel.videos || 0),
     verificationStatus,
     cmsStatus,
+    analyticsAccessStatus,
+    analyticsSyncStatus,
     workflowStatus: getYoutubeWorkflowStatus(verificationStatus, cmsStatus),
     workflowLabel: getYoutubeWorkflowLabel(verificationStatus, cmsStatus),
     connectedAt: toIso(channel.connectedAt),
     lastSyncedAt: toIso(channel.lastSyncedAt),
+    lastAnalyticsSyncedAt: channel.lastAnalyticsSyncedAt ? toIso(channel.lastAnalyticsSyncedAt) : undefined,
+    nextAnalyticsSyncAt: channel.nextAnalyticsSyncAt ? toIso(channel.nextAnalyticsSyncAt) : undefined,
+    analyticsError: typeof channel.analyticsError === 'string' ? channel.analyticsError : undefined,
     ...(user
       ? {
           user: {

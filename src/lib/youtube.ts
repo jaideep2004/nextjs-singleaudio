@@ -1,8 +1,24 @@
 export const YOUTUBE_VERIFICATION_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export const YOUTUBE_CMS_STATUSES = ['not_started', 'processing', 'connected'] as const;
+export const YOUTUBE_ANALYTICS_ACCESS_STATUSES = [
+  'active',
+  'reauthorization_required',
+  'analytics_denied',
+  'missing_refresh_token',
+] as const;
+export const YOUTUBE_ANALYTICS_SYNC_STATUSES = [
+  'never_synced',
+  'queued',
+  'syncing',
+  'fresh',
+  'stale',
+  'failed',
+] as const;
 
 export type YoutubeVerificationStatus = (typeof YOUTUBE_VERIFICATION_STATUSES)[number];
 export type YoutubeCmsStatus = (typeof YOUTUBE_CMS_STATUSES)[number];
+export type YoutubeAnalyticsAccessStatus = (typeof YOUTUBE_ANALYTICS_ACCESS_STATUSES)[number];
+export type YoutubeAnalyticsSyncStatus = (typeof YOUTUBE_ANALYTICS_SYNC_STATUSES)[number];
 
 export type YoutubeWorkflowStatus =
   | 'verification_pending'
@@ -25,10 +41,15 @@ export interface YoutubeChannelView extends YoutubeChannelCandidate {
   googleAccountEmail: string;
   verificationStatus: YoutubeVerificationStatus;
   cmsStatus: YoutubeCmsStatus;
+  analyticsAccessStatus: YoutubeAnalyticsAccessStatus;
+  analyticsSyncStatus: YoutubeAnalyticsSyncStatus;
   workflowStatus: YoutubeWorkflowStatus;
   workflowLabel: string;
   connectedAt: string;
   lastSyncedAt: string;
+  lastAnalyticsSyncedAt?: string;
+  nextAnalyticsSyncAt?: string;
+  analyticsError?: string;
   user?: {
     id: string;
     name: string;
@@ -50,6 +71,14 @@ export function isYoutubeVerificationStatus(value: unknown): value is YoutubeVer
 
 export function isYoutubeCmsStatus(value: unknown): value is YoutubeCmsStatus {
   return typeof value === 'string' && YOUTUBE_CMS_STATUSES.includes(value as YoutubeCmsStatus);
+}
+
+export function isYoutubeAnalyticsAccessStatus(value: unknown): value is YoutubeAnalyticsAccessStatus {
+  return typeof value === 'string' && YOUTUBE_ANALYTICS_ACCESS_STATUSES.includes(value as YoutubeAnalyticsAccessStatus);
+}
+
+export function isYoutubeAnalyticsSyncStatus(value: unknown): value is YoutubeAnalyticsSyncStatus {
+  return typeof value === 'string' && YOUTUBE_ANALYTICS_SYNC_STATUSES.includes(value as YoutubeAnalyticsSyncStatus);
 }
 
 export function getYoutubeWorkflowStatus(

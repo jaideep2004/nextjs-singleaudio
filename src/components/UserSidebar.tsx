@@ -88,6 +88,10 @@ const menuSections = [
         text: 'YouTube Network',
         icon: <YouTube />,
         path: '/dashboard/youtube-network',
+        subItems: [
+          { text: 'Channels', path: '/dashboard/youtube-network' },
+          { text: 'Analytics', path: '/dashboard/youtube-network/analytics' },
+        ],
       },
       {
         text: 'Podcasts',
@@ -164,6 +168,9 @@ export default function UserSidebar() {
     }
     if (pathname.startsWith('/dashboard/payouts')) {
       setOpenSubMenu('/dashboard/payouts');
+    }
+    if (pathname.startsWith('/dashboard/youtube-network')) {
+      setOpenSubMenu('/dashboard/youtube-network');
     }
   }, [pathname]);
 

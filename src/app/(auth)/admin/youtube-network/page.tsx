@@ -1,6 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, type ReactElement, type SyntheticEvent } from 'react';
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type SyntheticEvent,
+} from 'react';
 import {
   Alert,
   Avatar,
@@ -35,6 +42,7 @@ import {
   DoNotDisturb,
   ManageSearch,
   OpenInNew,
+  QueryStats,
   Search,
   SettingsSuggest,
   Sync,
@@ -76,7 +84,10 @@ const cmsOptions: Array<{ value: 'all' | YoutubeCmsStatus; label: string }> = [
   { value: 'connected', label: 'Connected' },
 ];
 
-const statusColor: Record<YoutubeChannelView['workflowStatus'], 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+const statusColor: Record<
+  YoutubeChannelView['workflowStatus'],
+  'default' | 'success' | 'warning' | 'error' | 'info'
+> = {
   verification_pending: 'warning',
   under_review: 'info',
   processing: 'info',
@@ -184,7 +195,7 @@ function AdminYouTubeNetworkContent() {
       }
       const updated = payload.data?.channel as YoutubeChannelView | undefined;
       if (updated) {
-        setChannels((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+        setChannels(current => current.map(item => (item.id === updated.id ? updated : item)));
       }
       setNotice('YouTube channel status updated.');
     } catch (err) {
@@ -199,11 +210,19 @@ function AdminYouTubeNetworkContent() {
       <PremiumHeader
         eyebrow="Admin YouTube"
         title="YouTube Network"
-        description="Review connected channels and track manual CMS/MCN onboarding status."
+        description="Review connected channels, track CMS status, and inspect internal analytics readiness."
       />
 
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-      {notice ? <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert> : null}
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      ) : null}
+      {notice ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {notice}
+        </Alert>
+      ) : null}
 
       <Box
         sx={{
@@ -213,15 +232,40 @@ function AdminYouTubeNetworkContent() {
           mb: 3,
         }}
       >
-        <PremiumMetric label="Matching Channels" value={total} hint="Across current filters" accent="#ef4444" />
-        <PremiumMetric label="Pending On Page" value={visibleStats.pending} hint="Awaiting admin review" accent="#f59e0b" />
-        <PremiumMetric label="Audience On Page" value={formatYoutubeMetric(visibleStats.subscribers)} hint="Subscriber total" accent="#0f766e" />
+        <PremiumMetric
+          label="Matching Channels"
+          value={total}
+          hint="Across current filters"
+          accent="#ef4444"
+        />
+        <PremiumMetric
+          label="Pending On Page"
+          value={visibleStats.pending}
+          hint="Awaiting admin review"
+          accent="#f59e0b"
+        />
+        <PremiumMetric
+          label="Audience On Page"
+          value={formatYoutubeMetric(visibleStats.subscribers)}
+          hint="Subscriber total"
+          accent="#0f766e"
+        />
       </Box>
 
       <Paper sx={{ ...premiumTableSx(theme), p: { xs: 2, md: 2.5 } }}>
-        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} justifyContent="space-between" sx={{ mb: 2 }}>
-          <Tabs value={activeTab} onChange={handleTabChange} variant="scrollable" scrollButtons="auto">
-            {tabOptions.map((tab) => (
+        <Stack
+          direction={{ xs: 'column', lg: 'row' }}
+          spacing={2}
+          justifyContent="space-between"
+          sx={{ mb: 2 }}
+        >
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+          >
+            {tabOptions.map(tab => (
               <Tab key={tab.value} value={tab.value} label={tab.label} />
             ))}
           </Tabs>
@@ -230,7 +274,7 @@ function AdminYouTubeNetworkContent() {
               size="small"
               placeholder="Search channels, users, emails"
               value={searchQuery}
-              onChange={(event) => {
+              onChange={event => {
                 setSearchQuery(event.target.value);
                 setPage(0);
               }}
@@ -247,12 +291,12 @@ function AdminYouTubeNetworkContent() {
               <Select
                 label="CMS Status"
                 value={cmsStatus}
-                onChange={(event) => {
+                onChange={event => {
                   setCmsStatus(event.target.value as 'all' | YoutubeCmsStatus);
                   setPage(0);
                 }}
               >
-                {cmsOptions.map((option) => (
+                {cmsOptions.map(option => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
                   </MenuItem>
@@ -265,13 +309,14 @@ function AdminYouTubeNetworkContent() {
         {loading ? <LinearProgress sx={{ mb: 1 }} /> : null}
 
         <TableContainer>
-          <Table size="small" sx={{ minWidth: 1080 }}>
+          <Table size="small" sx={{ minWidth: 1240 }}>
             <TableHead>
               <TableRow>
                 <TableCell>Channel</TableCell>
                 <TableCell>User</TableCell>
                 <TableCell>Stats</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Analytics</TableCell>
                 <TableCell>Connected</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -279,19 +324,27 @@ function AdminYouTubeNetworkContent() {
             <TableBody>
               {!loading && channels.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
-                    <Stack alignItems="center" spacing={1.5} sx={{ py: 5, color: 'text.secondary' }}>
+                  <TableCell colSpan={7}>
+                    <Stack
+                      alignItems="center"
+                      spacing={1.5}
+                      sx={{ py: 5, color: 'text.secondary' }}
+                    >
                       <ManageSearch />
                       <Typography>No YouTube channels match these filters.</Typography>
                     </Stack>
                   </TableCell>
                 </TableRow>
               ) : (
-                channels.map((channel) => (
+                channels.map(channel => (
                   <TableRow key={channel.id} hover>
                     <TableCell>
                       <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar src={channel.thumbnail} alt={channel.channelTitle} sx={{ bgcolor: '#ef4444' }}>
+                        <Avatar
+                          src={channel.thumbnail}
+                          alt={channel.channelTitle}
+                          sx={{ bgcolor: '#ef4444' }}
+                        >
                           <YouTube />
                         </Avatar>
                         <Box sx={{ minWidth: 0 }}>
@@ -303,8 +356,13 @@ function AdminYouTubeNetworkContent() {
                       </Stack>
                     </TableCell>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 800 }}>{channel.user?.name || 'Unknown user'}</Typography>
-                      <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      <Typography sx={{ fontWeight: 800 }}>
+                        {channel.user?.name || 'Unknown user'}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: 'text.secondary', display: 'block' }}
+                      >
                         {channel.user?.email || channel.googleAccountEmail}
                       </Typography>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -313,9 +371,12 @@ function AdminYouTubeNetworkContent() {
                     </TableCell>
                     <TableCell>
                       <Stack spacing={0.25}>
-                        <Typography variant="body2">{formatYoutubeMetric(channel.subscribers)} subscribers</Typography>
+                        <Typography variant="body2">
+                          {formatYoutubeMetric(channel.subscribers)} subscribers
+                        </Typography>
                         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                          {formatYoutubeMetric(channel.views)} views · {formatYoutubeMetric(channel.videos)} videos
+                          {formatYoutubeMetric(channel.views)} views ·{' '}
+                          {formatYoutubeMetric(channel.videos)} videos
                         </Typography>
                       </Stack>
                     </TableCell>
@@ -333,13 +394,30 @@ function AdminYouTubeNetworkContent() {
                       </Stack>
                     </TableCell>
                     <TableCell>
+                      <Stack spacing={0.75} alignItems="flex-start">
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={channel.analyticsAccessStatus.replace(/_/g, ' ')}
+                        />
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                          Sync: {channel.analyticsSyncStatus.replace(/_/g, ' ')}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="body2">{formatDate(channel.connectedAt)}</Typography>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                         Synced {formatDate(channel.lastSyncedAt)}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        justifyContent="flex-end"
+                        style={{ flexWrap: 'wrap' }}
+                      >
                         <ActionButton
                           title="Approve"
                           icon={<CheckCircle />}
@@ -382,6 +460,16 @@ function AdminYouTubeNetworkContent() {
                             <OpenInNew fontSize="small" />
                           </Button>
                         </Tooltip>
+                        <Tooltip title="Show YouTube analytics">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            href={`/admin/youtube-network/analytics?channelId=${channel.id}`}
+                            sx={{ minWidth: 38, px: 1 }}
+                          >
+                            <QueryStats fontSize="small" />
+                          </Button>
+                        </Tooltip>
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -398,7 +486,7 @@ function AdminYouTubeNetworkContent() {
           rowsPerPage={rowsPerPage}
           rowsPerPageOptions={[10, 25, 50, 100]}
           onPageChange={(_, nextPage) => setPage(nextPage)}
-          onRowsPerPageChange={(event) => {
+          onRowsPerPageChange={event => {
             setRowsPerPage(Number(event.target.value));
             setPage(0);
           }}

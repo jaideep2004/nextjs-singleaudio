@@ -196,7 +196,7 @@ function YoutubeNetworkContent() {
       <PremiumHeader
         eyebrow="YouTube"
         title="YouTube Network"
-        description="Connect channels for manual MCN/CMS review. This workspace tracks onboarding status only."
+        description="Connect channels, track review state, and monitor internal analytics sync readiness."
         action={
           <Button
             variant="contained"
@@ -276,6 +276,10 @@ function YoutubeNetworkContent() {
                       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
                         Connected with {channel.googleAccountEmail} on {formatDate(channel.connectedAt)}
                       </Typography>
+                      <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 1 }}>
+                        <Chip size="small" variant="outlined" label={`Analytics: ${channel.analyticsAccessStatus.replace(/_/g, ' ')}`} />
+                        <Chip size="small" variant="outlined" label={`Sync: ${channel.analyticsSyncStatus.replace(/_/g, ' ')}`} />
+                      </Stack>
                     </Box>
                     <Stack direction="row" spacing={1.25} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
                       <MetricChip icon={<PeopleAlt />} label={formatYoutubeMetric(channel.subscribers)} />
@@ -290,6 +294,14 @@ function YoutubeNetworkContent() {
                         rel="noreferrer"
                       >
                         View
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<QueryStats />}
+                        href={`/dashboard/youtube-network/analytics?channelId=${channel.id}`}
+                      >
+                        Analytics
                       </Button>
                     </Stack>
                   </Stack>

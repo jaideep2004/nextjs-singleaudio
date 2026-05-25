@@ -104,6 +104,10 @@ const menuSections = [
         icon: <YouTube />,
         path: '/admin/youtube-network',
         permission: 'settings' as AdminPermission,
+        subItems: [
+          { text: 'Channels', path: '/admin/youtube-network' },
+          { text: 'Analytics', path: '/admin/youtube-network/analytics' },
+        ],
       },
     ],
   },
@@ -192,6 +196,9 @@ export default function AdminSidebar() {
     }
     if (pathname.startsWith('/admin/support')) {
       setOpenSubMenu(null);
+    }
+    if (pathname.startsWith('/admin/youtube-network')) {
+      setOpenSubMenu('/admin/youtube-network');
     }
   }, [pathname]);
 

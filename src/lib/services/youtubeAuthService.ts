@@ -15,7 +15,14 @@ const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo';
 const YOUTUBE_CHANNELS_URL = 'https://www.googleapis.com/youtube/v3/channels';
-const SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/youtube.readonly'];
+export const YOUTUBE_ANALYTICS_SCOPE = 'https://www.googleapis.com/auth/yt-analytics.readonly';
+
+const SCOPES = [
+  'openid',
+  'email',
+  'https://www.googleapis.com/auth/youtube.readonly',
+  YOUTUBE_ANALYTICS_SCOPE,
+];
 const STATE_TTL_MS = 10 * 60 * 1000;
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -135,6 +142,7 @@ export async function handleYoutubeOAuthCallback(
     channels,
     accessTokenEncrypted: encryptSecret(tokens.access_token),
     refreshTokenEncrypted: encryptSecret(tokens.refresh_token),
+    grantedScopes: parseGrantedScopes(tokens.scope),
     tokenExpiresAt: tokens.expires_in
       ? new Date(now.getTime() + tokens.expires_in * 1000)
       : undefined,
@@ -253,6 +261,14 @@ async function fetchYoutubeChannels(accessToken: string): Promise<YoutubeChannel
 function toNumber(value: unknown) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function parseGrantedScopes(value: unknown) {
+  return typeof value === 'string' ? value.split(/\s+/).filter(Boolean) : [];
+}
+
+export function hasYoutubeAnalyticsScope(scopes: readonly string[] | undefined) {
+  return Boolean(scopes?.includes(YOUTUBE_ANALYTICS_SCOPE));
 }
 
 function hashState(state: string) {
