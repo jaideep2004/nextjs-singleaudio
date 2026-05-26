@@ -15,6 +15,7 @@ import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { removeAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 
 export default function DebugPage() {
   const [tokenData, setTokenData] = useState<any>(null);
@@ -65,7 +66,7 @@ export default function DebugPage() {
       const modifiedToken = `${btoa(JSON.stringify(header))}.${btoa(JSON.stringify(payload))}.${tokenParts[2]}`;
       
       // Save the modified token
-      Cookies.set('token', modifiedToken, { expires: 30, sameSite: 'Lax' });
+      setAuthTokenCookie(modifiedToken);
       
       // Update state
       setTokenData(payload);
@@ -83,7 +84,7 @@ export default function DebugPage() {
   };
 
   const clearToken = () => {
-    Cookies.remove('token');
+    removeAuthTokenCookie();
     setHasToken(false);
     setTokenData(null);
     window.location.reload();

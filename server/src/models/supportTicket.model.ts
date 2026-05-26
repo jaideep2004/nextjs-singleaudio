@@ -26,6 +26,7 @@ export interface ISupportTicket extends Document {
   related?: {
     releaseId?: mongoose.Types.ObjectId;
     trackId?: mongoose.Types.ObjectId;
+    knowledgeBaseArticleId?: mongoose.Types.ObjectId;
     kycUserId?: mongoose.Types.ObjectId;
     acrCloudFileId?: string;
   };
@@ -90,6 +91,7 @@ const SupportTicketSchema = new Schema<ISupportTicket>(
     related: {
       releaseId: { type: Schema.Types.ObjectId },
       trackId: { type: Schema.Types.ObjectId },
+      knowledgeBaseArticleId: { type: Schema.Types.ObjectId, ref: 'KnowledgeBaseArticle' },
       kycUserId: { type: Schema.Types.ObjectId, ref: 'User' },
       acrCloudFileId: { type: String, trim: true },
     },

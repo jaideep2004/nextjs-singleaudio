@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Cookies from 'js-cookie';
 import {
   AppBar,
   Toolbar,
@@ -34,6 +33,7 @@ import { useNotifications } from '@/context/NotificationsContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { useAuth } from '@/context/AppContext';
 import { isSubadmin } from '@/lib/adminAccess';
+import { removeAuthTokenCookie } from '@/lib/authCookie';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -88,7 +88,7 @@ export default function AdminHeader() {
   };
 
   const handleLogout = async () => {
-    Cookies.remove('token', { path: '/' });
+    removeAuthTokenCookie();
     window.location.assign('/login');
   };
 

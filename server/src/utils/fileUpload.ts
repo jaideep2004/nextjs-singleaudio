@@ -8,16 +8,19 @@ import {
   ARTWORK_DIR,
   REGISTRATION_DIR,
   SUPPORT_ATTACHMENT_DIR,
+  KNOWLEDGE_BASE_MEDIA_DIR,
   MAX_FILE_SIZE,
   ALLOWED_AUDIO_TYPES,
   ALLOWED_IMAGE_TYPES,
   ALLOWED_SUPPORT_ATTACHMENT_TYPES,
-  SUPPORT_ATTACHMENT_MAX_FILE_SIZE
+  ALLOWED_KNOWLEDGE_BASE_MEDIA_TYPES,
+  SUPPORT_ATTACHMENT_MAX_FILE_SIZE,
+  KNOWLEDGE_BASE_MEDIA_MAX_FILE_SIZE
 } from '../config/constants';
 import { ApiError } from '../middleware/errorHandler.middleware';
 
 // Ensure upload directories exist
-[TRACKS_DIR, ARTWORK_DIR, REGISTRATION_DIR, SUPPORT_ATTACHMENT_DIR].forEach(dir => {
+[TRACKS_DIR, ARTWORK_DIR, REGISTRATION_DIR, SUPPORT_ATTACHMENT_DIR, KNOWLEDGE_BASE_MEDIA_DIR].forEach(dir => {
   try {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -198,6 +201,39 @@ export const uploadSupportAttachment = multer({
   fileFilter: supportAttachmentFileFilter,
 });
 
+const knowledgeBaseMediaStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, KNOWLEDGE_BASE_MEDIA_DIR);
+  },
+  filename: (_req, file, cb) => {
+    cb(null, createUniqueFilename(file));
+  },
+});
+
+const knowledgeBaseMediaFileFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (ALLOWED_KNOWLEDGE_BASE_MEDIA_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+    return;
+  }
+
+  cb(
+    new ApiError(
+      `Invalid file type. Allowed types: ${ALLOWED_KNOWLEDGE_BASE_MEDIA_TYPES.join(', ')}`,
+      400
+    )
+  );
+};
+
+export const uploadKnowledgeBaseMedia = multer({
+  storage: knowledgeBaseMediaStorage,
+  limits: { fileSize: KNOWLEDGE_BASE_MEDIA_MAX_FILE_SIZE },
+  fileFilter: knowledgeBaseMediaFileFilter,
+});
+
 // Delete file
 export const deleteFile = (filePath: string): void => {
   try {
@@ -210,8 +246,14 @@ export const deleteFile = (filePath: string): void => {
 };
 
 // Get file URL (in a real app, this would be a CDN or S3 URL)
-export const getFileUrl = (filename: string, type: 'audio' | 'image' | 'support'): string => {
+export const getFileUrl = (filename: string, type: 'audio' | 'image' | 'support' | 'knowledge-base'): string => {
   const baseUrl = process.env.API_URL || 'http://localhost:5000';
-  const directory = type === 'audio' ? 'tracks' : type === 'image' ? 'artwork' : 'support';
+  const directory = type === 'audio'
+    ? 'tracks'
+    : type === 'image'
+      ? 'artwork'
+      : type === 'knowledge-base'
+        ? 'knowledge-base'
+        : 'support';
   return `${baseUrl}/uploads/${directory}/${filename}`;
 }; 

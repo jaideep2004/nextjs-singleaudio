@@ -23,6 +23,7 @@ import {
   NotificationsOutlined,
   KeyboardArrowDown,
   DarkMode,
+  HelpOutline,
   LightMode,
   Logout,
   Person as PersonIcon,
@@ -36,6 +37,16 @@ import { useNotifications } from '@/context/NotificationsContext';
 
 interface TopNavigationProps {
   title?: string;
+}
+
+function getHelpCenterHref() {
+  if (typeof window === 'undefined') return '/help';
+
+  const helpHost = process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com';
+  const appHost = process.env.NEXT_PUBLIC_APP_HOST || 'app.singleaudio.com';
+
+  if (window.location.hostname === appHost) return `https://${helpHost}`;
+  return '/help';
 }
 
 export default function TopNavigation({ title = 'Single Audio' }: TopNavigationProps) {
@@ -148,6 +159,56 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
 
         {/* Right: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Tooltip title="Open Help Center">
+            <Button
+              component={Link}
+              href={getHelpCenterHref()}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="small"
+              startIcon={<HelpOutline sx={{ fontSize: 18 }} />}
+              sx={{
+                display: { xs: 'none', md: 'inline-flex' },
+                minHeight: 36,
+                borderRadius: '10px',
+                px: 1.25,
+                color: isDarkMode ? 'rgba(255,255,255,0.72)' : 'rgba(15,23,42,0.72)',
+                border: '1px solid',
+                borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+                bgcolor: isDarkMode ? 'rgba(255,255,255,0.035)' : 'rgba(15,23,42,0.025)',
+                fontWeight: 800,
+                textTransform: 'none',
+                '&:hover': {
+                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.055)',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.16)' : 'rgba(15,23,42,0.14)',
+                },
+              }}
+            >
+              Help
+            </Button>
+          </Tooltip>
+          <Tooltip title="Open Help Center">
+            <IconButton
+              component={Link}
+              href={getHelpCenterHref()}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open Help Center"
+              size="small"
+              sx={{
+                display: { xs: 'inline-flex', md: 'none' },
+                width: 36,
+                height: 36,
+                color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)',
+                '&:hover': {
+                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
+                },
+              }}
+            >
+              <HelpOutline sx={{ fontSize: 20 }} />
+            </IconButton>
+          </Tooltip>
+
           {/* Search */}
           <Tooltip title="Search">
             <IconButton

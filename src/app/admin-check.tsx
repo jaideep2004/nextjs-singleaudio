@@ -16,6 +16,7 @@ import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
 import axios from 'axios';
 import Link from 'next/link';
+import { removeAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 
 export default function AdminCheck() {
   const [token, setToken] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export default function AdminCheck() {
 
       if (response.data.success && response.data.data.token) {
         // Save token to cookies
-        Cookies.set('token', response.data.data.token, { expires: 30, sameSite: 'Lax' });
+        setAuthTokenCookie(response.data.data.token);
         
         // Update token state
         setToken(response.data.data.token);
@@ -130,7 +131,7 @@ export default function AdminCheck() {
 
   // Clear token
   const clearToken = () => {
-    Cookies.remove('token');
+    removeAuthTokenCookie();
     setToken(null);
     setDecodedToken(null);
     checkToken();

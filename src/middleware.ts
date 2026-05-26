@@ -14,6 +14,23 @@ const excludedPaths = [
   '/_error',
 ];
 
+const APP_HOST = process.env.NEXT_PUBLIC_APP_HOST || 'app.singleaudio.com';
+const HELP_HOST = process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com';
+
+const normalizeHost = (host: string | null) => (host || '').split(':')[0].toLowerCase();
+
+const getRequestHost = (request: NextRequest) =>
+  normalizeHost(request.headers.get('x-forwarded-host') || request.headers.get('host'));
+
+const isHelpHost = (host: string) => host === HELP_HOST;
+
+const buildAppLoginUrl = (request: NextRequest) => {
+  const protocol = request.headers.get('x-forwarded-proto') || request.nextUrl.protocol.replace(':', '') || 'https';
+  const loginUrl = new URL(`${protocol}://${APP_HOST}/login`);
+  loginUrl.searchParams.set('from', request.url);
+  return loginUrl;
+};
+
 // Helper function to validate token
 const validateToken = (token: string) => {
   try {
@@ -35,6 +52,7 @@ const validateToken = (token: string) => {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = getRequestHost(request);
   console.log('Middleware processing path:', pathname);
   
   // Skip middleware for excluded paths
@@ -62,6 +80,22 @@ export function middleware(request: NextRequest) {
   }
   
   console.log('Is authenticated?', isAuthenticated);
+
+  if (isHelpHost(host)) {
+    if (!isAuthenticated) {
+      console.log('Help host requires authentication, redirecting to app login');
+      return NextResponse.redirect(buildAppLoginUrl(request));
+    }
+
+    const rewriteUrl = request.nextUrl.clone();
+    rewriteUrl.pathname = pathname === '/'
+      ? '/help'
+      : pathname.startsWith('/help')
+        ? pathname
+        : `/help${pathname}`;
+    console.log('Help host rewrite to:', rewriteUrl.pathname);
+    return NextResponse.rewrite(rewriteUrl);
+  }
 
   // Handle authentication redirects
   if (isAuthenticated) {

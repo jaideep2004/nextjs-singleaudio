@@ -35,6 +35,7 @@ import {
   LibraryMusic,
   VideoLibrary,
   YouTube,
+  Article as ArticleIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { hasAdminPermission, isFullAdmin, type AdminPermission } from '@/lib/adminAccess';
@@ -108,6 +109,12 @@ const menuSections = [
           { text: 'Channels', path: '/admin/youtube-network' },
           { text: 'Analytics', path: '/admin/youtube-network/analytics' },
         ],
+      },
+      {
+        text: 'Knowledge Base',
+        icon: <ArticleIcon />,
+        path: '/admin/knowledge-base',
+        permission: 'support' as AdminPermission,
       },
     ],
   },

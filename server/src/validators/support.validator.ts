@@ -30,6 +30,7 @@ export const createSupportTicketValidator = [
   body('message').trim().notEmpty().withMessage('Message is required').isLength({ max: 5000 }),
   body('related.releaseId').optional().isMongoId().withMessage('Invalid release ID'),
   body('related.trackId').optional().isMongoId().withMessage('Invalid track ID'),
+  body('related.knowledgeBaseArticleId').optional().isMongoId().withMessage('Invalid knowledge base article ID'),
 ];
 
 export const addSupportMessageValidator = [

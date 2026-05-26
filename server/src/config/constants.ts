@@ -121,19 +121,30 @@ export enum SupportMessageVisibility {
 export enum SupportTicketSource {
   USER = 'user',
   ADMIN = 'admin',
+  KNOWLEDGE_BASE = 'knowledge_base',
   ACRCLOUD = 'acrcloud',
   KYC = 'kyc',
   SYSTEM = 'system'
 }
 
 export const SUPPORT_ATTACHMENT_DIR = path.join(UPLOAD_DIR, 'support');
+export const KNOWLEDGE_BASE_MEDIA_DIR = path.join(UPLOAD_DIR, 'knowledge-base');
 export const SUPPORT_ATTACHMENT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+export const KNOWLEDGE_BASE_MEDIA_MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const ALLOWED_SUPPORT_ATTACHMENT_TYPES = [
   'image/jpeg',
   'image/png',
   'application/pdf',
   'text/plain',
   'application/zip'
+];
+export const ALLOWED_KNOWLEDGE_BASE_MEDIA_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime'
 ];
 
 // Payment methods

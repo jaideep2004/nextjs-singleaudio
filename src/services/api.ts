@@ -474,7 +474,7 @@ export const supportAPI = {
     category: SupportTicketCategory;
     priority?: SupportTicketPriority;
     message: string;
-    related?: { releaseId?: string; trackId?: string };
+    related?: { releaseId?: string; trackId?: string; knowledgeBaseArticleId?: string };
   }) => {
     try {
       const response = await api.post<ApiResponse<any>>('/support/tickets', payload);
@@ -568,6 +568,196 @@ export const adminSupportAPI = {
   addInternalNote: async (id: string, body: string) => {
     try {
       const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/internal-notes`, { body });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+};
+
+export type KnowledgeBaseArticleStatus = 'draft' | 'published' | 'archived';
+
+export type KnowledgeBaseCategory = {
+  _id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type KnowledgeBaseSection = {
+  _id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
+export type KnowledgeBaseArticle = {
+  _id: string;
+  categoryId: string | KnowledgeBaseCategory;
+  sectionId?: string | KnowledgeBaseSection;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  status: KnowledgeBaseArticleStatus;
+  content?: Record<string, unknown>;
+  contentHtml?: string;
+  contentText?: string;
+  faqBlocks?: Array<{ question: string; answer: string }>;
+  videoEmbeds?: Array<{ url: string; title?: string }>;
+  imageRefs?: Array<{ url: string; alt?: string }>;
+  seo?: { title?: string; description?: string; keywords?: string[] };
+  relatedArticleIds?: KnowledgeBaseArticle[];
+  publishedAt?: string;
+  updatedAt?: string;
+};
+
+export type KnowledgeBaseTree = {
+  categories: KnowledgeBaseCategory[];
+  sections: KnowledgeBaseSection[];
+  articles: KnowledgeBaseArticle[];
+};
+
+export const knowledgeBaseAPI = {
+  getTree: async () => {
+    try {
+      const response = await api.get<ApiResponse<KnowledgeBaseTree>>('/knowledge-base/categories');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  search: async (q: string, limit = 10) => {
+    try {
+      const response = await api.get<ApiResponse<{ articles: KnowledgeBaseArticle[] }>>('/knowledge-base/search', {
+        params: { q, limit },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  getArticle: async (slug: string) => {
+    try {
+      const response = await api.get<ApiResponse<KnowledgeBaseArticle>>(`/knowledge-base/articles/${slug}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+};
+
+export const adminKnowledgeBaseAPI = {
+  getTree: async () => {
+    try {
+      const response = await api.get<ApiResponse<KnowledgeBaseTree>>('/admin/knowledge-base/tree');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  createCategory: async (payload: Partial<KnowledgeBaseCategory>) => {
+    try {
+      const response = await api.post<ApiResponse<KnowledgeBaseCategory>>('/admin/knowledge-base/categories', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  updateCategory: async (id: string, payload: Partial<KnowledgeBaseCategory>) => {
+    try {
+      const response = await api.patch<ApiResponse<KnowledgeBaseCategory>>(`/admin/knowledge-base/categories/${id}`, payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  createSection: async (payload: Partial<KnowledgeBaseSection>) => {
+    try {
+      const response = await api.post<ApiResponse<KnowledgeBaseSection>>('/admin/knowledge-base/sections', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  updateSection: async (id: string, payload: Partial<KnowledgeBaseSection>) => {
+    try {
+      const response = await api.patch<ApiResponse<KnowledgeBaseSection>>(`/admin/knowledge-base/sections/${id}`, payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  getArticles: async (params: Record<string, string | number> = {}) => {
+    try {
+      const response = await api.get<ApiResponse<{ articles: KnowledgeBaseArticle[]; pagination: any }>>('/admin/knowledge-base/articles', { params });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  createArticle: async (payload: Partial<KnowledgeBaseArticle>) => {
+    try {
+      const response = await api.post<ApiResponse<KnowledgeBaseArticle>>('/admin/knowledge-base/articles', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  updateArticle: async (id: string, payload: Partial<KnowledgeBaseArticle>) => {
+    try {
+      const response = await api.patch<ApiResponse<KnowledgeBaseArticle>>(`/admin/knowledge-base/articles/${id}`, payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  publishArticle: async (id: string) => {
+    try {
+      const response = await api.post<ApiResponse<KnowledgeBaseArticle>>(`/admin/knowledge-base/articles/${id}/publish`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  archiveArticle: async (id: string) => {
+    try {
+      const response = await api.delete<ApiResponse<KnowledgeBaseArticle>>(`/admin/knowledge-base/articles/${id}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  uploadMedia: async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append('media', file);
+      const response = await api.post<ApiResponse<{
+        fileName: string;
+        key: string;
+        url: string;
+        contentType: string;
+        mediaType: 'image' | 'video';
+        size: number;
+      }>>('/admin/knowledge-base/media', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     } catch (error) {
       return handleApiError(error);

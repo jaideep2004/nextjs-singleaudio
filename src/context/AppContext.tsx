@@ -2,9 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import axios from 'axios';
-import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
 import { getFirstAllowedAdminPath } from '@/lib/adminAccess';
+import { getAuthTokenCookie, removeAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 
 interface User {
   id: string;
@@ -192,19 +192,40 @@ const toUser = (payload: UserPayload): User => ({
   payoutMethod: payload.payoutMethod,
 });
 
+const getSafeLoginReturnUrl = () => {
+  if (typeof window === 'undefined') return '';
+
+  const from = new URLSearchParams(window.location.search).get('from');
+  if (!from) return '';
+
+  if (from.startsWith('/')) return from;
+
+  try {
+    const url = new URL(from);
+    const allowedHosts = new Set([
+      window.location.hostname,
+      process.env.NEXT_PUBLIC_APP_HOST || 'app.singleaudio.com',
+      process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com',
+    ]);
+    return allowedHosts.has(url.hostname) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+};
+
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const getToken = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
-    return Cookies.get('token') || null;
+    return getAuthTokenCookie();
   }, []);
 
   const logout = useCallback(() => {
     if (typeof window === 'undefined') return;
 
-    Cookies.remove('token');
+    removeAuthTokenCookie();
     setUser(null);
     setIsLoading(false);
     window.location.assign('/login');
@@ -282,19 +303,15 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
         throw new Error('No token received from server');
       }
 
-      Cookies.set('token', token, {
-        expires: 30,
-        sameSite: 'Lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-      });
+      setAuthTokenCookie(token);
 
       const currentUser = toUser({ ...userData, artistName: userData.artistName || userData.name });
       setUser(currentUser);
 
-      const redirectUrl = userData.role === 'admin' || userData.role === 'subadmin'
+      const returnUrl = getSafeLoginReturnUrl();
+      const redirectUrl = returnUrl || (userData.role === 'admin' || userData.role === 'subadmin'
         ? getFirstAllowedAdminPath(currentUser)
-        : '/dashboard';
+        : '/dashboard');
       window.location.assign(redirectUrl);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Login failed'));
@@ -373,12 +390,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       const response = await axios.post<AuthResponse>('/auth/signup/verify', payload);
       const { token } = response.data.data;
 
-      Cookies.set('token', token, {
-        expires: 30,
-        sameSite: 'Lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-      });
+      setAuthTokenCookie(token);
 
       setUser(toUser(jwtDecode<DecodedToken>(token)));
       window.location.assign('/dashboard');

@@ -32,6 +32,7 @@ const ADMIN_ROUTE_RULES: Array<{ prefix: string; access: AdminRouteAccess }> = [
   { prefix: '/admin/royalties', access: { kind: 'permission', permission: 'payouts' } },
   { prefix: '/admin/podcasts', access: { kind: 'permission', permission: 'podcasts' } },
   { prefix: '/admin/support', access: { kind: 'permission', permission: 'support' } },
+  { prefix: '/admin/knowledge-base', access: { kind: 'permission', permission: 'support' } },
   { prefix: '/admin/music-publishing', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/vevo-video-distribution', access: { kind: 'permission', permission: 'settings' } },
   { prefix: '/admin/youtube-network', access: { kind: 'permission', permission: 'settings' } },

@@ -54,13 +54,17 @@ export const getAdminSupportTickets = async (req: AuthRequest, res: Response): P
 
 export const createUserSupportTicket = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const source = req.body.related?.knowledgeBaseArticleId
+      ? SupportTicketSource.KNOWLEDGE_BASE
+      : SupportTicketSource.USER;
+
     const ticket = await createSupportTicket({
       ownerId: req.user._id,
       subject: req.body.subject,
       category: req.body.category,
       priority: req.body.priority,
       message: req.body.message,
-      source: SupportTicketSource.USER,
+      source,
       related: req.body.related,
       createdBy: req.user._id,
       authorRole: 'user',

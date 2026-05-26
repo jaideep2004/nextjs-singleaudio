@@ -13,6 +13,8 @@ import rightsRoutes from './rights.routes';
 import uploadRoutes from './upload.routes';
 import dspRoutes from './dsp.routes';
 import supportRoutes from './support.routes';
+import knowledgeBaseRoutes from './knowledgeBase.routes';
+import adminKnowledgeBaseRoutes from './adminKnowledgeBase.routes';
 
 const router = Router();
 
@@ -30,5 +32,7 @@ router.use(`${API_PREFIX}/rights`, rightsRoutes);
 router.use(`${API_PREFIX}/uploads`, uploadRoutes);
 router.use(`${API_PREFIX}/dsp`, dspRoutes);
 router.use(`${API_PREFIX}/support`, supportRoutes);
+router.use(`${API_PREFIX}/knowledge-base`, knowledgeBaseRoutes);
+router.use(`${API_PREFIX}/admin/knowledge-base`, adminKnowledgeBaseRoutes);
 
 export default router;
