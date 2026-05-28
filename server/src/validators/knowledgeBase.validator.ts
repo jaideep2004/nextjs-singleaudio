@@ -25,6 +25,7 @@ export const categoryValidator = [
   body('name').trim().notEmpty().withMessage('Category name is required').isLength({ max: 120 }),
   body('slug').optional().trim().isLength({ max: 140 }).withMessage('Slug cannot exceed 140 characters'),
   body('description').optional().trim().isLength({ max: 500 }).withMessage('Description cannot exceed 500 characters'),
+  body('iconUrl').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 1000 }).withMessage('Icon/image URL cannot exceed 1000 characters'),
   body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sort order must be positive'),
 ];
 
@@ -33,6 +34,7 @@ export const updateCategoryValidator = [
   body('name').optional().trim().notEmpty().isLength({ max: 120 }),
   body('slug').optional().trim().isLength({ max: 140 }),
   body('description').optional().trim().isLength({ max: 500 }),
+  body('iconUrl').optional({ nullable: true, checkFalsy: true }).trim().isLength({ max: 1000 }),
   body('sortOrder').optional().isInt({ min: 0 }),
   body('isActive').optional().isBoolean().withMessage('isActive must be boolean'),
 ];

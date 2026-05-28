@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Box,
   Button,
-  Chip,
   CircularProgress,
   Divider,
   Drawer,
@@ -17,6 +16,7 @@ import {
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
   alpha,
   useMediaQuery,
@@ -24,9 +24,11 @@ import {
 } from '@mui/material';
 import {
   Article,
+  ArrowForward,
   Close,
+  DarkMode,
   GraphicEq,
-  HelpOutline,
+  LightMode,
   Menu,
   Search,
 } from '@mui/icons-material';
@@ -35,28 +37,42 @@ import {
   type KnowledgeBaseArticle,
   type KnowledgeBaseCategory,
   type KnowledgeBaseSection,
+  type KnowledgeBaseTree,
 } from '@/services/api';
 import { groupKnowledgeBase } from '@/components/knowledge-base/kbUtils';
-import { useAuth } from '@/context/AppContext';
+import { useColorMode } from '@/context/ColorModeContext';
 
 type HelpCenterClientProps = {
-  mode?: 'home' | 'article';
+  mode?: 'home' | 'article' | 'category';
   slug?: string;
+  categorySlug?: string;
+  initialTree?: KnowledgeBaseTree;
 };
 
 function articleHref(slug: string) {
-  if (typeof window !== 'undefined' && window.location.hostname === (process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com')) {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname === (process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com')
+  ) {
     return `/${slug}`;
   }
   return `/help/${slug}`;
 }
 
-function appSupportHref() {
-  const host = process.env.NEXT_PUBLIC_APP_HOST || 'app.singleaudio.com';
-  if (typeof window !== 'undefined' && window.location.hostname === (process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com')) {
-    return `https://${host}/dashboard/support`;
+function categoryHref(slug: string) {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.hostname === (process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com')
+  ) {
+    return `/category/${slug}`;
   }
-  return '/dashboard/support';
+  return `/help/category/${slug}`;
+}
+
+function hasTreeData(tree?: KnowledgeBaseTree) {
+  return Boolean(
+    tree && (tree.categories.length > 0 || tree.sections.length > 0 || tree.articles.length > 0)
+  );
 }
 
 export function HelpSidebar({
@@ -81,17 +97,22 @@ export function HelpSidebar({
         <GraphicEq color="primary" />
         <Box>
           <Typography fontWeight={950}>SingleAudio Help</Typography>
-          <Typography variant="caption" color="text.secondary">Knowledge base</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Knowledge base
+          </Typography>
         </Box>
       </Stack>
       <Divider sx={{ mb: 2 }} />
       <List disablePadding>
-        {grouped.map((category) => (
+        {grouped.map(category => (
           <Box key={category._id} sx={{ mb: 1.5 }}>
-            <Typography variant="overline" sx={{ px: 1, color: 'text.secondary', fontWeight: 900, letterSpacing: '0.06em' }}>
+            <Typography
+              variant="overline"
+              sx={{ px: 1, color: 'text.secondary', fontWeight: 900, letterSpacing: 0 }}
+            >
               {category.name}
             </Typography>
-            {category.articles.map((article) => (
+            {category.articles.map(article => (
               <ListItemButton
                 key={article._id}
                 component={Link}
@@ -103,19 +124,28 @@ export function HelpSidebar({
                   minHeight: 40,
                   color: 'text.primary',
                   '&.Mui-selected': {
-                    bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.1),
+                    bgcolor: alpha(
+                      theme.palette.primary.main,
+                      theme.palette.mode === 'dark' ? 0.22 : 0.1
+                    ),
                   },
                 }}
               >
-                <ListItemText primary={article.title} primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }} />
+                <ListItemText
+                  primary={article.title}
+                  primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
+                />
               </ListItemButton>
             ))}
-            {category.sections.map((section) => (
+            {category.sections.map(section => (
               <Box key={section._id} sx={{ mt: 0.5 }}>
-                <Typography variant="caption" sx={{ px: 1.25, color: 'text.secondary', fontWeight: 850 }}>
+                <Typography
+                  variant="caption"
+                  sx={{ px: 1.25, color: 'text.secondary', fontWeight: 850 }}
+                >
                   {section.name}
                 </Typography>
-                {section.articles.map((article) => (
+                {section.articles.map(article => (
                   <ListItemButton
                     key={article._id}
                     component={Link}
@@ -128,11 +158,17 @@ export function HelpSidebar({
                       pl: 2,
                       color: 'text.primary',
                       '&.Mui-selected': {
-                        bgcolor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.22 : 0.1),
+                        bgcolor: alpha(
+                          theme.palette.primary.main,
+                          theme.palette.mode === 'dark' ? 0.22 : 0.1
+                        ),
                       },
                     }}
                   >
-                    <ListItemText primary={article.title} primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }} />
+                    <ListItemText
+                      primary={article.title}
+                      primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
+                    />
                   </ListItemButton>
                 ))}
               </Box>
@@ -144,23 +180,39 @@ export function HelpSidebar({
   );
 }
 
-export default function HelpCenterClient({ mode = 'home', slug }: HelpCenterClientProps) {
+export default function HelpCenterClient({
+  mode = 'home',
+  slug,
+  categorySlug,
+  initialTree,
+}: HelpCenterClientProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user } = useAuth();
-  const [categories, setCategories] = useState<KnowledgeBaseCategory[]>([]);
-  const [sections, setSections] = useState<KnowledgeBaseSection[]>([]);
-  const [articles, setArticles] = useState<KnowledgeBaseArticle[]>([]);
+  const { mode: colorMode, toggleColorMode } = useColorMode();
+  const [categories, setCategories] = useState<KnowledgeBaseCategory[]>(
+    initialTree?.categories || []
+  );
+  const [sections, setSections] = useState<KnowledgeBaseSection[]>(initialTree?.sections || []);
+  const [articles, setArticles] = useState<KnowledgeBaseArticle[]>(initialTree?.articles || []);
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<KnowledgeBaseArticle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasTreeData(initialTree));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [error, setError] = useState('');
 
-  const featured = useMemo(() => articles.slice(0, 8), [articles]);
-  const grouped = useMemo(() => groupKnowledgeBase(categories, sections, articles), [categories, sections, articles]);
+  const isDark = colorMode === 'dark';
+  const grouped = useMemo(
+    () => groupKnowledgeBase(categories, sections, articles),
+    [categories, sections, articles]
+  );
+  const activeCategory = useMemo(
+    () => grouped.find(category => category.slug === categorySlug),
+    [grouped, categorySlug]
+  );
 
   useEffect(() => {
+    if (hasTreeData(initialTree)) return;
+
     let active = true;
     const load = async () => {
       setLoading(true);
@@ -181,7 +233,7 @@ export default function HelpCenterClient({ mode = 'home', slug }: HelpCenterClie
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialTree]);
 
   useEffect(() => {
     let active = true;
@@ -210,16 +262,44 @@ export default function HelpCenterClient({ mode = 'home', slug }: HelpCenterClie
     />
   );
 
-  const pageBg = theme.palette.mode === 'dark' ? '#111517' : '#F7F4EF';
-  const headerBg = theme.palette.mode === 'dark'
-    ? alpha('#111517', 0.94)
-    : alpha('#F7F4EF', 0.94);
-  const panelBg = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.06)
-    : alpha(theme.palette.common.white, 0.82);
-  const panelBorder = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.12)
-    : alpha('#18201F', 0.12);
+  const pageBg = isDark ? '#081112' : '#f6f2ea';
+  const headerBg = isDark ? alpha('#081112', 0.95) : alpha('#f6f2ea', 0.96);
+  const panelBg = isDark ? alpha('#f8f0df', 0.07) : '#ffffff';
+  const panelBorder = isDark ? alpha('#f8f0df', 0.14) : alpha('#101820', 0.12);
+  const heroBg = isDark
+    ? 'linear-gradient(135deg, #0a1718 0%, #10252c 48%, #223923 100%)'
+    : 'linear-gradient(135deg, #092435 0%, #245d80 56%, #d87544 100%)';
+
+  const searchField = (
+    <TextField
+      fullWidth
+      size="small"
+      value={search}
+      onChange={event => setSearch(event.target.value)}
+      placeholder="Search help articles"
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Search />
+          </InputAdornment>
+        ),
+      }}
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          minHeight: 44,
+          bgcolor: isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
+          color: isDark ? '#f8f0df' : '#101820',
+        },
+        '& .MuiSvgIcon-root': {
+          color: isDark ? alpha('#f8f0df', 0.9) : alpha('#101820', 0.72),
+        },
+        '& .MuiInputBase-input::placeholder': {
+          color: isDark ? alpha('#f8f0df', 0.7) : alpha('#101820', 0.58),
+          opacity: 1,
+        },
+      }}
+    />
+  );
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: pageBg, color: 'text.primary' }}>
@@ -235,95 +315,474 @@ export default function HelpCenterClient({ mode = 'home', slug }: HelpCenterClie
           backdropFilter: 'blur(14px)',
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: { xs: 2, md: 4 }, py: 1.5 }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
-            {isMobile && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ px: { xs: 2, md: 4 }, py: 1.25, minHeight: 68 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+            {isMobile && mode === 'article' && (
               <IconButton onClick={() => setMobileOpen(true)} aria-label="Open help navigation">
                 <Menu />
               </IconButton>
             )}
-            <GraphicEq />
-            <Typography fontWeight={950}>SingleAudio Help Center</Typography>
+            <Box
+              component={Link}
+              href="/help"
+              sx={{ display: 'inline-flex', alignItems: 'center', minWidth: 0 }}
+            >
+              <Box
+                component="img"
+                src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+                alt="SingleAudio"
+                sx={{
+                  width: { xs: 168, sm: 210 },
+                  height: 42,
+                  objectFit: 'contain',
+                  objectPosition: 'left center',
+                  display: 'block',
+                }}
+              />
+            </Box>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Chip size="small" label={user?.name || 'Signed in'} />
-            <Button component={Link} href={appSupportHref()} variant="outlined" size="small" startIcon={<HelpOutline />}>
-              Support
-            </Button>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ flex: 1, justifyContent: 'flex-end', minWidth: 0 }}
+          >
+            <Box sx={{ width: { sm: 280, md: 360 }, display: { xs: 'none', sm: 'block' } }}>
+              {searchField}
+            </Box>
+            <Tooltip title={isDark ? 'Light mode' : 'Dark mode'}>
+              <IconButton
+                onClick={toggleColorMode}
+                aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {isDark ? <LightMode /> : <DarkMode />}
+              </IconButton>
+            </Tooltip>
           </Stack>
         </Stack>
+        <Box sx={{ display: { xs: 'block', sm: 'none' }, px: 2, pb: 1.5 }}>{searchField}</Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '292px minmax(0, 1fr)' } }}>
-        <Box sx={{ display: { xs: 'none', md: 'block' }, borderRight: '1px solid', borderColor: panelBorder, minHeight: 'calc(100vh - 65px)' }}>
-          {sidebar}
-        </Box>
+      {mode === 'article' && (
         <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
           <Stack direction="row" justifyContent="flex-end" sx={{ p: 1 }}>
-            <IconButton onClick={() => setMobileOpen(false)}><Close /></IconButton>
+            <IconButton onClick={() => setMobileOpen(false)}>
+              <Close />
+            </IconButton>
           </Stack>
           {sidebar}
         </Drawer>
+      )}
 
-        <Box component="main" sx={{ px: { xs: 2, md: 5 }, py: { xs: 3, md: 5 }, maxWidth: 1180, width: '100%' }}>
-          {loading ? (
-            <Stack alignItems="center" sx={{ py: 10 }}><CircularProgress /></Stack>
-          ) : error ? (
-            <Paper variant="outlined" sx={{ p: 3, borderRadius: 1 }}><Typography color="error">{error}</Typography></Paper>
-          ) : mode === 'home' ? (
-            <Stack spacing={4}>
-              <Box>
-                <Typography variant="h3" fontWeight={950} sx={{ mb: 1 }}>How can we help?</Typography>
-                <Typography color="text.secondary" sx={{ maxWidth: 680 }}>
-                  Browse guides for distribution, publishing, video, podcasts, YouTube network operations, and support workflows.
+      <Box component="main">
+        {loading ? (
+          <Stack alignItems="center" sx={{ py: 10 }}>
+            <CircularProgress />
+          </Stack>
+        ) : error ? (
+          <Box sx={{ px: 2, py: 4 }}>
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 1, maxWidth: 760, mx: 'auto' }}>
+              <Typography color="error">{error}</Typography>
+            </Paper>
+          </Box>
+        ) : mode === 'home' ? (
+          <Stack spacing={{ xs: 3, md: 5 }}>
+            <Box
+              sx={{
+                color: 'white',
+                bgcolor: '#0d3044',
+                backgroundImage: `${heroBg}, linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.06) 1px, transparent 1px)`,
+                backgroundSize: 'auto, 42px 42px, 42px 42px',
+                display: 'grid',
+                placeItems: 'center',
+                px: 2,
+                py: { xs: 4, md: 5.5 },
+                borderBottom: '1px solid',
+                borderColor: alpha('#f8f0df', 0.12),
+                minHeight: '300px',
+              }}
+            >
+              <Stack
+                spacing={2.5}
+                alignItems="center"
+                sx={{ width: '100%', maxWidth: 920, textAlign: 'center' }}
+              >
+                <Typography
+                  component="h1"
+                  sx={{
+                    fontSize: { xs: '2.1rem', sm: '2.75rem', md: '3.35rem' },
+                    lineHeight: 1.05,
+                    fontWeight: 950,
+                    letterSpacing: 0,
+                  }}
+                >
+                  How can we help you?
                 </Typography>
-              </Box>
-              <TextField
-                fullWidth
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search guides, tutorials, policies"
-                InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
-                sx={{
-                  maxWidth: 760,
-                  bgcolor: theme.palette.background.paper,
-                  '& .MuiInputBase-input': { color: 'text.primary' },
-                }}
-              />
+                <Box sx={{ width: '100%', maxWidth: 760 }}>
+                  <TextField
+                    fullWidth
+                    value={search}
+                    onChange={event => setSearch(event.target.value)}
+                    placeholder="Type your question here..."
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        bgcolor: '#ffffff',
+                        color: '#101820',
+                        borderRadius: 1,
+                        minHeight: 56,
+                        fontSize: 17,
+                        boxShadow: '0 18px 44px rgba(0, 0, 0, 0.2)',
+                      },
+                      '& .MuiSvgIcon-root': {
+                        color: alpha('#101820', 0.72),
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#101820',
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: alpha('#101820', 0.58),
+                        opacity: 1,
+                      },
+                    }}
+                  />
+                </Box>
+              </Stack>
+            </Box>
+
+            <Box
+              sx={{ width: '100%', maxWidth: 1500, mx: 'auto', px: { xs: 2, md: 4 } }}
+              style={{ paddingBottom: '50px' }}
+            >
               {results.length > 0 && (
-                <Paper variant="outlined" sx={{ borderRadius: 1, overflow: 'hidden' }}>
-                  {results.map((article) => (
-                    <ListItemButton key={article._id} component={Link} href={articleHref(article.slug)}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    mb: 3,
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    borderColor: panelBorder,
+                    bgcolor: panelBg,
+                  }}
+                >
+                  {results.map(article => (
+                    <ListItemButton
+                      key={article._id}
+                      component={Link}
+                      href={articleHref(article.slug)}
+                    >
                       <Article sx={{ mr: 1.5 }} />
                       <ListItemText primary={article.title} secondary={article.excerpt} />
                     </ListItemButton>
                   ))}
                 </Paper>
               )}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
-                {grouped.map((category) => (
-                  <Paper key={category._id} variant="outlined" sx={{ p: 2.5, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}>
-                    <Typography variant="h6" fontWeight={950} color="text.primary">{category.name}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>{category.description || 'Guides and reference material.'}</Typography>
-                    <Stack spacing={0.75}>
-                      {[...category.articles, ...category.sections.flatMap((section) => section.articles)].slice(0, 4).map((article) => (
-                        <Button key={article._id} component={Link} href={articleHref(article.slug)} size="small" sx={{ justifyContent: 'flex-start' }}>
-                          {article.title}
-                        </Button>
-                      ))}
-                    </Stack>
-                  </Paper>
-                ))}
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  justifyContent: 'center',
+                  gap: { xs: 2, md: 2.5 },
+                  mx: 'auto',
+                }}
+              >
+                {grouped.map(category => {
+                  const categoryArticles = [
+                    ...category.articles,
+                    ...category.sections.flatMap(section => section.articles),
+                  ];
+
+                  return (
+                    <Paper
+                      key={category._id}
+                      component={Link}
+                      href={categoryHref(category.slug)}
+                      variant="outlined"
+                      sx={{
+                        textAlign: 'left',
+                        p: { xs: 2.5, md: 3 },
+                        borderRadius: 1,
+                        minHeight: 190,
+                        flex: {
+                          xs: '1 1 100%',
+                          sm: '0 1 calc((100% - 16px) / 2)',
+                          lg: '0 1 calc((100% - 40px) / 3)',
+                          xl: '0 1 calc((100% - 60px) / 4)',
+                        },
+                        maxWidth: { xs: 420, sm: 'none' },
+                        bgcolor: panelBg,
+                        borderColor: panelBorder,
+                        color: 'text.primary',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        boxShadow: isDark ? 'none' : '0 18px 42px rgba(16, 24, 32, 0.08)',
+                        transition:
+                          'transform 180ms ease, border-color 180ms ease, background-color 180ms ease',
+                        '&:hover': {
+                          transform: 'translateY(-3px)',
+                          borderColor: 'primary.main',
+                          bgcolor: isDark ? alpha('#f8f0df', 0.1) : '#ffffff',
+                        },
+                        '&:focus-visible': {
+                          outline: '3px solid',
+                          outlineColor: alpha(theme.palette.primary.main, 0.45),
+                          outlineOffset: 3,
+                        },
+                      }}
+                    >
+                      <Box>
+                        <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1.5 }}>
+                          <Box
+                            sx={{
+                              width: 46,
+                              height: 46,
+                              borderRadius: category.iconUrl ? 1 : '50%',
+                              overflow: 'hidden',
+                              display: 'grid',
+                              placeItems: 'center',
+                              color: '#ffffff',
+                            }}
+                          >
+                            {category.iconUrl ? (
+                              <Box
+                                component="img"
+                                src={category.iconUrl}
+                                alt=""
+                                sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <GraphicEq />
+                            )}
+                          </Box>
+                          <Typography variant="h5" fontWeight={950}>
+                            {category.name}
+                          </Typography>
+                        </Stack>
+                        <Typography color="text.secondary" sx={{ mb: 2 }}>
+                          {category.description || 'Guides and reference material.'}
+                        </Typography>
+                      </Box>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ color: 'primary.main' }}
+                      >
+                        <Typography variant="body2" fontWeight={900}>
+                          {categoryArticles.length}{' '}
+                          {categoryArticles.length === 1 ? 'article' : 'articles'}
+                        </Typography>
+                        <ArrowForward fontSize="small" />
+                      </Stack>
+                    </Paper>
+                  );
+                })}
               </Box>
-              {featured.length === 0 && (
-                <Paper variant="outlined" sx={{ p: 4, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}>
-                  <Typography fontWeight={900} color="text.primary">No published help articles yet.</Typography>
-                  <Typography color="text.secondary">Publish articles from Admin to Knowledge Base CMS.</Typography>
+              {articles.length === 0 && (
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 4, mt: 3, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+                >
+                  <Typography fontWeight={900}>No published help articles yet.</Typography>
+                  <Typography color="text.secondary">
+                    Publish articles from Admin to Knowledge Base CMS.
+                  </Typography>
                 </Paper>
               )}
-            </Stack>
-          ) : null}
-        </Box>
+            </Box>
+          </Stack>
+        ) : mode === 'category' ? (
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: 1180,
+              mx: 'auto',
+              px: { xs: 2, md: 4 },
+              py: { xs: 4, md: 6 },
+            }}
+          >
+            {activeCategory ? (
+              <Stack spacing={3}>
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  alignItems={{ xs: 'flex-start', sm: 'center' }}
+                >
+                  <Box
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: activeCategory.iconUrl ? 1 : '50%',
+                      overflow: 'hidden',
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: '#ffffff',
+
+                      flexShrink: 0,
+                    }}
+                  >
+                    {activeCategory.iconUrl ? (
+                      <Box
+                        component="img"
+                        src={activeCategory.iconUrl}
+                        alt=""
+                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <GraphicEq fontSize="large" />
+                    )}
+                  </Box>
+                  <Box>
+                    <Typography
+                      component="h1"
+                      sx={{
+                        fontSize: { xs: '2.1rem', md: '3rem' },
+                        lineHeight: 1.05,
+                        fontWeight: 950,
+                        letterSpacing: 0,
+                      }}
+                    >
+                      {activeCategory.name}
+                    </Typography>
+                    <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: 16, md: 18 } }}>
+                      {activeCategory.description || 'Guides and reference material.'}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                {results.length > 0 && (
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      borderColor: panelBorder,
+                      bgcolor: panelBg,
+                    }}
+                  >
+                    {results.map(article => (
+                      <ListItemButton
+                        key={article._id}
+                        component={Link}
+                        href={articleHref(article.slug)}
+                      >
+                        <Article sx={{ mr: 1.5 }} />
+                        <ListItemText primary={article.title} secondary={article.excerpt} />
+                      </ListItemButton>
+                    ))}
+                  </Paper>
+                )}
+
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                    gap: 2.5,
+                  }}
+                >
+                  {activeCategory.articles.length > 0 && (
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 2.5, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+                    >
+                      <Typography
+                        variant="overline"
+                        fontWeight={900}
+                        color="text.secondary"
+                        sx={{ letterSpacing: 0 }}
+                      >
+                        Articles
+                      </Typography>
+                      <Stack spacing={0.75} sx={{ mt: 1 }}>
+                        {activeCategory.articles.map(article => (
+                          <Button
+                            key={article._id}
+                            component={Link}
+                            href={articleHref(article.slug)}
+                            endIcon={<ArrowForward />}
+                            sx={{ justifyContent: 'space-between', textAlign: 'left' }}
+                          >
+                            {article.title}
+                          </Button>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  )}
+                  {activeCategory.sections.map(section => (
+                    <Paper
+                      key={section._id}
+                      variant="outlined"
+                      sx={{ p: 2.5, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+                    >
+                      <Typography
+                        variant="overline"
+                        fontWeight={900}
+                        color="text.secondary"
+                        sx={{ letterSpacing: 0 }}
+                      >
+                        {section.name}
+                      </Typography>
+                      <Stack spacing={0.75} sx={{ mt: 1 }}>
+                        {section.articles.map(article => (
+                          <Button
+                            key={article._id}
+                            component={Link}
+                            href={articleHref(article.slug)}
+                            endIcon={<ArrowForward />}
+                            sx={{ justifyContent: 'space-between', textAlign: 'left' }}
+                          >
+                            {article.title}
+                          </Button>
+                        ))}
+                        {section.articles.length === 0 && (
+                          <Typography variant="body2" color="text.secondary">
+                            No published articles in this section yet.
+                          </Typography>
+                        )}
+                      </Stack>
+                    </Paper>
+                  ))}
+                </Box>
+                {activeCategory.articles.length === 0 &&
+                  activeCategory.sections.every(section => section.articles.length === 0) && (
+                    <Paper
+                      variant="outlined"
+                      sx={{ p: 4, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+                    >
+                      <Typography color="text.secondary">
+                        No published articles in this category yet.
+                      </Typography>
+                    </Paper>
+                  )}
+              </Stack>
+            ) : (
+              <Paper
+                variant="outlined"
+                sx={{ p: 4, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+              >
+                <Typography fontWeight={900}>Category not found.</Typography>
+                <Button component={Link} href="/help" sx={{ mt: 1 }}>
+                  Back to help center
+                </Button>
+              </Paper>
+            )}
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );

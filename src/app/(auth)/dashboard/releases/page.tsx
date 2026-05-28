@@ -15,21 +15,7 @@ import {
   Tabs,
   Button,
 } from '@mui/material';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faApple,
-  faSpotify,
-  faYoutube,
-  faAmazon,
-  faSoundcloud,
-  faDeezer,
-  faTidal,
-  faTiktok,
-  faFacebook,
-  faInstagram
-} from '@fortawesome/free-brands-svg-icons';
-import {
-  Store,
   Album as AlbumIcon,
   CloudUpload,
   ArrowForward,
@@ -37,21 +23,8 @@ import {
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
-
-// DSP mapping
-const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
-  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
-  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
-  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
-  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
-  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
-  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
-  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
-  'TikTok': { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
-  'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
-  'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
-  'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
-};
+import { DspLogo } from '@/components/dsp/DspLogo';
+import { getDspDisplayName } from '@/lib/platforms';
 
 const statusTabs = [
   { label: 'All', value: '' },
@@ -136,32 +109,13 @@ function ReleasesContent() {
     return (
       <Box sx={{ display: 'flex', gap: 0.35, alignItems: 'center' }}>
         {shown.map((store, i) => {
-          let dspKey = store;
-          if (!DSP_MAPPING[store]) {
-            const matchedKey = Object.keys(DSP_MAPPING).find(key =>
-              store.toLowerCase().includes(key.toLowerCase()) ||
-              key.toLowerCase().includes(store.toLowerCase())
-            );
-            dspKey = matchedKey || 'default';
-          }
-          const dsp = DSP_MAPPING[dspKey] || DSP_MAPPING.default;
-          const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');
+          const dspName = getDspDisplayName(store);
 
           return (
-            <Tooltip key={i} title={dsp.name}>
-              <Avatar
-                sx={{
-                  width: 22, height: 22,
-                  bgcolor: dsp.color, color: '#fff',
-                  fontSize: '0.6rem',
-                }}
-              >
-                {isFAIcon ? (
-                  <FontAwesomeIcon icon={dsp.icon} style={{ fontSize: '0.6rem', color: '#fff' }} />
-                ) : (
-                  <Store sx={{ fontSize: '0.6rem', color: '#fff' }} />
-                )}
-              </Avatar>
+            <Tooltip key={`${store}-${i}`} title={dspName}>
+              <Box component="span">
+                <DspLogo value={store} alt={dspName} size={22} padding={0.25} />
+              </Box>
             </Tooltip>
           );
         })}

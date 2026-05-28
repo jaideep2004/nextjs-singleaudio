@@ -1,6 +1,6 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { ThemeProvider, createTheme, PaletteMode, Theme } from '@mui/material/styles';
+import { ThemeProvider, createTheme, PaletteMode } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 
 // Define the context type

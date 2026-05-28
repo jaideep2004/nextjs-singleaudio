@@ -51,83 +51,99 @@ export interface DspMeta {
   info: string;
 }
 
+const DSP_LOGOS = {
+  amazon: '/images/dsp/amazonmusic.png',
+  apple: '/images/dsp/applemusic.png',
+  audiomack: '/images/dsp/audiomack.png',
+  deezer: '/images/dsp/deezer.png',
+  facebook: '/images/dsp/facebook-audio-library.png',
+  instagram: '/images/dsp/instagram-music.png',
+  pandora: '/images/dsp/pandora.png',
+  snapchat: '/images/dsp/snapchat-sounds.png',
+  soundcloud: '/images/dsp/soundcloud.png',
+  spotify: '/images/dsp/spotify.png',
+  tidal: '/images/dsp/tidal.png',
+  tiktok: '/images/dsp/tiktok-music-library.png',
+  youtube: '/images/dsp/yt-music.png',
+} as const;
+
 export const DSP_META: DspMeta[] = [
   {
     key: 'spotify',
     name: 'Spotify',
-    logo: '/images/dsp/spotify.png',
+    logo: DSP_LOGOS.spotify,
     info: "World's largest streaming service.",
   },
   {
     key: 'apple',
     name: 'Apple Music',
-    logo: '/images/dsp/applemusic.png',
+    logo: DSP_LOGOS.apple,
     info: "Apple's music streaming.",
   },
   {
     key: 'amazon',
     name: 'Amazon Music',
-    logo: '/images/dsp/amazonmusic.png',
+    logo: DSP_LOGOS.amazon,
     info: "Amazon's music streaming.",
   },
   {
     key: 'youtube',
     name: 'YouTube Music',
-    logo: '/images/dsp/ytmusic.png',
+    logo: DSP_LOGOS.youtube,
     info: "Google's streaming platform.",
   },
   {
     key: 'deezer',
     name: 'Deezer',
-    logo: '/images/dsp/deezer.png',
+    logo: DSP_LOGOS.deezer,
     info: 'Popular in Europe.',
   },
   {
     key: 'tidal',
     name: 'Tidal',
-    logo: '/images/dsp/tidal.png',
+    logo: DSP_LOGOS.tidal,
     info: 'High-fidelity audio.',
   },
   {
     key: 'pandora',
     name: 'Pandora',
-    logo: '/images/dsp/pandora.png',
+    logo: DSP_LOGOS.pandora,
     info: 'US-based streaming.',
   },
   {
     key: 'soundcloud',
     name: 'SoundCloud',
-    logo: '/images/dsp/soundcloud.png',
+    logo: DSP_LOGOS.soundcloud,
     info: 'Indie & creators.',
   },
   {
     key: 'facebook',
     name: 'Facebook Audio Library',
-    logo: '',
+    logo: DSP_LOGOS.facebook,
     info: 'Meta music usage across Facebook surfaces.',
   },
   {
     key: 'instagram',
     name: 'Instagram Music',
-    logo: '',
+    logo: DSP_LOGOS.instagram,
     info: 'Music for reels, stories, and creator tools.',
   },
   {
     key: 'tiktok',
     name: 'TikTok Music Library',
-    logo: '',
+    logo: DSP_LOGOS.tiktok,
     info: 'Short-form discovery and creator sounds.',
   },
   {
     key: 'snapchat',
     name: 'Snapchat Sounds',
-    logo: '',
+    logo: DSP_LOGOS.snapchat,
     info: 'Music for snaps and spotlight content.',
   },
   {
     key: 'audiomack',
     name: 'Audiomack',
-    logo: '',
+    logo: DSP_LOGOS.audiomack,
     info: 'Streaming platform for emerging and global catalog.',
   },
   { key: 'boomplay', name: 'Boomplay', logo: '', info: 'Major African music streaming platform.' },
@@ -198,6 +214,75 @@ export const DSP_META: DspMeta[] = [
 export const DSP_META_BY_KEY: Record<DspKey, DspMeta> = Object.fromEntries(
   DSP_META.map(meta => [meta.key, meta])
 ) as Record<DspKey, DspMeta>;
+
+const DSP_ALIASES: Record<string, DspKey> = {
+  apple_music: 'apple',
+  applemusic: 'apple',
+  amazon_music: 'amazon',
+  amazonmusic: 'amazon',
+  youtube_music: 'youtube',
+  youtubemusic: 'youtube',
+  yt_music: 'youtube',
+  ytmusic: 'youtube',
+  youtube_content_id: 'youtube',
+  youtubecontentid: 'youtube',
+  youtube_music_video: 'youtube',
+  youtubemusicvideo: 'youtube',
+  youtube_art_track: 'youtube',
+  youtubearttrack: 'youtube',
+  facebook_audio_library: 'facebook',
+  facebookaudiolibrary: 'facebook',
+  instagram_music: 'instagram',
+  instagrammusic: 'instagram',
+  tiktok_music_library: 'tiktok',
+  tiktokmusiclibrary: 'tiktok',
+  snapchat_sounds: 'snapchat',
+  snapchatsounds: 'snapchat',
+};
+
+export function normalizeDspName(value: string) {
+  return value.toLowerCase().replace(/[\s_-]+/g, '');
+}
+
+export function humanizeDspKey(value: string) {
+  return value
+    .replace(/[-_]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .trim()
+    .replace(/\b\w/g, char => char.toUpperCase());
+}
+
+export function getDspMeta(value?: string | null): DspMeta | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const direct = DSP_META_BY_KEY[trimmed];
+  if (direct) return direct;
+
+  const normalized = normalizeDspName(trimmed);
+  const aliasKey = DSP_ALIASES[normalized] || DSP_ALIASES[trimmed.toLowerCase()];
+  if (aliasKey) return DSP_META_BY_KEY[aliasKey] || null;
+
+  return (
+    DSP_META.find(
+      meta =>
+        normalizeDspName(meta.key) === normalized ||
+        normalizeDspName(meta.name) === normalized ||
+        normalized.includes(normalizeDspName(meta.name)) ||
+        normalizeDspName(meta.name).includes(normalized)
+    ) || null
+  );
+}
+
+export function getDspDisplayName(value?: string | null) {
+  const meta = getDspMeta(value);
+  return meta?.name || (value ? humanizeDspKey(value) : 'Other');
+}
+
+export function getDspInitials(value?: string | null) {
+  const name = getDspDisplayName(value);
+  return (name.match(/\b\w/g) || []).slice(0, 2).join('').toUpperCase();
+}
 
 export function sanitizeDspKeys(input: unknown): DspKey[] {
   if (!Array.isArray(input)) return ALL_DSP_KEYS;

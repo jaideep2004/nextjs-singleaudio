@@ -1,10 +1,11 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   InputAdornment,
@@ -15,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import {
+  AttachFile,
   AssignmentInd,
   Clear,
   Notes,
@@ -41,7 +43,9 @@ const statuses: Array<{ value: SupportTicketStatus | ''; label: string }> = [
   { value: 'closed', label: 'Closed' },
 ];
 
-const categoryLabels = Object.fromEntries(SUPPORT_CATEGORIES.map((category) => [category.value, category.label]));
+const categoryLabels = Object.fromEntries(
+  SUPPORT_CATEGORIES.map(category => [category.value, category.label])
+);
 
 const sortOptions: Array<{ value: SupportTicketSort; label: string }> = [
   { value: 'latest', label: 'Latest Chat' },
@@ -63,6 +67,7 @@ export default function AdminSupportPage() {
   const [monthFilter, setMonthFilter] = useState('');
   const [sort, setSort] = useState<SupportTicketSort>('latest');
   const [reply, setReply] = useState('');
+  const [replyAttachment, setReplyAttachment] = useState<File | null>(null);
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<SupportTicketStatus>('in_review');
   const [reason, setReason] = useState('');
@@ -72,7 +77,7 @@ export default function AdminSupportPage() {
   const [error, setError] = useState('');
 
   const selectedTicket = useMemo(
-    () => detail?.ticket || tickets.find((ticket) => ticket._id === selectedId),
+    () => detail?.ticket || tickets.find(ticket => ticket._id === selectedId),
     [detail, selectedId, tickets]
   );
 
@@ -91,7 +96,7 @@ export default function AdminSupportPage() {
       const response = await adminSupportAPI.getTickets(params);
       const nextTickets = response?.data?.tickets || [];
       setTickets(nextTickets);
-      setSelectedId((current) => current || nextTickets[0]?._id || '');
+      setSelectedId(current => current || nextTickets[0]?._id || '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load support queue');
     } finally {
@@ -122,6 +127,8 @@ export default function AdminSupportPage() {
 
   useEffect(() => {
     void loadDetail(selectedId);
+    setReply('');
+    setReplyAttachment(null);
   }, [selectedId]);
 
   const refreshSelected = async () => {
@@ -158,14 +165,35 @@ export default function AdminSupportPage() {
     }
   };
 
+  const handleReplyAttachment = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setReplyAttachment(null);
+      setError('Attachment cannot exceed 10 MB');
+      return;
+    }
+
+    setReplyAttachment(file);
+    setError('');
+  };
+
   const handleReply = async (event: FormEvent) => {
     event.preventDefault();
-    if (!selectedId || !reply.trim()) return;
+    const body = reply.trim();
+    if (!selectedId || (!body && !replyAttachment)) return;
     setSubmitting(true);
     setError('');
     try {
-      await adminSupportAPI.addMessage(selectedId, reply.trim());
+      if (replyAttachment) {
+        await adminSupportAPI.uploadAttachment(selectedId, replyAttachment, body || undefined);
+      } else {
+        await adminSupportAPI.addMessage(selectedId, body);
+      }
       setReply('');
+      setReplyAttachment(null);
       await refreshSelected();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send reply');
@@ -201,11 +229,20 @@ export default function AdminSupportPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
+    <Box sx={{ minHeight: '100vh' }}>
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        justifyContent="space-between"
+        gap={2}
+        sx={{ mb: 2 }} 
+      >
         <Box>
-          <Typography variant="h4" fontWeight={900} color="text.primary">Support Queue</Typography>
-          <Typography color="text.secondary">Assign, investigate, reply, and keep internal notes separate.</Typography>
+          <Typography variant="h4" fontWeight={900} color="text.primary">
+            Support Queue
+          </Typography>
+          <Typography color="text.secondary">
+            Assign, investigate, reply, and keep internal notes separate.
+          </Typography>
         </Box>
       </Stack>
 
@@ -230,92 +267,111 @@ export default function AdminSupportPage() {
             alignItems: 'center',
           }}
         >
-            <TextField
-              size="small"
-              label="Search users or tickets"
-              value={searchFilter}
-              onChange={(event) => setSearchFilter(event.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search fontSize="small" />
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <TextField
-              select
-              size="small"
-              label="Status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              {statuses.map((item) => (
-                <MenuItem key={item.value || 'all'} value={item.value}>{item.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="Category"
-              value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              {SUPPORT_CATEGORIES.map((category) => (
-                <MenuItem key={category.value} value={category.value}>{category.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              size="small"
-              label="Sort"
-              value={sort}
-              onChange={(event) => setSort(event.target.value as SupportTicketSort)}
-            >
-              {sortOptions.map((item) => (
-                <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              size="small"
-              label="Month"
-              type="month"
-              value={monthFilter}
-              onChange={(event) => setMonthFilter(event.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              size="small"
-              label="From"
-              type="date"
-              value={fromFilter}
-              onChange={(event) => setFromFilter(event.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              size="small"
-              label="To"
-              type="date"
-              value={toFilter}
-              onChange={(event) => setToFilter(event.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-            <Button variant="outlined" startIcon={<Clear />} onClick={clearFilters} sx={{ height: 40, whiteSpace: 'nowrap' }}>
-              Clear
-            </Button>
+          <TextField
+            size="small"
+            label="Search users or tickets"
+            value={searchFilter}
+            onChange={event => setSearchFilter(event.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            select
+            size="small"
+            label="Status"
+            value={statusFilter}
+            onChange={event => setStatusFilter(event.target.value)}
+          >
+            {statuses.map(item => (
+              <MenuItem key={item.value || 'all'} value={item.value}>
+                {item.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Category"
+            value={categoryFilter}
+            onChange={event => setCategoryFilter(event.target.value)}
+          >
+            <MenuItem value="">All Categories</MenuItem>
+            {SUPPORT_CATEGORIES.map(category => (
+              <MenuItem key={category.value} value={category.value}>
+                {category.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            size="small"
+            label="Sort"
+            value={sort}
+            onChange={event => setSort(event.target.value as SupportTicketSort)}
+          >
+            {sortOptions.map(item => (
+              <MenuItem key={item.value} value={item.value}>
+                {item.label}
+              </MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            size="small"
+            label="Month"
+            type="month"
+            value={monthFilter}
+            onChange={event => setMonthFilter(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            size="small"
+            label="From"
+            type="date"
+            value={fromFilter}
+            onChange={event => setFromFilter(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            size="small"
+            label="To"
+            type="date"
+            value={toFilter}
+            onChange={event => setToFilter(event.target.value)}
+            InputLabelProps={{ shrink: true }}
+          />
+          <Button
+            variant="outlined"
+            startIcon={<Clear />}
+            onClick={clearFilters}
+            sx={{ height: 40, whiteSpace: 'nowrap' }}
+          >
+            Clear
+          </Button>
         </Box>
       </Paper>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '390px 1fr 340px' }, gap: 2 }}>
+      <Box
+        sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '390px 1fr 340px' }, gap: 2 }}
+      >
         <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Typography fontWeight={900}>Queue</Typography>
           </Box>
           {loading ? (
-            <Box sx={{ p: 3, textAlign: 'center' }}><CircularProgress size={24} /></Box>
+            <Box sx={{ p: 3, textAlign: 'center' }}>
+              <CircularProgress size={24} />
+            </Box>
           ) : tickets.length === 0 ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <SupportAgent color="disabled" />
@@ -323,7 +379,7 @@ export default function AdminSupportPage() {
             </Box>
           ) : (
             <Stack divider={<Divider />}>
-              {tickets.map((ticket) => (
+              {tickets.map(ticket => (
                 <Box
                   key={ticket._id}
                   onClick={() => setSelectedId(ticket._id)}
@@ -335,20 +391,31 @@ export default function AdminSupportPage() {
                   }}
                 >
                   <Stack direction="row" justifyContent="space-between" gap={1}>
-                    <Typography fontWeight={850} noWrap>{ticket.subject}</Typography>
+                    <Typography fontWeight={850} noWrap>
+                      {ticket.subject}
+                    </Typography>
                     <SupportPriorityChip priority={ticket.priority} />
                   </Stack>
                   <Box sx={{ mt: 0.5, minWidth: 0 }}>
                     <Typography variant="body2" color="text.primary" fontWeight={800} noWrap>
                       {ticket.ownerId?.name || 'Unknown user'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                      {ticket.ownerId?.email || 'No email'} - {categoryLabels[ticket.category] || ticket.category}
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ display: 'block' }}
+                    >
+                      {ticket.ownerId?.email || 'No email'} -{' '}
+                      {categoryLabels[ticket.category] || ticket.category}
                     </Typography>
                   </Box>
                   <Stack direction="row" gap={1} sx={{ mt: 1 }}>
                     <SupportStatusChip status={ticket.status} />
-                    <Typography variant="caption" sx={{ alignSelf: 'center', color: 'text.secondary', fontWeight: 800 }}>
+                    <Typography
+                      variant="caption"
+                      sx={{ alignSelf: 'center', color: 'text.secondary', fontWeight: 800 }}
+                    >
                       {ticket.ticketNumber}
                     </Typography>
                   </Stack>
@@ -366,11 +433,18 @@ export default function AdminSupportPage() {
           ) : (
             <>
               <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  justifyContent="space-between"
+                  gap={1}
+                >
                   <Box>
-                    <Typography variant="h6" fontWeight={900}>{selectedTicket.subject}</Typography>
+                    <Typography variant="h6" fontWeight={900}>
+                      {selectedTicket.subject}
+                    </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {selectedTicket.ticketNumber} - {categoryLabels[selectedTicket.category] || selectedTicket.category}
+                      {selectedTicket.ticketNumber} -{' '}
+                      {categoryLabels[selectedTicket.category] || selectedTicket.category}
                     </Typography>
                   </Box>
                   <Stack direction="row" gap={1}>
@@ -378,14 +452,21 @@ export default function AdminSupportPage() {
                     <SupportPriorityChip priority={selectedTicket.priority} />
                   </Stack>
                 </Stack>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, overflowWrap: 'anywhere' }}>
-                  User: <strong>{selectedTicket.ownerId?.name || 'Unknown user'}</strong> ({selectedTicket.ownerId?.email || 'No email'})
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1, overflowWrap: 'anywhere' }}
+                >
+                  User: <strong>{selectedTicket.ownerId?.name || 'Unknown user'}</strong> (
+                  {selectedTicket.ownerId?.email || 'No email'})
                 </Typography>
               </Box>
 
               <Stack spacing={1.5} sx={{ p: 2, flex: 1, overflow: 'auto' }}>
                 {detailLoading ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <CircularProgress size={24} />
+                  </Box>
                 ) : (
                   detail?.messages?.map((message: any) => {
                     const internal = message.visibility === 'internal';
@@ -395,8 +476,15 @@ export default function AdminSupportPage() {
                         sx={{
                           p: 1.5,
                           borderRadius: 2,
-                          bgcolor: internal ? 'warning.light' : message.authorRole === 'admin' ? 'primary.main' : 'action.hover',
-                          color: internal || message.authorRole !== 'admin' ? 'text.primary' : 'primary.contrastText',
+                          bgcolor: internal
+                            ? 'warning.light'
+                            : message.authorRole === 'admin'
+                              ? 'primary.main'
+                              : 'action.hover',
+                          color:
+                            internal || message.authorRole !== 'admin'
+                              ? 'text.primary'
+                              : 'primary.contrastText',
                           border: internal ? '1px solid' : 'none',
                           borderColor: 'warning.main',
                           maxWidth: { xs: '100%', md: '82%' },
@@ -406,31 +494,81 @@ export default function AdminSupportPage() {
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                           {internal && <Notes fontSize="small" />}
                           <Typography variant="caption" fontWeight={900}>
-                            {internal ? 'Internal note' : message.authorId?.name || message.authorRole}
+                            {internal
+                              ? 'Internal note'
+                              : message.authorId?.name || message.authorRole}
                           </Typography>
                         </Stack>
-                        <Typography variant="body2" whiteSpace="pre-wrap">{message.body}</Typography>
-                        {message.attachments?.map((item: any) => <AttachmentPreview key={item.key} attachment={item} />)}
+                        <Typography variant="body2" whiteSpace="pre-wrap">
+                          {message.body}
+                        </Typography>
+                        {message.attachments?.map((item: any) => (
+                          <AttachmentPreview key={item.key} attachment={item} />
+                        ))}
                       </Box>
                     );
                   })
                 )}
               </Stack>
 
-              <Box component="form" onSubmit={handleReply} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                <Stack direction="row" spacing={1}>
+              <Box
+                component="form"
+                onSubmit={handleReply}
+                sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}
+              >
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                   <TextField
                     value={reply}
-                    onChange={(event) => setReply(event.target.value)}
+                    onChange={event => setReply(event.target.value)}
                     placeholder="Public reply to user"
                     size="small"
                     fullWidth
                     disabled={selectedTicket.status === 'closed'}
                   />
-                  <Button type="submit" variant="contained" endIcon={<SendIcon />} disabled={submitting || selectedTicket.status === 'closed'}>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<AttachFile />}
+                    disabled={submitting || selectedTicket.status === 'closed'}
+                    sx={{ minWidth: { sm: 118 }, whiteSpace: 'nowrap' }}
+                  >
+                    Attach
+                    <input
+                      hidden
+                      type="file"
+                      accept="image/jpeg,image/png,application/pdf,text/plain,application/zip"
+                      onChange={handleReplyAttachment}
+                    />
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    endIcon={<SendIcon />}
+                    disabled={
+                      submitting ||
+                      selectedTicket.status === 'closed' ||
+                      (!reply.trim() && !replyAttachment)
+                    }
+                  >
                     Reply
                   </Button>
                 </Stack>
+                {replyAttachment && (
+                  <Chip
+                    sx={{
+                      mt: 1,
+                      maxWidth: '100%',
+                      '& .MuiChip-label': {
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      },
+                    }}
+                    icon={<AttachFile fontSize="small" />}
+                    label={`${replyAttachment.name} (${(replyAttachment.size / (1024 * 1024)).toFixed(1)} MB)`}
+                    onDelete={() => setReplyAttachment(null)}
+                    variant="outlined"
+                  />
+                )}
               </Box>
             </>
           )}
@@ -455,21 +593,29 @@ export default function AdminSupportPage() {
                     size="small"
                     label="Status"
                     value={status}
-                    onChange={(event) => setStatus(event.target.value as SupportTicketStatus)}
+                    onChange={event => setStatus(event.target.value as SupportTicketStatus)}
                     disabled={!selectedTicket}
                   >
-                    {statuses.filter((item) => item.value).map((item) => (
-                      <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>
-                    ))}
+                    {statuses
+                      .filter(item => item.value)
+                      .map(item => (
+                        <MenuItem key={item.value} value={item.value}>
+                          {item.label}
+                        </MenuItem>
+                      ))}
                   </TextField>
                   <TextField
                     size="small"
                     label="Reason"
                     value={reason}
-                    onChange={(event) => setReason(event.target.value)}
+                    onChange={event => setReason(event.target.value)}
                     disabled={!selectedTicket}
                   />
-                  <Button type="submit" variant="contained" disabled={!selectedTicket || submitting}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={!selectedTicket || submitting}
+                  >
                     Update Status
                   </Button>
                 </Stack>
@@ -482,20 +628,26 @@ export default function AdminSupportPage() {
               <Typography fontWeight={900}>Internal Notes</Typography>
               <TextField
                 value={note}
-                onChange={(event) => setNote(event.target.value)}
+                onChange={event => setNote(event.target.value)}
                 multiline
                 minRows={5}
                 placeholder="Private investigation note"
                 disabled={!selectedTicket || selectedTicket.status === 'closed'}
               />
-              <Button type="submit" variant="outlined" disabled={!selectedTicket || submitting || selectedTicket.status === 'closed'}>
+              <Button
+                type="submit"
+                variant="outlined"
+                disabled={!selectedTicket || submitting || selectedTicket.status === 'closed'}
+              >
                 Add Note
               </Button>
             </Stack>
           </Paper>
 
           <Paper sx={{ p: 2, borderRadius: 2 }}>
-            <Typography fontWeight={900} sx={{ mb: 1 }}>Linked Context</Typography>
+            <Typography fontWeight={900} sx={{ mb: 1 }}>
+              Linked Context
+            </Typography>
             <Typography variant="body2" color="text.secondary">
               Release: {selectedTicket?.related?.releaseId || 'None'}
             </Typography>

@@ -17,19 +17,6 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faAmazon,
-  faApple,
-  faDeezer,
-  faFacebook,
-  faInstagram,
-  faSoundcloud,
-  faSpotify,
-  faTidal,
-  faTiktok,
-  faYoutube,
-} from '@fortawesome/free-brands-svg-icons';
 import {
   AccessTime,
   Album as AlbumIcon,
@@ -47,6 +34,7 @@ import {
   UploadFile,
 } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
+import { DspLogo } from '@/components/dsp/DspLogo';
 import {
   AcrCloudStatusLike,
   fetchAcrCloudScanResult,
@@ -55,9 +43,7 @@ import {
   getAcrCloudState,
   getAcrCloudSummary,
 } from '@/lib/acrCloud';
-import { DSP_META, DSP_META_BY_KEY } from '@/lib/platforms';
-
-type DspMeta = { icon: any; color: string; name: string };
+import { getDspDisplayName } from '@/lib/platforms';
 
 type Track = {
   _id?: string;
@@ -98,29 +84,6 @@ type Release = {
   rejectReason?: string;
 };
 
-const DSP_MAPPING: Record<string, DspMeta> = {
-  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
-  Spotify: { icon: faSpotify, color: '#1db954', name: 'Spotify' },
-  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
-  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
-  Tidal: { icon: faTidal, color: '#000000', name: 'Tidal' },
-  Deezer: { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
-  SoundCloud: { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
-  TikTok: { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
-  Facebook: { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
-  Instagram: { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
-  default: { icon: Store, color: '#4a6cf7', name: 'Other' },
-};
-
-const normalizeDspName = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, '');
-
-const humanizeDspKey = (value: string) =>
-  value
-    .replace(/[-_]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
 const panelSx = (isDark: boolean) => ({
   borderRadius: '14px',
   bgcolor: isDark ? '#101722' : '#ffffff',
@@ -142,39 +105,6 @@ const formatDuration = (value?: string | number) => {
   const mins = Math.floor(value / 60);
   const secs = Math.round(value % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
-const matchDsp = (store: string): DspMeta => {
-  if (DSP_MAPPING[store]) return DSP_MAPPING[store];
-  const trimmed = store.trim();
-  const platform =
-    DSP_META_BY_KEY[trimmed] ||
-    DSP_META.find(
-      (meta) =>
-        normalizeDspName(meta.key) === normalizeDspName(trimmed) ||
-        normalizeDspName(meta.name) === normalizeDspName(trimmed)
-    );
-
-  if (platform) {
-    const iconMeta = DSP_MAPPING[platform.name] || DSP_MAPPING[humanizeDspKey(platform.key)];
-    return {
-      icon: iconMeta?.icon || Store,
-      color: iconMeta?.color || '#4a6cf7',
-      name: platform.name,
-    };
-  }
-
-  const matchedKey = Object.keys(DSP_MAPPING).find(
-    (key) =>
-      store.toLowerCase().includes(key.toLowerCase()) ||
-      key.toLowerCase().includes(store.toLowerCase())
-  );
-  if (matchedKey) return DSP_MAPPING[matchedKey];
-
-  return {
-    ...DSP_MAPPING.default,
-    name: trimmed ? humanizeDspKey(trimmed) : DSP_MAPPING.default.name,
-  };
 };
 
 const getStatusStyle = (status?: string, isDark = false) => {
@@ -341,11 +271,10 @@ function ReleaseDetail() {
   };
 
   const renderDspIcon = (store: string, index: number) => {
-    const dsp = matchDsp(store);
-    const isFAIcon = typeof dsp.icon === 'object' && 'iconName' in dsp.icon;
+    const dspName = getDspDisplayName(store);
 
     return (
-      <Tooltip key={`${store}-${index}`} title={dsp.name}>
+      <Tooltip key={`${store}-${index}`} title={dspName}>
         <Box
           sx={{
             display: 'inline-flex',
@@ -359,15 +288,9 @@ function ReleaseDetail() {
             borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)',
           }}
         >
-          <Avatar sx={{ width: 24, height: 24, bgcolor: dsp.color, color: '#fff' }}>
-            {isFAIcon ? (
-              <FontAwesomeIcon icon={dsp.icon} style={{ fontSize: '0.72rem', color: '#fff' }} />
-            ) : (
-              <Store sx={{ fontSize: 14 }} />
-            )}
-          </Avatar>
+          <DspLogo value={store} alt={dspName} size={24} padding={0.25} />
           <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: isDark ? '#e5edf6' : '#1f2937' }}>
-            {dsp.name}
+            {dspName}
           </Typography>
         </Box>
       </Tooltip>

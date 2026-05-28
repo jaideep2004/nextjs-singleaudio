@@ -4,8 +4,8 @@ export const metadata: Metadata = {
   title: 'SingleAudio Help Center',
   description: 'Operational guides and support for SingleAudio users.',
   robots: {
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
   },
 };
 

@@ -41,7 +41,9 @@ import {
 } from '@/services/api';
 import { groupKnowledgeBase } from '@/components/knowledge-base/kbUtils';
 
-const TiptapEditor = dynamic(() => import('@/components/knowledge-base/TiptapEditor'), { ssr: false });
+const TiptapEditor = dynamic(() => import('@/components/knowledge-base/TiptapEditor'), {
+  ssr: false,
+});
 
 const emptyDoc = { type: 'doc', content: [] };
 
@@ -84,7 +86,7 @@ export default function AdminKnowledgeBasePage() {
   const [sections, setSections] = useState<KnowledgeBaseSection[]>([]);
   const [articles, setArticles] = useState<KnowledgeBaseArticle[]>([]);
   const [form, setForm] = useState<ArticleForm>(createBlankArticle());
-  const [categoryDraft, setCategoryDraft] = useState({ name: '', description: '' });
+  const [categoryDraft, setCategoryDraft] = useState({ name: '', description: '', iconUrl: '' });
   const [sectionDraft, setSectionDraft] = useState({ categoryId: '', name: '', description: '' });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
@@ -93,25 +95,30 @@ export default function AdminKnowledgeBasePage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const grouped = useMemo(() => groupKnowledgeBase(categories, sections, articles), [categories, sections, articles]);
+  const grouped = useMemo(
+    () => groupKnowledgeBase(categories, sections, articles),
+    [categories, sections, articles]
+  );
   const availableSections = useMemo(
-    () => sections.filter((section) => String(section.categoryId) === form.categoryId),
+    () => sections.filter(section => String(section.categoryId) === form.categoryId),
     [sections, form.categoryId]
   );
   const filteredArticles = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return articles;
-    return articles.filter((article) =>
+    return articles.filter(article =>
       `${article.title} ${article.slug} ${article.excerpt || ''}`.toLowerCase().includes(query)
     );
   }, [articles, search]);
 
-  const surface = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.05)
-    : theme.palette.background.paper;
-  const softSurface = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.primary.main, 0.1)
-    : alpha(theme.palette.primary.main, 0.04);
+  const surface =
+    theme.palette.mode === 'dark'
+      ? alpha(theme.palette.common.white, 0.05)
+      : theme.palette.background.paper;
+  const softSurface =
+    theme.palette.mode === 'dark'
+      ? alpha(theme.palette.primary.main, 0.1)
+      : alpha(theme.palette.primary.main, 0.04);
 
   const load = async () => {
     setLoading(true);
@@ -127,8 +134,8 @@ export default function AdminKnowledgeBasePage() {
       setArticles(articleResponse?.data?.articles || tree?.articles || []);
 
       if (!form.categoryId && tree?.categories?.[0]) {
-        setForm((current) => ({ ...current, categoryId: tree.categories[0]._id }));
-        setSectionDraft((current) => ({ ...current, categoryId: tree.categories[0]._id }));
+        setForm(current => ({ ...current, categoryId: tree.categories[0]._id }));
+        setSectionDraft(current => ({ ...current, categoryId: tree.categories[0]._id }));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load knowledge base');
@@ -185,11 +192,14 @@ export default function AdminKnowledgeBasePage() {
       const payload = {
         ...form,
         sectionId: form.sectionId || undefined,
-        status: publish ? 'published' as KnowledgeBaseArticleStatus : form.status,
+        status: publish ? ('published' as KnowledgeBaseArticleStatus) : form.status,
       };
       const response = form._id
-        ? await adminKnowledgeBaseAPI.updateArticle(form._id, payload)
-        : await adminKnowledgeBaseAPI.createArticle(payload);
+        ? await adminKnowledgeBaseAPI.updateArticle(
+            form._id,
+            payload as Partial<KnowledgeBaseArticle>
+          )
+        : await adminKnowledgeBaseAPI.createArticle(payload as Partial<KnowledgeBaseArticle>);
 
       const saved = response?.data;
       if (saved && publish && form._id) {
@@ -226,7 +236,7 @@ export default function AdminKnowledgeBasePage() {
     setSaving(true);
     try {
       await adminKnowledgeBaseAPI.createCategory(categoryDraft);
-      setCategoryDraft({ name: '', description: '' });
+      setCategoryDraft({ name: '', description: '', iconUrl: '' });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create category');
@@ -249,8 +259,22 @@ export default function AdminKnowledgeBasePage() {
     }
   };
 
+  const updateCategoryIcon = async (categoryId: string, iconUrl: string) => {
+    setSaving(true);
+    setError('');
+    try {
+      await adminKnowledgeBaseAPI.updateCategory(categoryId, { iconUrl });
+      await load();
+      setNotice('Category image updated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update category image');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const updateFaq = (index: number, field: 'question' | 'answer', value: string) => {
-    setForm((current) => ({
+    setForm(current => ({
       ...current,
       faqBlocks: current.faqBlocks.map((faq, faqIndex) =>
         faqIndex === index ? { ...faq, [field]: value } : faq
@@ -259,13 +283,16 @@ export default function AdminKnowledgeBasePage() {
   };
 
   const removeFaq = (index: number) => {
-    setForm((current) => ({
+    setForm(current => ({
       ...current,
       faqBlocks: current.faqBlocks.filter((_, faqIndex) => faqIndex !== index),
     }));
   };
 
-  const uploadMedia = async (event: ChangeEvent<HTMLInputElement>, mediaType: 'image' | 'video') => {
+  const uploadMedia = async (
+    event: ChangeEvent<HTMLInputElement>,
+    mediaType: 'image' | 'video'
+  ) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
@@ -278,12 +305,12 @@ export default function AdminKnowledgeBasePage() {
       if (!media) throw new Error('Upload failed');
 
       if (mediaType === 'image') {
-        setForm((current) => ({
+        setForm(current => ({
           ...current,
           imageRefs: [...current.imageRefs, { url: media.url, alt: media.fileName }],
         }));
       } else {
-        setForm((current) => ({
+        setForm(current => ({
           ...current,
           videoEmbeds: [...current.videoEmbeds, { url: media.url, title: media.fileName }],
         }));
@@ -296,8 +323,33 @@ export default function AdminKnowledgeBasePage() {
     }
   };
 
+  const uploadCategoryImage = async (event: ChangeEvent<HTMLInputElement>, categoryId?: string) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    setError('');
+    try {
+      const response = await adminKnowledgeBaseAPI.uploadMedia(file);
+      const media = response?.data;
+      if (!media) throw new Error('Upload failed');
+
+      if (categoryId) {
+        await updateCategoryIcon(categoryId, media.url);
+      } else {
+        setCategoryDraft(current => ({ ...current, iconUrl: media.url }));
+        setNotice('Category image uploaded');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload category image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.default', minHeight: '100vh' }}>
+    <Box sx={{ minHeight: '100vh', overflowX: 'hidden' }}>
       <Paper
         variant="outlined"
         sx={{
@@ -308,30 +360,77 @@ export default function AdminKnowledgeBasePage() {
           borderColor: 'divider',
         }}
       >
-        <Stack direction={{ xs: 'column', lg: 'row' }} justifyContent="space-between" spacing={2}>
+        <Stack
+          direction={{ xs: 'column', lg: 'row' }}
+          justifyContent="space-between"
+          spacing={2}
+          alignItems={{ xs: 'stretch', lg: 'center' }}
+        >
           <Box>
-            <Typography variant="h4" fontWeight={950} color="text.primary">Knowledge Base CMS</Typography>
-            <Typography color="text.secondary">Manage searchable help articles, structured FAQs, and media assets.</Typography>
+            <Typography variant="h4" fontWeight={950} color="text.primary">
+              Knowledge Base CMS
+            </Typography>
+            <Typography color="text.secondary">
+              Manage searchable help articles, structured FAQs, and media assets.
+            </Typography>
           </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button variant="outlined" startIcon={<Add />} onClick={resetForm}>New Article</Button>
-            <Button variant="contained" startIcon={<Save />} onClick={() => saveArticle(false)} disabled={saving}>Save Draft</Button>
-            <Button color="success" variant="contained" startIcon={<Publish />} onClick={() => saveArticle(true)} disabled={saving}>Publish</Button>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ width: { xs: '100%', lg: 'auto' } }}
+          >
+            <Button
+              variant="outlined"
+              startIcon={<Add />}
+              onClick={resetForm}
+              sx={{ minWidth: { sm: 150 } }}
+            >
+              New Article
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Save />}
+              onClick={() => saveArticle(false)}
+              disabled={saving}
+              sx={{ minWidth: { sm: 150 } }}
+            >
+              Save Draft
+            </Button>
+            <Button
+              color="success"
+              variant="contained"
+              startIcon={<Publish />}
+              onClick={() => saveArticle(true)}
+              disabled={saving}
+              sx={{ minWidth: { sm: 150 } }}
+            >
+              Publish
+            </Button>
           </Stack>
         </Stack>
       </Paper>
 
       {(loading || saving || uploading) && <LinearProgress sx={{ mb: 2 }} />}
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      {notice && <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert>}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {notice && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {notice}
+        </Alert>
+      )}
 
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: 'minmax(0, 1fr)',
-            lg: '300px minmax(560px, 1fr) 340px',
-            xl: '320px minmax(680px, 1fr) 360px',
+            lg: '300px minmax(0, 1fr)',
+            xl: '320px minmax(0, 1fr) 360px',
           },
           alignItems: 'start',
           gap: 2.5,
@@ -344,10 +443,16 @@ export default function AdminKnowledgeBasePage() {
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <Search fontSize="small" />
-                <TextField size="small" fullWidth placeholder="Search articles" value={search} onChange={(event) => setSearch(event.target.value)} />
+                <TextField
+                  size="small"
+                  fullWidth
+                  placeholder="Search articles"
+                  value={search}
+                  onChange={event => setSearch(event.target.value)}
+                />
               </Stack>
               <Stack spacing={1}>
-                {filteredArticles.map((articleItem) => (
+                {filteredArticles.map(articleItem => (
                   <Box
                     key={articleItem._id}
                     onClick={() => selectArticle(articleItem)}
@@ -360,15 +465,30 @@ export default function AdminKnowledgeBasePage() {
                       bgcolor: form._id === articleItem._id ? softSurface : 'background.paper',
                     }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                      <Typography fontWeight={850} noWrap color="text.primary">{articleItem.title || 'Untitled'}</Typography>
-                      <Chip size="small" label={articleItem.status} color={articleItem.status === 'published' ? 'success' : 'default'} />
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      justifyContent="space-between"
+                    >
+                      <Typography fontWeight={850} noWrap color="text.primary">
+                        {articleItem.title || 'Untitled'}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={articleItem.status}
+                        color={articleItem.status === 'published' ? 'success' : 'default'}
+                      />
                     </Stack>
-                    <Typography variant="caption" color="text.secondary">/{articleItem.slug}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      /{articleItem.slug}
+                    </Typography>
                   </Box>
                 ))}
                 {filteredArticles.length === 0 && (
-                  <Typography color="text.secondary" variant="body2">No articles found.</Typography>
+                  <Typography color="text.secondary" variant="body2">
+                    No articles found.
+                  </Typography>
                 )}
               </Stack>
             </Paper>
@@ -376,36 +496,213 @@ export default function AdminKnowledgeBasePage() {
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <ViewModule fontSize="small" />
-                <Typography fontWeight={900} color="text.primary">Structure</Typography>
+                <Typography fontWeight={900} color="text.primary">
+                  Structure
+                </Typography>
               </Stack>
               <Stack spacing={1.25}>
-                {grouped.map((categoryItem) => (
-                  <Box key={categoryItem._id}>
-                    <Typography fontWeight={850} color="text.primary">{categoryItem.name}</Typography>
-                    {categoryItem.sections.map((section) => (
-                      <Typography key={section._id} variant="caption" display="block" color="text.secondary" sx={{ ml: 1.5 }}>
+                {grouped.map(categoryItem => (
+                  <Box
+                    key={categoryItem._id}
+                    sx={{
+                      p: 1,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <Box
+                        sx={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 1,
+                          overflow: 'hidden',
+                          display: 'grid',
+                          placeItems: 'center',
+                          bgcolor: softSurface,
+                          color: 'primary.main',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {categoryItem.iconUrl ? (
+                          <Box
+                            component="img"
+                            src={categoryItem.iconUrl}
+                            alt=""
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <ViewModule fontSize="small" />
+                        )}
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography fontWeight={850} color="text.primary" noWrap>
+                          {categoryItem.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {categoryItem.articles.length +
+                            categoryItem.sections.reduce(
+                              (total, section) => total + section.articles.length,
+                              0
+                            )}{' '}
+                          articles
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    {categoryItem.sections.map(section => (
+                      <Typography
+                        key={section._id}
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                        sx={{ ml: 1.5 }}
+                      >
                         {section.name} · {section.articles.length} articles
                       </Typography>
                     ))}
+                    <Stack spacing={1} sx={{ mt: 1 }}>
+                      <TextField
+                        size="small"
+                        label="Category image URL"
+                        value={categoryItem.iconUrl || ''}
+                        onChange={event =>
+                          setCategories(current =>
+                            current.map(item =>
+                              item._id === categoryItem._id
+                                ? { ...item, iconUrl: event.target.value }
+                                : item
+                            )
+                          )
+                        }
+                      />
+                      <Stack direction="row" spacing={1}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          component="label"
+                          startIcon={<ImageIcon />}
+                          disabled={uploading || saving}
+                        >
+                          Upload
+                          <input
+                            hidden
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={event => uploadCategoryImage(event, categoryItem._id)}
+                          />
+                        </Button>
+                        <Button
+                          size="small"
+                          onClick={() =>
+                            updateCategoryIcon(categoryItem._id, categoryItem.iconUrl || '')
+                          }
+                          disabled={saving}
+                        >
+                          Save
+                        </Button>
+                      </Stack>
+                    </Stack>
                   </Box>
                 ))}
               </Stack>
               <Divider sx={{ my: 2 }} />
               <Stack spacing={1}>
-                <TextField size="small" label="New category" value={categoryDraft.name} onChange={(event) => setCategoryDraft((current) => ({ ...current, name: event.target.value }))} />
-                <TextField size="small" label="Description" value={categoryDraft.description} onChange={(event) => setCategoryDraft((current) => ({ ...current, description: event.target.value }))} />
-                <Button size="small" startIcon={<Add />} onClick={createCategory} disabled={saving}>Create Category</Button>
+                <TextField
+                  size="small"
+                  label="New category"
+                  value={categoryDraft.name}
+                  onChange={event =>
+                    setCategoryDraft(current => ({ ...current, name: event.target.value }))
+                  }
+                />
+                <TextField
+                  size="small"
+                  label="Description"
+                  value={categoryDraft.description}
+                  onChange={event =>
+                    setCategoryDraft(current => ({ ...current, description: event.target.value }))
+                  }
+                />
+                <TextField
+                  size="small"
+                  label="Category image URL"
+                  value={categoryDraft.iconUrl}
+                  onChange={event =>
+                    setCategoryDraft(current => ({ ...current, iconUrl: event.target.value }))
+                  }
+                />
+                {categoryDraft.iconUrl && (
+                  <Box
+                    component="img"
+                    src={categoryDraft.iconUrl}
+                    alt=""
+                    sx={{
+                      width: '100%',
+                      aspectRatio: '16 / 9',
+                      objectFit: 'cover',
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                    }}
+                  />
+                )}
+                <Button
+                  size="small"
+                  variant="outlined"
+                  component="label"
+                  startIcon={<ImageIcon />}
+                  disabled={uploading}
+                >
+                  Upload Category Image
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={event => uploadCategoryImage(event)}
+                  />
+                </Button>
+                <Button size="small" startIcon={<Add />} onClick={createCategory} disabled={saving}>
+                  Create Category
+                </Button>
               </Stack>
               <Divider sx={{ my: 2 }} />
               <Stack spacing={1}>
-                <TextField select size="small" label="Category" value={sectionDraft.categoryId} onChange={(event) => setSectionDraft((current) => ({ ...current, categoryId: event.target.value }))}>
-                  {categories.map((categoryItem) => (
-                    <MenuItem key={categoryItem._id} value={categoryItem._id}>{categoryItem.name}</MenuItem>
+                <TextField
+                  select
+                  size="small"
+                  label="Category"
+                  value={sectionDraft.categoryId}
+                  onChange={event =>
+                    setSectionDraft(current => ({ ...current, categoryId: event.target.value }))
+                  }
+                >
+                  {categories.map(categoryItem => (
+                    <MenuItem key={categoryItem._id} value={categoryItem._id}>
+                      {categoryItem.name}
+                    </MenuItem>
                   ))}
                 </TextField>
-                <TextField size="small" label="New section" value={sectionDraft.name} onChange={(event) => setSectionDraft((current) => ({ ...current, name: event.target.value }))} />
-                <TextField size="small" label="Description" value={sectionDraft.description} onChange={(event) => setSectionDraft((current) => ({ ...current, description: event.target.value }))} />
-                <Button size="small" startIcon={<Add />} onClick={createSection} disabled={saving}>Create Section</Button>
+                <TextField
+                  size="small"
+                  label="New section"
+                  value={sectionDraft.name}
+                  onChange={event =>
+                    setSectionDraft(current => ({ ...current, name: event.target.value }))
+                  }
+                />
+                <TextField
+                  size="small"
+                  label="Description"
+                  value={sectionDraft.description}
+                  onChange={event =>
+                    setSectionDraft(current => ({ ...current, description: event.target.value }))
+                  }
+                />
+                <Button size="small" startIcon={<Add />} onClick={createSection} disabled={saving}>
+                  Create Section
+                </Button>
               </Stack>
             </Paper>
           </Stack>
@@ -413,10 +710,17 @@ export default function AdminKnowledgeBasePage() {
 
         <Box sx={{ minWidth: 0 }}>
           <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 1, bgcolor: surface }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 2 }}
+            >
               <Stack direction="row" spacing={1} alignItems="center">
                 <Article color="primary" />
-                <Typography variant="h6" fontWeight={900} color="text.primary">{form._id ? 'Edit Article' : 'New Article'}</Typography>
+                <Typography variant="h6" fontWeight={900} color="text.primary">
+                  {form._id ? 'Edit Article' : 'New Article'}
+                </Typography>
               </Stack>
               {form._id && (
                 <Tooltip title="Archive article">
@@ -434,10 +738,23 @@ export default function AdminKnowledgeBasePage() {
               }}
             >
               <Box sx={{ minWidth: 0 }}>
-                <TextField fullWidth label="Title" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} />
+                <TextField
+                  fullWidth
+                  label="Title"
+                  value={form.title}
+                  onChange={event =>
+                    setForm(current => ({ ...current, title: event.target.value }))
+                  }
+                />
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <TextField fullWidth label="Slug" value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} helperText="Blank auto-generates." />
+                <TextField
+                  fullWidth
+                  label="Slug"
+                  value={form.slug}
+                  onChange={event => setForm(current => ({ ...current, slug: event.target.value }))}
+                  helperText="Blank auto-generates."
+                />
               </Box>
             </Box>
 
@@ -450,22 +767,57 @@ export default function AdminKnowledgeBasePage() {
               }}
             >
               <Box sx={{ minWidth: 0 }}>
-                <TextField select fullWidth label="Category" value={form.categoryId} onChange={(event) => setForm((current) => ({ ...current, categoryId: event.target.value, sectionId: '' }))}>
-                  {categories.map((categoryItem) => (
-                    <MenuItem key={categoryItem._id} value={categoryItem._id}>{categoryItem.name}</MenuItem>
+                <TextField
+                  select
+                  fullWidth
+                  label="Category"
+                  value={form.categoryId}
+                  onChange={event =>
+                    setForm(current => ({
+                      ...current,
+                      categoryId: event.target.value,
+                      sectionId: '',
+                    }))
+                  }
+                >
+                  {categories.map(categoryItem => (
+                    <MenuItem key={categoryItem._id} value={categoryItem._id}>
+                      {categoryItem.name}
+                    </MenuItem>
                   ))}
                 </TextField>
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <TextField select fullWidth label="Section" value={form.sectionId} onChange={(event) => setForm((current) => ({ ...current, sectionId: event.target.value }))}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Section"
+                  value={form.sectionId}
+                  onChange={event =>
+                    setForm(current => ({ ...current, sectionId: event.target.value }))
+                  }
+                >
                   <MenuItem value="">No section</MenuItem>
-                  {availableSections.map((section) => (
-                    <MenuItem key={section._id} value={section._id}>{section.name}</MenuItem>
+                  {availableSections.map(section => (
+                    <MenuItem key={section._id} value={section._id}>
+                      {section.name}
+                    </MenuItem>
                   ))}
                 </TextField>
               </Box>
               <Box sx={{ minWidth: 0 }}>
-                <TextField select fullWidth label="Status" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value as KnowledgeBaseArticleStatus }))}>
+                <TextField
+                  select
+                  fullWidth
+                  label="Status"
+                  value={form.status}
+                  onChange={event =>
+                    setForm(current => ({
+                      ...current,
+                      status: event.target.value as KnowledgeBaseArticleStatus,
+                    }))
+                  }
+                >
                   <MenuItem value="draft">Draft</MenuItem>
                   <MenuItem value="published">Published</MenuItem>
                   <MenuItem value="archived">Archived</MenuItem>
@@ -474,89 +826,278 @@ export default function AdminKnowledgeBasePage() {
             </Box>
 
             <Stack spacing={2} sx={{ mt: 2 }}>
-                <TextField fullWidth multiline minRows={2} label="Excerpt" value={form.excerpt} onChange={(event) => setForm((current) => ({ ...current, excerpt: event.target.value }))} />
-                <TiptapEditor value={form.content} onChange={(content) => setForm((current) => ({ ...current, content }))} />
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                label="Excerpt"
+                value={form.excerpt}
+                onChange={event =>
+                  setForm(current => ({ ...current, excerpt: event.target.value }))
+                }
+              />
+              <TiptapEditor
+                value={form.content}
+                onChange={content => setForm(current => ({ ...current, content }))}
+              />
             </Stack>
           </Paper>
         </Box>
 
-        <Box sx={{ minWidth: 0 }}>
-          <Stack spacing={2} sx={{ position: { lg: 'sticky' }, top: 88 }}>
+        <Box sx={{ minWidth: 0, gridColumn: { lg: '1 / -1', xl: 'auto' } }}>
+          <Stack spacing={2} sx={{ position: { xl: 'sticky' }, top: 88 }}>
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
-              <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>SEO</Typography>
+              <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
+                SEO
+              </Typography>
               <Stack spacing={1.5}>
-                <TextField label="SEO title" value={form.seo.title} onChange={(event) => setForm((current) => ({ ...current, seo: { ...current.seo, title: event.target.value } }))} />
-                <TextField label="Keywords" value={form.seo.keywords.join(', ')} onChange={(event) => setForm((current) => ({ ...current, seo: { ...current.seo, keywords: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) } }))} />
-                <TextField multiline minRows={3} label="SEO description" value={form.seo.description} onChange={(event) => setForm((current) => ({ ...current, seo: { ...current.seo, description: event.target.value } }))} />
+                <TextField
+                  fullWidth
+                  label="SEO title"
+                  value={form.seo.title}
+                  onChange={event =>
+                    setForm(current => ({
+                      ...current,
+                      seo: { ...current.seo, title: event.target.value },
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  label="Keywords"
+                  value={form.seo.keywords.join(', ')}
+                  onChange={event =>
+                    setForm(current => ({
+                      ...current,
+                      seo: {
+                        ...current.seo,
+                        keywords: event.target.value
+                          .split(',')
+                          .map(item => item.trim())
+                          .filter(Boolean),
+                      },
+                    }))
+                  }
+                />
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  label="SEO description"
+                  value={form.seo.description}
+                  onChange={event =>
+                    setForm(current => ({
+                      ...current,
+                      seo: { ...current.seo, description: event.target.value },
+                    }))
+                  }
+                />
               </Stack>
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="center"
+                sx={{ mb: 1.5 }}
+              >
                 <Stack direction="row" spacing={1} alignItems="center">
                   <HelpOutline fontSize="small" />
-                  <Typography fontWeight={900} color="text.primary">FAQs</Typography>
+                  <Typography fontWeight={900} color="text.primary">
+                    FAQs
+                  </Typography>
                 </Stack>
-                <Button size="small" startIcon={<Add />} onClick={() => setForm((current) => ({ ...current, faqBlocks: [...current.faqBlocks, { question: '', answer: '' }] }))}>
+                <Button
+                  size="small"
+                  startIcon={<Add />}
+                  onClick={() =>
+                    setForm(current => ({
+                      ...current,
+                      faqBlocks: [...current.faqBlocks, { question: '', answer: '' }],
+                    }))
+                  }
+                >
                   Add
                 </Button>
               </Stack>
               <Stack spacing={1.5}>
                 {form.faqBlocks.map((faq, index) => (
-                  <Paper key={index} variant="outlined" sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.paper' }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                      <Typography variant="caption" color="text.secondary" fontWeight={800}>FAQ {index + 1}</Typography>
-                      <IconButton size="small" color="error" onClick={() => removeFaq(index)}><Delete fontSize="small" /></IconButton>
+                  <Paper
+                    key={index}
+                    variant="outlined"
+                    sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.paper' }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{ mb: 1 }}
+                    >
+                      <Typography variant="caption" color="text.secondary" fontWeight={800}>
+                        FAQ {index + 1}
+                      </Typography>
+                      <IconButton size="small" color="error" onClick={() => removeFaq(index)}>
+                        <Delete fontSize="small" />
+                      </IconButton>
                     </Stack>
                     <Stack spacing={1}>
-                      <TextField size="small" label="Question" value={faq.question} onChange={(event) => updateFaq(index, 'question', event.target.value)} />
-                      <TextField size="small" multiline minRows={3} label="Answer" value={faq.answer} onChange={(event) => updateFaq(index, 'answer', event.target.value)} />
+                      <TextField
+                        size="small"
+                        label="Question"
+                        value={faq.question}
+                        onChange={event => updateFaq(index, 'question', event.target.value)}
+                      />
+                      <TextField
+                        size="small"
+                        multiline
+                        minRows={3}
+                        label="Answer"
+                        value={faq.answer}
+                        onChange={event => updateFaq(index, 'answer', event.target.value)}
+                      />
                     </Stack>
                   </Paper>
                 ))}
-                {form.faqBlocks.length === 0 && <Typography variant="body2" color="text.secondary">No FAQs yet.</Typography>}
+                {form.faqBlocks.length === 0 && (
+                  <Typography variant="body2" color="text.secondary">
+                    No FAQs yet.
+                  </Typography>
+                )}
               </Stack>
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
-              <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>Media</Typography>
-              <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                <Button component="label" variant="outlined" startIcon={<ImageIcon />} disabled={uploading}>
+              <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
+                Media
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<ImageIcon />}
+                  disabled={uploading}
+                >
                   Image
-                  <input hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => uploadMedia(event, 'image')} />
+                  <input
+                    hidden
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={event => uploadMedia(event, 'image')}
+                  />
                 </Button>
-                <Button component="label" variant="outlined" startIcon={<Movie />} disabled={uploading}>
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<Movie />}
+                  disabled={uploading}
+                >
                   Video
-                  <input hidden type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => uploadMedia(event, 'video')} />
+                  <input
+                    hidden
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    onChange={event => uploadMedia(event, 'video')}
+                  />
                 </Button>
               </Stack>
               <Stack spacing={1.5}>
                 {form.imageRefs.map((image, index) => (
-                  <Paper key={`${image.url}-${index}`} variant="outlined" sx={{ p: 1, borderRadius: 1 }}>
-                    <Box component="img" src={image.url} alt={image.alt || ''} sx={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 1, mb: 1 }} />
-                    <TextField size="small" fullWidth label="Alt text" value={image.alt || ''} onChange={(event) => setForm((current) => ({
-                      ...current,
-                      imageRefs: current.imageRefs.map((item, itemIndex) => itemIndex === index ? { ...item, alt: event.target.value } : item),
-                    }))} />
-                    <Button size="small" color="error" startIcon={<Delete />} onClick={() => setForm((current) => ({ ...current, imageRefs: current.imageRefs.filter((_, itemIndex) => itemIndex !== index) }))}>
+                  <Paper
+                    key={`${image.url}-${index}`}
+                    variant="outlined"
+                    sx={{ p: 1, borderRadius: 1 }}
+                  >
+                    <Box
+                      component="img"
+                      src={image.url}
+                      alt={image.alt || ''}
+                      sx={{
+                        width: '100%',
+                        aspectRatio: '16 / 9',
+                        objectFit: 'cover',
+                        borderRadius: 1,
+                        mb: 1,
+                      }}
+                    />
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Alt text"
+                      value={image.alt || ''}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          imageRefs: current.imageRefs.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, alt: event.target.value } : item
+                          ),
+                        }))
+                      }
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<Delete />}
+                      onClick={() =>
+                        setForm(current => ({
+                          ...current,
+                          imageRefs: current.imageRefs.filter(
+                            (_, itemIndex) => itemIndex !== index
+                          ),
+                        }))
+                      }
+                    >
                       Remove
                     </Button>
                   </Paper>
                 ))}
                 {form.videoEmbeds.map((video, index) => (
-                  <Paper key={`${video.url}-${index}`} variant="outlined" sx={{ p: 1, borderRadius: 1 }}>
-                    <Box component="video" src={video.url} controls sx={{ width: '100%', borderRadius: 1, mb: 1 }} />
-                    <TextField size="small" fullWidth label="Title" value={video.title || ''} onChange={(event) => setForm((current) => ({
-                      ...current,
-                      videoEmbeds: current.videoEmbeds.map((item, itemIndex) => itemIndex === index ? { ...item, title: event.target.value } : item),
-                    }))} />
-                    <Button size="small" color="error" startIcon={<Delete />} onClick={() => setForm((current) => ({ ...current, videoEmbeds: current.videoEmbeds.filter((_, itemIndex) => itemIndex !== index) }))}>
+                  <Paper
+                    key={`${video.url}-${index}`}
+                    variant="outlined"
+                    sx={{ p: 1, borderRadius: 1 }}
+                  >
+                    <Box
+                      component="video"
+                      src={video.url}
+                      controls
+                      sx={{ width: '100%', borderRadius: 1, mb: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Title"
+                      value={video.title || ''}
+                      onChange={event =>
+                        setForm(current => ({
+                          ...current,
+                          videoEmbeds: current.videoEmbeds.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, title: event.target.value } : item
+                          ),
+                        }))
+                      }
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<Delete />}
+                      onClick={() =>
+                        setForm(current => ({
+                          ...current,
+                          videoEmbeds: current.videoEmbeds.filter(
+                            (_, itemIndex) => itemIndex !== index
+                          ),
+                        }))
+                      }
+                    >
                       Remove
                     </Button>
                   </Paper>
                 ))}
                 {form.imageRefs.length === 0 && form.videoEmbeds.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">Upload images or videos for this article.</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Upload images or videos for this article.
+                  </Typography>
                 )}
               </Stack>
             </Paper>

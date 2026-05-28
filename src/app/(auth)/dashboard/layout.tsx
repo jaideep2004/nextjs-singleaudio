@@ -8,7 +8,6 @@ import { useTheme } from '@mui/material/styles';
 import TopNavigation from '@/components/TopNavigation';
 import UserSidebar from '@/components/UserSidebar';
 import KycGate, { userKycUnderReview, userNeedsKyc } from '@/components/kyc/KycGate';
-import FloatingSupportButton from '@/components/support/FloatingSupportButton';
 import { useAuth } from '@/context/AppContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -85,7 +84,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <KycGate>{children}</KycGate>
           )}
         </Box>
-        {!needsKycForm && <FloatingSupportButton />}
       </Box>
     </Box>
   );

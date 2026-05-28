@@ -422,11 +422,7 @@ export async function readYoutubeAnalyticsDashboard(
     .toArray();
   const summary = sumMetrics(daily.map((row) => row.metrics));
   const latestBreakdowns = await readLatestBreakdowns(db, selected._id, input.rangeDays);
-  const topVideos = await youtubeAnalyticsVideosCollection(db)
-    .find({ channelObjectId: selected._id, startDate, endDate })
-    .sort({ 'metrics.views': -1 })
-    .limit(10)
-    .toArray();
+  const topVideos = await readLatestVideoSnapshots(db, selected._id, input.rangeDays);
 
   return {
     rangeDays: input.rangeDays,
@@ -485,12 +481,30 @@ function sumMetrics(rows: YoutubeAnalyticsMetrics[]) {
 }
 
 async function readLatestBreakdowns(db: Db, channelObjectId: ObjectId, rangeDays: number) {
-  const endDate = dateKey(new Date());
-  const startDate = dateKey(addDays(new Date(), -(rangeDays - 1)));
-  const rows = await youtubeAnalyticsBreakdownsCollection(db)
-    .find({ channelObjectId, startDate, endDate })
-    .sort({ 'metrics.views': -1 })
-    .toArray();
+  const rowsByType = await Promise.all(
+    ['country', 'deviceType', 'trafficSource', 'demographics'].map(async (reportType) => {
+      const latest = await youtubeAnalyticsBreakdownsCollection(db)
+        .find({ channelObjectId, reportType: reportType as YoutubeAnalyticsReportType })
+        .sort({ endDate: -1, syncedAt: -1 })
+        .limit(500)
+        .toArray();
+      const matchingWindow = latest.find((row) => getWindowDays(row.startDate, row.endDate) === rangeDays);
+      const selectedWindow = matchingWindow || latest[0];
+      if (!selectedWindow) return [];
+
+      return youtubeAnalyticsBreakdownsCollection(db)
+        .find({
+          channelObjectId,
+          reportType: reportType as YoutubeAnalyticsReportType,
+          startDate: selectedWindow.startDate,
+          endDate: selectedWindow.endDate,
+        })
+        .sort({ 'metrics.views': -1 })
+        .toArray();
+    })
+  );
+
+  const rows = rowsByType.flat();
 
   return rows.reduce((acc, row) => {
     const key = row.reportType;
@@ -502,6 +516,34 @@ async function readLatestBreakdowns(db: Db, channelObjectId: ObjectId, rangeDays
     });
     return acc;
   }, {} as Record<YoutubeAnalyticsReportType, Array<Record<string, unknown>>>);
+}
+
+async function readLatestVideoSnapshots(db: Db, channelObjectId: ObjectId, rangeDays: number) {
+  const latest = await youtubeAnalyticsVideosCollection(db)
+    .find({ channelObjectId })
+    .sort({ endDate: -1, syncedAt: -1 })
+    .limit(500)
+    .toArray();
+  const matchingWindow = latest.find((row) => getWindowDays(row.startDate, row.endDate) === rangeDays);
+  const selectedWindow = matchingWindow || latest[0];
+  if (!selectedWindow) return [];
+
+  return youtubeAnalyticsVideosCollection(db)
+    .find({
+      channelObjectId,
+      startDate: selectedWindow.startDate,
+      endDate: selectedWindow.endDate,
+    })
+    .sort({ 'metrics.views': -1 })
+    .limit(10)
+    .toArray();
+}
+
+function getWindowDays(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+  return Math.round((end - start) / (24 * 60 * 60 * 1000)) + 1;
 }
 
 function deriveSyncStatus(channel: Partial<YoutubeChannelDocument>): YoutubeAnalyticsSyncStatus {

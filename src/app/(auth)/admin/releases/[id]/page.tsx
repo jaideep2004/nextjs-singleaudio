@@ -33,26 +33,12 @@ import {
   ThumbDown,
   Info,
   MusicNote,
-  Store,
   Link as LinkIcon,
   PlayArrow,
   Pause,
   PlaylistAddCheck,
   Delete,
 } from "@mui/icons-material";
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faApple, 
-  faSpotify, 
-  faYoutube, 
-  faAmazon, 
-  faSoundcloud, 
-  faDeezer,
-  faTidal,
-  faTiktok,
-  faFacebook,
-  faInstagram
-} from '@fortawesome/free-brands-svg-icons';
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { releaseAPI } from "@/services/api";
@@ -67,63 +53,8 @@ import {
   getAcrCloudSummary,
   stringifyAcrCloudRawResult,
 } from '@/lib/acrCloud';
-import { DSP_META, DSP_META_BY_KEY } from '@/lib/platforms';
-
-// DSP mapping for better visualization with Font Awesome icons
-const DSP_MAPPING: Record<string, { icon: any; color: string; name: string }> = {
-  'Apple Music': { icon: faApple, color: '#fa233b', name: 'Apple Music' },
-  'Spotify': { icon: faSpotify, color: '#1db954', name: 'Spotify' },
-  'YouTube Music': { icon: faYoutube, color: '#ff0000', name: 'YouTube Music' },
-  'Amazon Music': { icon: faAmazon, color: '#ff9900', name: 'Amazon Music' },
-  'Tidal': { icon: faTidal, color: '#000000', name: 'Tidal' },
-  'Deezer': { icon: faDeezer, color: '#feaa2e', name: 'Deezer' },
-  'SoundCloud': { icon: faSoundcloud, color: '#ff7700', name: 'SoundCloud' },
-  'TikTok': { icon: faTiktok, color: '#69c9d0', name: 'TikTok' },
-  'Facebook': { icon: faFacebook, color: '#1877f2', name: 'Facebook' },
-  'Instagram': { icon: faInstagram, color: '#e1306c', name: 'Instagram' },
-  'default': { icon: Store, color: '#4a6cf7', name: 'Other' },
-};
-
-const normalizeDspName = (value: string) => value.toLowerCase().replace(/[\s_-]+/g, '');
-
-const humanizeDspKey = (value: string) =>
-  value
-    .replace(/[-_]+/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const matchDsp = (store: string) => {
-  if (DSP_MAPPING[store]) return DSP_MAPPING[store];
-  const trimmed = store.trim();
-  const platform =
-    DSP_META_BY_KEY[trimmed] ||
-    DSP_META.find(
-      (meta) =>
-        normalizeDspName(meta.key) === normalizeDspName(trimmed) ||
-        normalizeDspName(meta.name) === normalizeDspName(trimmed)
-    );
-
-  if (platform) {
-    const iconMeta = DSP_MAPPING[platform.name] || DSP_MAPPING[humanizeDspKey(platform.key)];
-    return {
-      icon: iconMeta?.icon || Store,
-      color: iconMeta?.color || '#4a6cf7',
-      name: platform.name,
-    };
-  }
-
-  const matchedKey = Object.keys(DSP_MAPPING).find((key) =>
-    normalizeDspName(trimmed).includes(normalizeDspName(key)) ||
-    normalizeDspName(key).includes(normalizeDspName(trimmed))
-  );
-  if (matchedKey) return DSP_MAPPING[matchedKey];
-
-  return {
-    ...DSP_MAPPING.default,
-    name: trimmed ? humanizeDspKey(trimmed) : DSP_MAPPING.default.name,
-  };
-};
+import { DspLogo } from '@/components/dsp/DspLogo';
+import { getDspDisplayName } from '@/lib/platforms';
 
 const formatAcrProbability = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
@@ -371,28 +302,13 @@ export default function AdminReleaseDetailPage() {
     return (
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {stores.map((store, index) => {
-          const dsp = matchDsp(store);
-          
-          // Check if it's a Font Awesome icon or MUI icon
-          const isFAIcon = typeof dsp.icon === 'object' && dsp.icon.hasOwnProperty('iconName');
+          const dspName = getDspDisplayName(store);
           
           return (
-            <Tooltip key={index} title={dsp.name}>
+            <Tooltip key={`${store}-${index}`} title={dspName}>
               <Chip
-                icon={
-                  isFAIcon ? (
-                    <FontAwesomeIcon 
-                      icon={dsp.icon} 
-                      style={{ 
-                        color: dsp.color,
-                        fontSize: '1rem'
-                      }} 
-                    />
-                  ) : (
-                    <Store sx={{ color: dsp.color }} />
-                  )
-                }
-                label={dsp.name}
+                avatar={<DspLogo value={store} alt={dspName} size={22} padding={0.25} />}
+                label={dspName}
                 size="small"
                 sx={{
                   bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',

@@ -64,6 +64,7 @@ import { useAuth } from '@/context/AppContext';
 import Cookies from 'js-cookie';
 import countries from '@/utils/countries';
 import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
+import { DspLogo } from '@/components/dsp/DspLogo';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import {
   AcrCloudStatusLike,
@@ -3003,10 +3004,6 @@ export default function UploadPage() {
               >
                 {visibleDSPs.map((dsp: DspItem) => {
                   const selected = selectedDSPs.includes(dsp.key);
-                  const initials = (dsp.name.match(/\b\w/g) || [])
-                    .slice(0, 2)
-                    .join('')
-                    .toUpperCase();
                   return (
                     <Paper
                       key={dsp.key}
@@ -3038,25 +3035,13 @@ export default function UploadPage() {
                         },
                       }}
                     >
-                      <Avatar
-                        src={dsp.logo || undefined}
+                      <DspLogo
+                        value={dsp.key}
                         alt={dsp.name}
-                        variant="rounded"
-                        sx={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 2,
-                          bgcolor: 'background.default',
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          p: 0.75,
-                          fontSize: 14,
-                          fontWeight: 900,
-                          flex: '0 0 auto',
-                        }}
-                      >
-                        {initials}
-                      </Avatar>
+                        size={64}
+                        padding={0.75}
+                        sx={{ fontSize: 14 }}
+                      />
                       <Box sx={{ minWidth: 0, flex: 1 }}>
                         <Typography fontWeight={850} noWrap>
                           {dsp.name}
@@ -3507,7 +3492,7 @@ export default function UploadPage() {
                     <Chip
                       key={key}
                       label={dsp.name}
-                      avatar={<Avatar src={dsp.logo} alt={dsp.name} />}
+                      avatar={<DspLogo value={dsp.key} alt={dsp.name} size={24} />}
                       variant="outlined"
                     />
                   );

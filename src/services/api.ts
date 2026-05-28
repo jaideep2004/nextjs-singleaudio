@@ -565,6 +565,20 @@ export const adminSupportAPI = {
     }
   },
 
+  uploadAttachment: async (id: string, file: File, body?: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('attachment', file);
+      if (body) formData.append('body', body);
+      const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
   addInternalNote: async (id: string, body: string) => {
     try {
       const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/internal-notes`, { body });
@@ -582,6 +596,7 @@ export type KnowledgeBaseCategory = {
   name: string;
   slug: string;
   description?: string;
+  iconUrl?: string;
   sortOrder?: number;
   isActive?: boolean;
 };
@@ -611,7 +626,7 @@ export type KnowledgeBaseArticle = {
   videoEmbeds?: Array<{ url: string; title?: string }>;
   imageRefs?: Array<{ url: string; alt?: string }>;
   seo?: { title?: string; description?: string; keywords?: string[] };
-  relatedArticleIds?: KnowledgeBaseArticle[];
+  relatedArticleIds?: KnowledgeBaseArticle[] | string[];
   publishedAt?: string;
   updatedAt?: string;
 };

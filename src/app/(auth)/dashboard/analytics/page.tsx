@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Box, Chip, Stack, ToggleButton, ToggleButtonGroup, Typography, useTheme } from '@mui/material';
 import { PlayCircle, Public, TrendingUp, Visibility } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
+import { DspLogo } from '@/components/dsp/DspLogo';
 import { PremiumHeader, PremiumMetric, PremiumPanel } from '@/components/premium/PremiumSurface';
 
 const streamData = {
@@ -80,7 +81,10 @@ function AnalyticsContent() {
             {platforms.map((platform) => (
               <Box key={platform.name}>
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography sx={{ fontWeight: 800 }}>{platform.name}</Typography>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <DspLogo value={platform.name} alt={platform.name} size={24} padding={0.25} />
+                    <Typography sx={{ fontWeight: 800 }}>{platform.name}</Typography>
+                  </Stack>
                   <Typography sx={{ color: 'text.secondary' }}>{platform.value.toLocaleString()} ({platform.pct}%)</Typography>
                 </Stack>
                 <Box sx={{ mt: 0.7, height: 6, borderRadius: 1, bgcolor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)', overflow: 'hidden' }}>

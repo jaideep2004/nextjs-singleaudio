@@ -4,6 +4,7 @@ export interface IKnowledgeBaseCategory extends Document {
   name: string;
   slug: string;
   description?: string;
+  iconUrl?: string;
   sortOrder: number;
   isActive: boolean;
   createdBy?: mongoose.Types.ObjectId;
@@ -32,6 +33,11 @@ const KnowledgeBaseCategorySchema = new Schema<IKnowledgeBaseCategory>(
       type: String,
       trim: true,
       maxlength: 500,
+    },
+    iconUrl: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
     },
     sortOrder: {
       type: Number,

@@ -26,6 +26,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ConstructionIcon from '@mui/icons-material/Construction';
+import { DspLogo } from '@/components/dsp/DspLogo';
+import { getDspDisplayName } from '@/lib/platforms';
 import { adminAPI } from '@/services/api';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { PremiumHeader } from '@/components/premium/PremiumSurface';
@@ -247,12 +249,17 @@ export default function AdminDspDeliveriesPage() {
             {providers.map((provider) => (
               <TableRow key={provider.key}>
                 <TableCell>
-                  <Typography variant="body2" fontWeight={700}>
-                    {provider.displayName}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {provider.key}
-                  </Typography>
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <DspLogo value={provider.key} alt={provider.displayName} size={34} padding={0.35} />
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={700}>
+                        {provider.displayName}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {provider.key}
+                      </Typography>
+                    </Box>
+                  </Stack>
                 </TableCell>
                 <TableCell>
                   <Chip size="small" label={provider.integrationMode || 'shell'} variant="outlined" />
@@ -314,7 +321,10 @@ export default function AdminDspDeliveriesPage() {
             >
               {providers.map((provider) => (
                 <MenuItem key={provider.key} value={provider.key}>
-                  {provider.displayName}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <DspLogo value={provider.key} alt={provider.displayName} size={24} padding={0.25} />
+                    <span>{provider.displayName}</span>
+                  </Stack>
                 </MenuItem>
               ))}
             </Select>
@@ -343,7 +353,10 @@ export default function AdminDspDeliveriesPage() {
               <MenuItem value="all">All providers</MenuItem>
               {providers.map((provider) => (
                 <MenuItem key={provider.key} value={provider.key}>
-                  {provider.displayName}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <DspLogo value={provider.key} alt={provider.displayName} size={24} padding={0.25} />
+                    <span>{provider.displayName}</span>
+                  </Stack>
                 </MenuItem>
               ))}
             </Select>
@@ -401,7 +414,19 @@ export default function AdminDspDeliveriesPage() {
                         : `${job.trackId?.artistName || 'Unknown artist'} ${job.trackId?.isrc ? `| ${job.trackId.isrc}` : ''}`}
                     </Typography>
                   </TableCell>
-                  <TableCell>{providerMap.get(job.providerKey) || job.providerKey}</TableCell>
+                  <TableCell>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <DspLogo
+                        value={job.providerKey}
+                        alt={providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
+                        size={26}
+                        padding={0.25}
+                      />
+                      <Typography variant="body2" fontWeight={600}>
+                        {providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
                   <TableCell>{job.operation}</TableCell>
                   <TableCell>
                     <Chip label={job.state} color={job.state === 'delivered' ? 'success' : job.state === 'failed' ? 'error' : 'default'} size="small" />

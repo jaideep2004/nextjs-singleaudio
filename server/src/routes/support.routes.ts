@@ -57,6 +57,14 @@ router.post(
 );
 
 router.post(
+  '/tickets/admin/:id/attachments',
+  authorizeAdminPermission(AdminPermission.SUPPORT),
+  validate(ticketIdValidator),
+  uploadSupportAttachmentMiddleware.single('attachment'),
+  uploadSupportAttachment
+);
+
+router.post(
   '/tickets/admin/:id/internal-notes',
   authorizeAdminPermission(AdminPermission.SUPPORT),
   validate(addSupportMessageValidator),

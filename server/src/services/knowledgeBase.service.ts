@@ -35,6 +35,18 @@ const DEFAULT_CATEGORIES = [
   'Video Distribution',
 ];
 
+type CategoryInput = {
+  name: string;
+  slug?: string;
+  description?: string;
+  iconUrl?: string;
+  sortOrder?: number;
+};
+
+type CategoryUpdateInput = Partial<CategoryInput> & {
+  isActive?: boolean;
+};
+
 const emptyDoc = { type: 'doc', content: [] };
 
 function actorId(actor?: Actor) {
@@ -148,7 +160,7 @@ function normalizeKeywords(keywords?: string[]) {
 }
 
 async function ensureUniqueArticleSlug(baseSlug: string, currentId?: string) {
-  let slug = baseSlug || 'article';
+  const slug = baseSlug || 'article';
   let candidate = slug;
   let suffix = 2;
 
@@ -168,6 +180,7 @@ async function ensureDefaultCategories() {
     DEFAULT_CATEGORIES.map((name, index) => ({
       name,
       slug: slugify(name),
+      iconUrl: '',
       sortOrder: index + 1,
       isActive: true,
     })),
@@ -252,11 +265,12 @@ export async function getPublishedArticleBySlug(slug: string) {
   return article;
 }
 
-export async function createCategory(input: { name: string; slug?: string; description?: string; sortOrder?: number }, actor?: Actor) {
+export async function createCategory(input: CategoryInput, actor?: Actor) {
   const category = await KnowledgeBaseCategory.create({
     name: input.name,
     slug: slugify(input.slug || input.name),
     description: input.description,
+    iconUrl: input.iconUrl,
     sortOrder: input.sortOrder || 0,
     createdBy: actorId(actor),
     updatedBy: actorId(actor),
@@ -264,13 +278,14 @@ export async function createCategory(input: { name: string; slug?: string; descr
   return category;
 }
 
-export async function updateCategory(id: string, input: { name?: string; slug?: string; description?: string; sortOrder?: number; isActive?: boolean }, actor?: Actor) {
+export async function updateCategory(id: string, input: CategoryUpdateInput, actor?: Actor) {
   const category = await KnowledgeBaseCategory.findById(id);
   if (!category) throw new ApiError(404, 'Knowledge base category not found');
 
   if (input.name !== undefined) category.name = input.name;
   if (input.slug !== undefined) category.slug = slugify(input.slug);
   if (input.description !== undefined) category.description = input.description;
+  if (input.iconUrl !== undefined) category.iconUrl = input.iconUrl;
   if (input.sortOrder !== undefined) category.sortOrder = input.sortOrder;
   if (input.isActive !== undefined) category.isActive = input.isActive;
   category.updatedBy = actorId(actor);

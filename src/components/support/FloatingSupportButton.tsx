@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Badge, Box, Fab, Tooltip, useTheme } from '@mui/material';
 import { ChatBubble, SupportAgent } from '@mui/icons-material';
 import { useNotifications } from '@/context/NotificationsContext';
+import { countUnreadSupportNotifications } from '@/components/support/supportNotifications';
 
 export default function FloatingSupportButton({
   href = '/dashboard/support',
@@ -20,16 +21,7 @@ export default function FloatingSupportButton({
   const previousCount = useRef(0);
   const [pulse, setPulse] = useState(false);
 
-  const unreadSupportCount = useMemo(
-    () =>
-      notifications.filter((notification) => {
-        const unread = !(notification.read ?? notification.isRead);
-        const type = notification.type || '';
-        const message = notification.message || '';
-        return unread && (type.startsWith('support_') || message.toLowerCase().includes('support'));
-      }).length,
-    [notifications]
-  );
+  const unreadSupportCount = useMemo(() => countUnreadSupportNotifications(notifications), [notifications]);
 
   useEffect(() => {
     if (unreadSupportCount > previousCount.current) {

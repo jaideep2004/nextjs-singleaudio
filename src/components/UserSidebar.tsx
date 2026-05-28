@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   IconButton,
   Tooltip,
+  Badge,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -36,9 +37,12 @@ import {
   VideoLibrary,
   LockOutlined,
   YouTube,
+  SupportAgent,
 } from '@mui/icons-material';
 
 import { useAuth } from '@/context/AppContext';
+import { useNotifications } from '@/context/NotificationsContext';
+import { countUnreadSupportNotifications } from '@/components/support/supportNotifications';
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -113,6 +117,11 @@ const menuSections = [
         path: '/dashboard/profile',
       },
       {
+        text: 'Support Center',
+        icon: <SupportAgent />,
+        path: '/dashboard/support',
+      },
+      {
         text: 'Settings',
         icon: <SettingsIcon />,
         path: '/dashboard/settings',
@@ -148,8 +157,10 @@ export default function UserSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const auth = useAuth();
+  const { notifications } = useNotifications();
   const user = auth?.user;
   const kycUnderReview = user?.verification?.status === 'submitted' && (user.role === 'artist' || user.role === 'label');
+  const unreadSupportCount = countUnreadSupportNotifications(notifications);
 
   const isDark = theme.palette.mode === 'dark';
   const desktopCollapsed = collapsed && !isMobile;
@@ -312,6 +323,7 @@ export default function UserSidebar() {
             <List disablePadding>
               {section.items.map((item: any) => {
                 const lockedItem = kycUnderReview && !isUnlockedDuringReview(item.path);
+                const isSupportItem = item.path === '/dashboard/support';
                 return (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
@@ -377,7 +389,21 @@ export default function UserSidebar() {
                           '& .MuiSvgIcon-root': { fontSize: 20 },
                         }}
                       >
-                        {item.icon}
+                        <Badge
+                          badgeContent={isSupportItem ? unreadSupportCount : 0}
+                          color="error"
+                          invisible={!isSupportItem || unreadSupportCount === 0 || !desktopCollapsed}
+                          max={99}
+                          sx={{
+                            '& .MuiBadge-badge': {
+                              fontSize: '0.62rem',
+                              height: 16,
+                              minWidth: 16,
+                            },
+                          }}
+                        >
+                          {item.icon}
+                        </Badge>
                       </ListItemIcon>
                       <ListItemText
                         primary={item.text}
@@ -391,6 +417,28 @@ export default function UserSidebar() {
                             : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
+                      {isSupportItem && !desktopCollapsed && unreadSupportCount > 0 && (
+                        <Box
+                          component="span"
+                          sx={{
+                            mr: 0.75,
+                            minWidth: 18,
+                            height: 18,
+                            px: 0.6,
+                            borderRadius: 999,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: 'error.main',
+                            color: 'error.contrastText',
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {Math.min(unreadSupportCount, 99)}
+                        </Box>
+                      )}
                       {lockedItem && !desktopCollapsed && (
                         <LockOutlined sx={{ fontSize: 15, color: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.32)', mr: 0.5 }} />
                       )}

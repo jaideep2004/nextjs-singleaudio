@@ -16,6 +16,7 @@ import {
   useMediaQuery,
   IconButton,
   Tooltip,
+  Badge,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -36,9 +37,12 @@ import {
   VideoLibrary,
   YouTube,
   Article as ArticleIcon,
+  SupportAgent,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
+import { useNotifications } from '@/context/NotificationsContext';
 import { hasAdminPermission, isFullAdmin, type AdminPermission } from '@/lib/adminAccess';
+import { countUnreadSupportNotifications } from '@/components/support/supportNotifications';
 
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
@@ -111,9 +115,26 @@ const menuSections = [
         ],
       },
       {
+        text: 'Podcasts',
+        icon: <PodcastsIcon />,
+        path: '/admin/podcasts',
+        permission: 'podcasts' as AdminPermission,
+        subItems: [
+          { text: 'Manage Podcasts', path: '/admin/podcasts' },
+          { text: 'Upload Episode', path: '/admin/podcasts?view=episodes' },
+          { text: 'Payouts', path: '/admin/podcasts?view=payouts' },
+        ],
+      },
+      {
         text: 'Knowledge Base',
         icon: <ArticleIcon />,
         path: '/admin/knowledge-base',
+        permission: 'support' as AdminPermission,
+      },
+      {
+        text: 'Support Queue',
+        icon: <SupportAgent />,
+        path: '/admin/support',
         permission: 'support' as AdminPermission,
       },
     ],
@@ -132,22 +153,6 @@ const menuSections = [
         icon: <TrendingUp />,
         path: '/admin/royalties',
         permission: 'payouts' as AdminPermission,
-      },
-    ],
-  },
-  {
-    label: 'Podcasts',
-    items: [
-      {
-        text: 'Podcasts',
-        icon: <PodcastsIcon />,
-        path: '/admin/podcasts',
-        permission: 'podcasts' as AdminPermission,
-        subItems: [
-          { text: 'Manage Podcasts', path: '/admin/podcasts' },
-          { text: 'Upload Episode', path: '/admin/podcasts?view=episodes' },
-          { text: 'Payouts', path: '/admin/podcasts?view=payouts' },
-        ],
       },
     ],
   },
@@ -179,10 +184,12 @@ export default function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const { user } = useAuth();
+  const { notifications } = useNotifications();
 
   const isDark = theme.palette.mode === 'dark';
   const desktopCollapsed = collapsed && !isMobile;
   const currentDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : drawerWidth;
+  const unreadSupportCount = countUnreadSupportNotifications(notifications);
   const canSee = (item: any) => {
     if (isFullAdmin(user)) return true;
     if (!item.permission) return false;
@@ -342,7 +349,9 @@ export default function AdminSidebar() {
               {section.label}
             </Typography>
             <List disablePadding>
-              {section.items.map((item: any) => (
+              {section.items.map((item: any) => {
+                const isSupportItem = item.path === '/admin/support';
+                return (
                 <div key={item.path}>
                   <ListItem disablePadding sx={{ mb: 0.25 }}>
                     <Tooltip title={desktopCollapsed ? item.text : ''} placement="right" disableInteractive>
@@ -403,7 +412,21 @@ export default function AdminSidebar() {
                           '& .MuiSvgIcon-root': { fontSize: 20 },
                         }}
                       >
-                        {item.icon}
+                        <Badge
+                          badgeContent={isSupportItem ? unreadSupportCount : 0}
+                          color="error"
+                          invisible={!isSupportItem || unreadSupportCount === 0 || !desktopCollapsed}
+                          max={99}
+                          sx={{
+                            '& .MuiBadge-badge': {
+                              fontSize: '0.62rem',
+                              height: 16,
+                              minWidth: 16,
+                            },
+                          }}
+                        >
+                          {item.icon}
+                        </Badge>
                       </ListItemIcon>
                       <ListItemText
                         primary={item.text}
@@ -417,6 +440,28 @@ export default function AdminSidebar() {
                             : (isDark ? 'rgba(255, 255, 255, 0.84)' : 'rgba(15, 23, 42, 0.88)'),
                         }}
                       />
+                      {isSupportItem && !desktopCollapsed && unreadSupportCount > 0 && (
+                        <Box
+                          component="span"
+                          sx={{
+                            mr: 0.75,
+                            minWidth: 18,
+                            height: 18,
+                            px: 0.6,
+                            borderRadius: 999,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            bgcolor: 'error.main',
+                            color: 'error.contrastText',
+                            fontSize: '0.68rem',
+                            fontWeight: 900,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {Math.min(unreadSupportCount, 99)}
+                        </Box>
+                      )}
                       {item.subItems && !desktopCollapsed && (
                         <Box
                           sx={{
@@ -491,7 +536,7 @@ export default function AdminSidebar() {
                     </Collapse>
                   )}
                 </div>
-              ))}
+              )})}
             </List>
           </Box>
         ))}

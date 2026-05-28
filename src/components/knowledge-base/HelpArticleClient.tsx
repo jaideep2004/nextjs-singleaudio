@@ -3,67 +3,85 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
-  MenuItem,
+  Drawer,
+  IconButton,
+  InputAdornment,
+  ListItemButton,
+  ListItemText,
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
   alpha,
-  useTheme,
 } from '@mui/material';
-import { ConfirmationNumber, GraphicEq, HelpOutline } from '@mui/icons-material';
 import {
-  SUPPORT_CATEGORIES,
+  Article,
+  Close,
+  DarkMode,
+  LightMode,
+  Menu,
+  Search,
+} from '@mui/icons-material';
+import {
   knowledgeBaseAPI,
-  supportAPI,
   type KnowledgeBaseArticle,
-  type KnowledgeBaseCategory,
-  type KnowledgeBaseSection,
-  type SupportTicketCategory,
+  type KnowledgeBaseTree,
 } from '@/services/api';
 import { HelpSidebar } from '@/components/knowledge-base/HelpCenterClient';
 import { addHeadingIds, extractHeadings } from '@/components/knowledge-base/kbUtils';
+import { useColorMode } from '@/context/ColorModeContext';
 
-function appSupportHref() {
-  const host = process.env.NEXT_PUBLIC_APP_HOST || 'app.singleaudio.com';
+function articleHref(slug: string) {
   if (typeof window !== 'undefined' && window.location.hostname === (process.env.NEXT_PUBLIC_HELP_HOST || 'help.singleaudio.com')) {
-    return `https://${host}/dashboard/support`;
+    return `/${slug}`;
   }
-  return '/dashboard/support';
+  return `/help/${slug}`;
 }
 
-export default function HelpArticleClient({ slug }: { slug: string }) {
-  const theme = useTheme();
-  const [article, setArticle] = useState<KnowledgeBaseArticle | null>(null);
-  const [categories, setCategories] = useState<KnowledgeBaseCategory[]>([]);
-  const [sections, setSections] = useState<KnowledgeBaseSection[]>([]);
-  const [articles, setArticles] = useState<KnowledgeBaseArticle[]>([]);
-  const [loading, setLoading] = useState(true);
+function hasTreeData(tree?: KnowledgeBaseTree) {
+  return Boolean(tree && (tree.categories.length > 0 || tree.sections.length > 0 || tree.articles.length > 0));
+}
+
+export default function HelpArticleClient({
+  slug,
+  initialArticle,
+  initialTree,
+}: {
+  slug: string;
+  initialArticle?: KnowledgeBaseArticle | null;
+  initialTree?: KnowledgeBaseTree;
+}) {
+  const { mode, toggleColorMode } = useColorMode();
+  const isDark = mode === 'dark';
+  const [article, setArticle] = useState<KnowledgeBaseArticle | null>(initialArticle || null);
+  const [categories, setCategories] = useState(initialTree?.categories || []);
+  const [sections, setSections] = useState(initialTree?.sections || []);
+  const [articles, setArticles] = useState(initialTree?.articles || []);
+  const [search, setSearch] = useState('');
+  const [results, setResults] = useState<KnowledgeBaseArticle[]>([]);
+  const [loading, setLoading] = useState(!initialArticle);
   const [error, setError] = useState('');
-  const [ticketOpen, setTicketOpen] = useState(false);
-  const [ticketMessage, setTicketMessage] = useState('');
-  const [ticketCategory, setTicketCategory] = useState<SupportTicketCategory>('technical_issue');
-  const [submitting, setSubmitting] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
+    if (initialArticle && hasTreeData(initialTree)) return;
+
     let active = true;
     const load = async () => {
       setLoading(true);
       try {
-        const [articleResponse, treeResponse] = await Promise.all([
-          knowledgeBaseAPI.getArticle(slug),
-          knowledgeBaseAPI.getTree(),
-        ]);
+        const articlePromise: Promise<{ data?: KnowledgeBaseArticle | null }> = initialArticle
+          ? Promise.resolve({ data: initialArticle })
+          : knowledgeBaseAPI.getArticle(slug);
+        const treePromise: Promise<{ data?: KnowledgeBaseTree }> = hasTreeData(initialTree)
+          ? Promise.resolve({ data: initialTree })
+          : knowledgeBaseAPI.getTree();
+        const [articleResponse, treeResponse] = await Promise.all([articlePromise, treePromise]);
         if (!active) return;
         setArticle(articleResponse?.data || null);
         setCategories(treeResponse?.data?.categories || []);
@@ -79,43 +97,62 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [initialArticle, initialTree, slug]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      if (search.trim().length < 2) {
+        setResults([]);
+        return;
+      }
+      const response = await knowledgeBaseAPI.search(search.trim(), 8);
+      if (active) setResults(response?.data?.articles || []);
+    };
+    const id = window.setTimeout(run, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(id);
+    };
+  }, [search]);
 
   const html = useMemo(() => addHeadingIds(article?.contentHtml || ''), [article?.contentHtml]);
   const headings = useMemo(() => extractHeadings(article?.contentHtml || ''), [article?.contentHtml]);
-  const pageBg = theme.palette.mode === 'dark' ? '#111517' : '#F7F4EF';
-  const headerBg = theme.palette.mode === 'dark'
-    ? alpha('#111517', 0.94)
-    : alpha('#F7F4EF', 0.94);
-  const articleBg = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.06)
-    : alpha(theme.palette.common.white, 0.9);
-  const panelBorder = theme.palette.mode === 'dark'
-    ? alpha(theme.palette.common.white, 0.12)
-    : alpha('#18201F', 0.12);
+  const relatedArticles = useMemo(
+    () => (article?.relatedArticleIds || []).filter((related): related is KnowledgeBaseArticle => typeof related !== 'string'),
+    [article?.relatedArticleIds]
+  );
+  const pageBg = isDark ? '#081112' : '#f6f2ea';
+  const headerBg = isDark ? alpha('#081112', 0.95) : alpha('#f6f2ea', 0.96);
+  const articleBg = isDark ? alpha('#f8f0df', 0.07) : '#ffffff';
+  const panelBorder = isDark ? alpha('#f8f0df', 0.14) : alpha('#101820', 0.12);
 
-  const createTicket = async () => {
-    if (!article || !ticketMessage.trim()) return;
-    setSubmitting(true);
-    setNotice('');
-    setError('');
-    try {
-      await supportAPI.createTicket({
-        subject: `Help needed: ${article.title}`,
-        category: ticketCategory,
-        priority: 'normal',
-        message: ticketMessage,
-        related: { knowledgeBaseArticleId: article._id },
-      });
-      setTicketOpen(false);
-      setTicketMessage('');
-      setNotice('Ticket created. Support team will reply in your dashboard.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create ticket');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const sidebar = (
+    <HelpSidebar
+      categories={categories}
+      sections={sections}
+      articles={articles}
+      activeSlug={slug}
+      onNavigate={() => setMobileOpen(false)}
+    />
+  );
+
+  const searchField = (
+    <TextField
+      fullWidth
+      size="small"
+      value={search}
+      onChange={(event) => setSearch(event.target.value)}
+      placeholder="Search help articles"
+      InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
+      sx={{
+        '& .MuiOutlinedInput-root': {
+          minHeight: 44,
+          bgcolor: isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
+        },
+      }}
+    />
+  );
 
   if (loading) {
     return (
@@ -151,32 +188,100 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
           backdropFilter: 'blur(14px)',
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: { xs: 2, md: 4 }, py: 1.5 }}>
-          <Stack direction="row" alignItems="center" spacing={1.25}>
-            <GraphicEq />
-            <Typography fontWeight={950}>SingleAudio Help Center</Typography>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={2}
+          sx={{ px: { xs: 2, md: 4 }, py: 1.25, minHeight: 68 }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+            <IconButton onClick={() => setMobileOpen(true)} aria-label="Open help navigation" sx={{ display: { lg: 'none' } }}>
+              <Menu />
+            </IconButton>
+            <Box component={Link} href="/help" sx={{ display: 'inline-flex', alignItems: 'center', minWidth: 0 }}>
+              <Box
+                component="img"
+                src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+                alt="SingleAudio"
+                sx={{
+                  width: { xs: 168, sm: 210 },
+                  height: 42,
+                  objectFit: 'contain',
+                  objectPosition: 'left center',
+                  display: 'block',
+                }}
+              />
+            </Box>
           </Stack>
-          <Button component={Link} href={appSupportHref()} variant="outlined" size="small" startIcon={<HelpOutline />}>
-            Support
-          </Button>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
+            <Box sx={{ width: { sm: 280, md: 360 }, display: { xs: 'none', sm: 'block' } }}>
+              {searchField}
+            </Box>
+            <Tooltip title={isDark ? 'Light mode' : 'Dark mode'}>
+              <IconButton onClick={toggleColorMode} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+                {isDark ? <LightMode /> : <DarkMode />}
+              </IconButton>
+            </Tooltip>
+          </Stack>
         </Stack>
+        <Box sx={{ display: { xs: 'block', sm: 'none' }, px: 2, pb: 1.5 }}>
+          {searchField}
+        </Box>
+        {results.length > 0 && (
+          <Paper
+            variant="outlined"
+            sx={{
+              position: 'absolute',
+              right: { xs: 16, sm: 72 },
+              top: { xs: 124, sm: 60 },
+              width: { xs: 'calc(100% - 32px)', sm: 420 },
+              zIndex: 25,
+              borderRadius: 1,
+              overflow: 'hidden',
+              borderColor: panelBorder,
+            }}
+          >
+            {results.map((result) => (
+              <ListItemButton key={result._id} component={Link} href={articleHref(result.slug)}>
+                <Article sx={{ mr: 1.5 }} />
+                <ListItemText primary={result.title} secondary={result.excerpt} />
+              </ListItemButton>
+            ))}
+          </Paper>
+        )}
       </Box>
+
+      <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
+        <Stack direction="row" justifyContent="flex-end" sx={{ p: 1 }}>
+          <IconButton onClick={() => setMobileOpen(false)}><Close /></IconButton>
+        </Stack>
+        {sidebar}
+      </Drawer>
+
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '292px minmax(0, 820px) 260px' },
+          gridTemplateColumns: {
+            xs: 'minmax(0, 1fr)',
+            md: 'minmax(0, 1fr) 240px',
+            lg: '292px minmax(0, 820px) 260px',
+          },
           gap: { xs: 0, md: 3 },
           px: { xs: 2, md: 4 },
           py: { xs: 3, md: 4 },
+          maxWidth: 1440,
+          mx: 'auto',
         }}
       >
-        <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-          <HelpSidebar categories={categories} sections={sections} articles={articles} activeSlug={slug} />
+        <Box sx={{ display: { xs: 'none', lg: 'block' }, position: 'sticky', top: 92, alignSelf: 'start' }}>
+          {sidebar}
         </Box>
         <Paper
           component="article"
           variant="outlined"
           sx={{
+            minWidth: 0,
             p: { xs: 2.5, md: 4 },
             borderRadius: 1,
             bgcolor: articleBg,
@@ -186,7 +291,7 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
             '& .kb-article p': { lineHeight: 1.8, fontSize: 16, color: 'text.primary' },
             '& .kb-article li': { color: 'text.primary' },
             '& .kb-article a': { color: 'primary.main', fontWeight: 700 },
-            '& .kb-article table': { width: '100%', borderCollapse: 'collapse', my: 2 },
+            '& .kb-article table': { width: '100%', borderCollapse: 'collapse', my: 2, display: 'block', overflowX: 'auto' },
             '& .kb-article td, & .kb-article th': { border: '1px solid rgba(24,32,31,0.18)', p: 1 },
             '& .kb-article blockquote': { borderLeft: '4px solid #E46D4E', pl: 2, color: 'text.secondary' },
             '& .kb-article img': { maxWidth: '100%', borderRadius: 1 },
@@ -194,9 +299,19 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
           }}
         >
           <Button component={Link} href="/help" size="small" sx={{ mb: 2 }}>Help Center</Button>
-          <Typography variant="h3" fontWeight={950} sx={{ mb: 1 }}>{article.title}</Typography>
+          <Typography
+            component="h1"
+            sx={{
+              fontSize: { xs: '2rem', md: '3rem' },
+              lineHeight: 1.08,
+              fontWeight: 950,
+              letterSpacing: 0,
+              mb: 1,
+            }}
+          >
+            {article.title}
+          </Typography>
           {article.excerpt && <Typography color="text.secondary" sx={{ mb: 3 }}>{article.excerpt}</Typography>}
-          {notice && <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert>}
           <Divider sx={{ mb: 3 }} />
           <Box className="kb-article" dangerouslySetInnerHTML={{ __html: html }} />
           {((article.imageRefs || []).length > 0 || (article.videoEmbeds || []).length > 0) && (
@@ -239,33 +354,24 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
               </Stack>
             </Box>
           )}
-          <Paper variant="outlined" sx={{ mt: 4, p: 2.5, borderRadius: 1, bgcolor: '#17201F', color: 'white' }}>
-            <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }} spacing={2}>
-              <Box>
-                <Typography fontWeight={950}>Still need help?</Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.72)' }}>Create a support ticket with this article attached.</Typography>
-              </Box>
-              <Button variant="contained" color="warning" startIcon={<ConfirmationNumber />} onClick={() => setTicketOpen(true)}>
-                Create Ticket
-              </Button>
-            </Stack>
-          </Paper>
         </Paper>
-        <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'sticky', top: 88, alignSelf: 'start' }}>
-          <Typography variant="overline" color="text.secondary" fontWeight={900}>On this page</Typography>
+        <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'sticky', top: 92, alignSelf: 'start', minWidth: 0 }}>
+          <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>On this page</Typography>
           <Stack spacing={0.5} sx={{ mt: 1 }}>
-            {headings.map((heading) => (
-              <Button key={heading.id} href={`#${heading.id}`} size="small" sx={{ justifyContent: 'flex-start' }}>
+            {headings.length > 0 ? headings.map((heading) => (
+              <Button key={heading.id} href={`#${heading.id}`} size="small" sx={{ justifyContent: 'flex-start', textAlign: 'left' }}>
                 {heading.text}
               </Button>
-            ))}
+            )) : (
+              <Typography variant="body2" color="text.secondary">Article overview</Typography>
+            )}
           </Stack>
-          {(article.relatedArticleIds || []).length > 0 && (
+          {relatedArticles.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="overline" color="text.secondary" fontWeight={900}>Related</Typography>
-              {article.relatedArticleIds?.map((related) => (
-                <Button key={related._id} component={Link} href={`/help/${related.slug}`} size="small" sx={{ justifyContent: 'flex-start', display: 'flex' }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>Related</Typography>
+              {relatedArticles.map((related) => (
+                <Button key={related._id} component={Link} href={articleHref(related.slug)} size="small" sx={{ justifyContent: 'flex-start', display: 'flex', textAlign: 'left' }}>
                   {related.title}
                 </Button>
               ))}
@@ -273,26 +379,6 @@ export default function HelpArticleClient({ slug }: { slug: string }) {
           )}
         </Box>
       </Box>
-
-      <Dialog open={ticketOpen} onClose={() => setTicketOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Create Support Ticket</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField select label="Category" value={ticketCategory} onChange={(event) => setTicketCategory(event.target.value as SupportTicketCategory)}>
-              {SUPPORT_CATEGORIES.map((category) => (
-                <MenuItem key={category.value} value={category.value}>{category.label}</MenuItem>
-              ))}
-            </TextField>
-            <TextField multiline minRows={5} label="What do you need help with?" value={ticketMessage} onChange={(event) => setTicketMessage(event.target.value)} />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTicketOpen(false)}>Cancel</Button>
-          <Button variant="contained" startIcon={<HelpOutline />} onClick={createTicket} disabled={submitting || !ticketMessage.trim()}>
-            Create Ticket
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
