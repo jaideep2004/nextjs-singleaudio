@@ -438,7 +438,8 @@ export type SupportTicketCategory =
   | 'dsp_delivery'
   | 'royalties_payments'
   | 'technical_issue'
-  | 'account_support';
+  | 'account_support'
+  | 'other';
 export type SupportTicketPriority = 'low' | 'normal' | 'high' | 'urgent';
 export type SupportTicketSort = 'latest' | 'oldest' | 'priority' | 'status';
 
@@ -450,6 +451,7 @@ export const SUPPORT_CATEGORIES: Array<{ value: SupportTicketCategory; label: st
   { value: 'royalties_payments', label: 'Royalties / Payments' },
   { value: 'technical_issue', label: 'Technical Issue' },
   { value: 'account_support', label: 'Account Support' },
+  { value: 'other', label: 'Other' },
 ];
 
 export const SUPPORT_PRIORITIES: Array<{ value: SupportTicketPriority; label: string }> = [
@@ -470,8 +472,9 @@ export const supportAPI = {
   },
 
   createTicket: async (payload: {
-    subject: string;
+    subject?: string;
     category: SupportTicketCategory;
+    customIssue?: string;
     priority?: SupportTicketPriority;
     message: string;
     related?: { releaseId?: string; trackId?: string; knowledgeBaseArticleId?: string };
@@ -759,7 +762,7 @@ export const adminKnowledgeBaseAPI = {
     }
   },
 
-  uploadMedia: async (file: File) => {
+  uploadMedia: async (file: File, onProgress?: (progress: number) => void) => {
     try {
       const formData = new FormData();
       formData.append('media', file);
@@ -772,6 +775,10 @@ export const adminKnowledgeBaseAPI = {
         size: number;
       }>>('/admin/knowledge-base/media', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (event) => {
+          if (!onProgress || !event.total) return;
+          onProgress(Math.min(100, Math.round((event.loaded * 100) / event.total)));
+        },
       });
       return response.data;
     } catch (error) {

@@ -25,8 +25,9 @@ type Actor = {
 
 type TicketInput = {
   ownerId: mongoose.Types.ObjectId | string;
-  subject: string;
+  subject?: string;
   category: SupportTicketCategory;
+  customIssue?: string;
   message: string;
   priority?: SupportTicketPriority;
   source?: SupportTicketSource;
@@ -53,6 +54,17 @@ const VALID_TRANSITIONS: Record<SupportTicketStatus, SupportTicketStatus[]> = {
 };
 
 const ALL_SUPPORT_CATEGORIES = Object.values(SupportTicketCategory) as SupportTicketCategory[];
+
+const SUPPORT_CATEGORY_LABELS: Record<SupportTicketCategory, string> = {
+  [SupportTicketCategory.KYC_VERIFICATION]: 'KYC verification',
+  [SupportTicketCategory.RELEASE_REJECTION]: 'Release rejection',
+  [SupportTicketCategory.COPYRIGHT_ISSUE]: 'Copyright issue',
+  [SupportTicketCategory.DSP_DELIVERY]: 'DSP delivery',
+  [SupportTicketCategory.ROYALTIES_PAYMENTS]: 'Royalties / payments',
+  [SupportTicketCategory.TECHNICAL_ISSUE]: 'Technical issue',
+  [SupportTicketCategory.ACCOUNT_SUPPORT]: 'Account support',
+  [SupportTicketCategory.OTHER]: 'Other',
+};
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -117,6 +129,20 @@ function toObjectId(value: mongoose.Types.ObjectId | string | undefined) {
 
 function createTicketNumber() {
   return `SA-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+}
+
+function deriveTicketSubject(input: TicketInput) {
+  const explicitSubject = input.subject?.trim();
+  if (explicitSubject) return explicitSubject.slice(0, 180);
+
+  const customIssue = input.customIssue?.trim();
+  if (input.category === SupportTicketCategory.OTHER && customIssue) {
+    return `Other: ${customIssue}`.slice(0, 180);
+  }
+
+  const label = SUPPORT_CATEGORY_LABELS[input.category] || 'Support';
+  const messageSummary = input.message.trim().replace(/\s+/g, ' ').slice(0, 72);
+  return messageSummary ? `${label}: ${messageSummary}`.slice(0, 180) : `${label} support request`;
 }
 
 function ensureTransition(current: SupportTicketStatus, next: SupportTicketStatus) {
@@ -221,11 +247,12 @@ export async function createSupportTicket(input: TicketInput) {
 
   const ownerId = toObjectId(input.ownerId);
   if (!ownerId) throw new ApiError('Ticket owner is required', 400);
+  const subject = deriveTicketSubject(input);
 
   const ticket = await SupportTicket.create({
     ticketNumber: createTicketNumber(),
     ownerId,
-    subject: input.subject,
+    subject,
     category: input.category,
     priority: input.priority || SupportTicketPriority.NORMAL,
     source: input.source || SupportTicketSource.USER,

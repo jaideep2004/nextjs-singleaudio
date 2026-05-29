@@ -62,6 +62,7 @@ export const createUserSupportTicket = async (req: AuthRequest, res: Response): 
       ownerId: req.user._id,
       subject: req.body.subject,
       category: req.body.category,
+      customIssue: req.body.customIssue,
       priority: req.body.priority,
       message: req.body.message,
       source,

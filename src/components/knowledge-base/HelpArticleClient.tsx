@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   CircularProgress,
@@ -26,6 +29,7 @@ import {
   LightMode,
   Menu,
   Search,
+  ExpandMore,
 } from '@mui/icons-material';
 import {
   knowledgeBaseAPI,
@@ -264,18 +268,50 @@ export default function HelpArticleClient({
           display: 'grid',
           gridTemplateColumns: {
             xs: 'minmax(0, 1fr)',
-            md: 'minmax(0, 1fr) 240px',
-            lg: '292px minmax(0, 820px) 260px',
+            lg: '320px minmax(0, 980px)',
           },
-          gap: { xs: 0, md: 3 },
+          gap: { xs: 0, lg: 3 },
           px: { xs: 2, md: 4 },
           py: { xs: 3, md: 4 },
-          maxWidth: 1440,
+          maxWidth: 1380,
           mx: 'auto',
         }}
       >
-        <Box sx={{ display: { xs: 'none', lg: 'block' }, position: 'sticky', top: 92, alignSelf: 'start' }}>
-          {sidebar}
+        <Box
+          sx={{
+            display: { xs: 'none', lg: 'block' },
+            position: 'sticky',
+            top: 92,
+            alignSelf: 'start',
+            minWidth: 0,
+          }}
+        >
+          <Stack spacing={2}>
+            {sidebar}
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: articleBg, borderColor: panelBorder }}>
+              <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>On this page</Typography>
+              <Stack spacing={0.5} sx={{ mt: 1 }}>
+                {headings.length > 0 ? headings.map((heading) => (
+                  <Button key={heading.id} href={`#${heading.id}`} size="small" sx={{ justifyContent: 'flex-start', textAlign: 'left' }}>
+                    {heading.text}
+                  </Button>
+                )) : (
+                  <Typography variant="body2" color="text.secondary">Article overview</Typography>
+                )}
+              </Stack>
+              {relatedArticles.length > 0 && (
+                <>
+                  <Divider sx={{ my: 2 }} />
+                  <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>Related</Typography>
+                  {relatedArticles.map((related) => (
+                    <Button key={related._id} component={Link} href={articleHref(related.slug)} size="small" sx={{ justifyContent: 'flex-start', display: 'flex', textAlign: 'left' }}>
+                      {related.title}
+                    </Button>
+                  ))}
+                </>
+              )}
+            </Paper>
+          </Stack>
         </Box>
         <Paper
           component="article"
@@ -346,38 +382,30 @@ export default function HelpArticleClient({
               <Typography variant="h5" fontWeight={900} sx={{ mb: 1.5 }}>FAQs</Typography>
               <Stack spacing={1.5}>
                 {article.faqBlocks?.map((faq, index) => (
-                  <Paper key={`${faq.question}-${index}`} variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: articleBg, borderColor: panelBorder }}>
-                    <Typography fontWeight={850} color="text.primary">{faq.question}</Typography>
-                    <Typography color="text.secondary">{faq.answer}</Typography>
-                  </Paper>
+                  <Accordion
+                    key={`${faq.question}-${index}`}
+                    disableGutters
+                    elevation={0}
+                    sx={{
+                      bgcolor: articleBg,
+                      border: '1px solid',
+                      borderColor: panelBorder,
+                      borderRadius: 1,
+                      '&:before': { display: 'none' },
+                    }}
+                  >
+                    <AccordionSummary expandIcon={<ExpandMore />}>
+                      <Typography fontWeight={850} color="text.primary">{faq.question}</Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <Typography color="text.secondary">{faq.answer}</Typography>
+                    </AccordionDetails>
+                  </Accordion>
                 ))}
               </Stack>
             </Box>
           )}
         </Paper>
-        <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'sticky', top: 92, alignSelf: 'start', minWidth: 0 }}>
-          <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>On this page</Typography>
-          <Stack spacing={0.5} sx={{ mt: 1 }}>
-            {headings.length > 0 ? headings.map((heading) => (
-              <Button key={heading.id} href={`#${heading.id}`} size="small" sx={{ justifyContent: 'flex-start', textAlign: 'left' }}>
-                {heading.text}
-              </Button>
-            )) : (
-              <Typography variant="body2" color="text.secondary">Article overview</Typography>
-            )}
-          </Stack>
-          {relatedArticles.length > 0 && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Typography variant="overline" color="text.secondary" fontWeight={900} sx={{ letterSpacing: 0 }}>Related</Typography>
-              {relatedArticles.map((related) => (
-                <Button key={related._id} component={Link} href={articleHref(related.slug)} size="small" sx={{ justifyContent: 'flex-start', display: 'flex', textAlign: 'left' }}>
-                  {related.title}
-                </Button>
-              ))}
-            </>
-          )}
-        </Box>
       </Box>
     </Box>
   );

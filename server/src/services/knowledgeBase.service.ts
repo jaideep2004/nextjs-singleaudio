@@ -159,6 +159,52 @@ function normalizeKeywords(keywords?: string[]) {
   return Array.from(new Set((keywords || []).map((keyword) => keyword.trim()).filter(Boolean))).slice(0, 20);
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeSearchText(value: unknown) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function firstWords(value: string, count: number) {
+  return normalizeSearchText(value).split(/\s+/).filter(Boolean).slice(0, count).join(' ');
+}
+
+function scoreArticleSearch(article: any, query: string, textScore = 0) {
+  const normalizedQuery = normalizeSearchText(query);
+  const queryWords = normalizedQuery.split(/\s+/).filter(Boolean);
+  const firstTwoQueryWords = queryWords.slice(0, 2).join(' ');
+  const title = normalizeSearchText(article.title);
+  const slug = String(article.slug || '').toLowerCase();
+  const excerpt = normalizeSearchText(article.excerpt);
+  const contentText = normalizeSearchText(article.contentText);
+  const keywords: string[] = Array.isArray(article.seo?.keywords)
+    ? article.seo.keywords.map(normalizeSearchText)
+    : [];
+
+  let score = textScore * 10;
+
+  if (title === normalizedQuery) score += 1500;
+  if (title.startsWith(normalizedQuery)) score += 1200;
+  if (firstTwoQueryWords && firstWords(article.title, 2).startsWith(firstTwoQueryWords)) score += 1000;
+  if (title.split(/\s+/).some((word) => word.startsWith(normalizedQuery))) score += 850;
+  if (slug.startsWith(slugify(query))) score += 700;
+  if (keywords.some((keyword) => keyword === normalizedQuery)) score += 650;
+  if (keywords.some((keyword) => keyword.startsWith(normalizedQuery))) score += 520;
+  if (title.includes(normalizedQuery)) score += 420;
+  if (excerpt.includes(normalizedQuery)) score += 180;
+  if (contentText.includes(normalizedQuery)) score += 80;
+
+  queryWords.forEach((word) => {
+    if (title.split(/\s+/).some((titleWord) => titleWord.startsWith(word))) score += 120;
+    if (keywords.some((keyword) => keyword.startsWith(word))) score += 80;
+  });
+
+  score -= Math.min(title.length, 120) / 20;
+  return score;
+}
+
 async function ensureUniqueArticleSlug(baseSlug: string, currentId?: string) {
   const slug = baseSlug || 'article';
   let candidate = slug;
@@ -235,18 +281,76 @@ export async function listKnowledgeBaseTree({ includeDrafts = false } = {}) {
 export async function searchPublishedArticles(search: string, limit = 10) {
   const query = search.trim();
   if (!query) return { articles: [] };
+  const safeLimit = Math.min(Math.max(limit, 1), 25);
+  const normalizedQuery = normalizeSearchText(query);
+  if (!normalizedQuery) return { articles: [] };
 
-  const articles = await KnowledgeBaseArticle.find(
-    {
+  const escapedQuery = escapeRegex(normalizedQuery);
+  const wordPrefixRegex = new RegExp(`(^|[\\s-])${escapedQuery}`, 'i');
+  const containsRegex = new RegExp(escapedQuery, 'i');
+  const slugPrefix = slugify(query);
+
+  const baseFields = 'categoryId sectionId title slug excerpt contentText seo.keywords publishedAt updatedAt';
+  const textProjection = {
+    categoryId: 1,
+    sectionId: 1,
+    title: 1,
+    slug: 1,
+    excerpt: 1,
+    contentText: 1,
+    seo: 1,
+    publishedAt: 1,
+    updatedAt: 1,
+    score: { $meta: 'textScore' },
+  };
+
+  const [prefixArticles, textArticles] = await Promise.all([
+    KnowledgeBaseArticle.find({
       status: KnowledgeBaseArticleStatus.PUBLISHED,
-      $text: { $search: query },
-    },
-    { score: { $meta: 'textScore' } }
-  )
-    .select('categoryId sectionId title slug excerpt publishedAt updatedAt')
-    .sort({ score: { $meta: 'textScore' } as unknown as SortOrder })
-    .limit(Math.min(Math.max(limit, 1), 25))
-    .lean();
+      $or: [
+        { title: wordPrefixRegex },
+        { slug: new RegExp(`^${escapeRegex(slugPrefix)}`, 'i') },
+        { excerpt: containsRegex },
+        { 'seo.keywords': wordPrefixRegex },
+      ],
+    })
+      .select(baseFields)
+      .limit(Math.max(safeLimit * 4, 20))
+      .lean(),
+    KnowledgeBaseArticle.find(
+      {
+        status: KnowledgeBaseArticleStatus.PUBLISHED,
+        $text: { $search: query },
+      },
+      textProjection
+    )
+      .sort({ score: { $meta: 'textScore' } as unknown as SortOrder })
+      .limit(Math.max(safeLimit * 4, 20))
+      .lean(),
+  ]);
+
+  const textScores = new Map<string, number>();
+  textArticles.forEach((article: any) => {
+    textScores.set(String(article._id), Number(article.score || 0));
+  });
+
+  const merged = new Map<string, any>();
+  [...prefixArticles, ...textArticles].forEach((article: any) => {
+    merged.set(String(article._id), article);
+  });
+
+  const articles = Array.from(merged.values())
+    .map((article: any) => ({
+      ...article,
+      searchRank: scoreArticleSearch(article, query, textScores.get(String(article._id)) || 0),
+    }))
+    .filter((article) => article.searchRank > 0)
+    .sort((left, right) => {
+      if (right.searchRank !== left.searchRank) return right.searchRank - left.searchRank;
+      return new Date(right.publishedAt || right.updatedAt || 0).getTime() - new Date(left.publishedAt || left.updatedAt || 0).getTime();
+    })
+    .slice(0, safeLimit)
+    .map(({ searchRank: _searchRank, score: _score, contentText: _contentText, seo: _seo, ...article }) => article);
 
   return { articles };
 }

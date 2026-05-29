@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   CircularProgress,
@@ -31,6 +34,7 @@ import {
   LightMode,
   Menu,
   Search,
+  ExpandMore,
 } from '@mui/icons-material';
 import {
   knowledgeBaseAPI,
@@ -75,6 +79,62 @@ function hasTreeData(tree?: KnowledgeBaseTree) {
   );
 }
 
+function useKnowledgeBaseSearch(query: string) {
+  const [results, setResults] = useState<KnowledgeBaseArticle[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const run = async () => {
+      if (query.trim().length < 2) {
+        setResults([]);
+        return;
+      }
+      const response = await knowledgeBaseAPI.search(query.trim(), 8);
+      if (active) setResults(response?.data?.articles || []);
+    };
+    const id = window.setTimeout(run, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(id);
+    };
+  }, [query]);
+
+  return results;
+}
+
+function SearchResultsPanel({
+  results,
+  panelBorder,
+  panelBg,
+}: {
+  results: KnowledgeBaseArticle[];
+  panelBorder: string;
+  panelBg: string;
+}) {
+  if (results.length === 0) return null;
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        mt: 1,
+        borderRadius: 1,
+        overflow: 'hidden',
+        borderColor: panelBorder,
+        bgcolor: panelBg,
+        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      {results.map(article => (
+        <ListItemButton key={article._id} component={Link} href={articleHref(article.slug)}>
+          <Article sx={{ mr: 1.5 }} />
+          <ListItemText primary={article.title} secondary={article.excerpt} />
+        </ListItemButton>
+      ))}
+    </Paper>
+  );
+}
+
 export function HelpSidebar({
   categories,
   sections,
@@ -103,77 +163,98 @@ export function HelpSidebar({
         </Box>
       </Stack>
       <Divider sx={{ mb: 2 }} />
-      <List disablePadding>
+      <List disablePadding sx={{ display: 'grid', gap: 1 }}>
         {grouped.map(category => (
-          <Box key={category._id} sx={{ mb: 1.5 }}>
-            <Typography
-              variant="overline"
-              sx={{ px: 1, color: 'text.secondary', fontWeight: 900, letterSpacing: 0 }}
+          <Accordion
+            key={category._id}
+            defaultExpanded={category.articles.some(article => activeSlug === article.slug) || category.sections.some(section => section.articles.some(article => activeSlug === article.slug))}
+            disableGutters
+            elevation={0}
+            sx={{
+              bgcolor: 'transparent',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              '&:before': { display: 'none' },
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMore />}
+              sx={{ minHeight: 44, '& .MuiAccordionSummary-content': { my: 1 } }}
             >
-              {category.name}
-            </Typography>
-            {category.articles.map(article => (
-              <ListItemButton
-                key={article._id}
-                component={Link}
-                href={articleHref(article.slug)}
-                onClick={onNavigate}
-                selected={activeSlug === article.slug}
-                sx={{
-                  borderRadius: 1,
-                  minHeight: 40,
-                  color: 'text.primary',
-                  '&.Mui-selected': {
-                    bgcolor: alpha(
-                      theme.palette.primary.main,
-                      theme.palette.mode === 'dark' ? 0.22 : 0.1
-                    ),
-                  },
-                }}
-              >
-                <ListItemText
-                  primary={article.title}
-                  primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
-                />
-              </ListItemButton>
-            ))}
-            {category.sections.map(section => (
-              <Box key={section._id} sx={{ mt: 0.5 }}>
-                <Typography
-                  variant="caption"
-                  sx={{ px: 1.25, color: 'text.secondary', fontWeight: 850 }}
+              <Typography fontWeight={900} sx={{ fontSize: 13 }}>
+                {category.name}
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0, px: 1, pb: 1 }}>
+              {category.articles.map(article => (
+                <ListItemButton
+                  key={article._id}
+                  component={Link}
+                  href={articleHref(article.slug)}
+                  onClick={onNavigate}
+                  selected={activeSlug === article.slug}
+                  sx={{
+                    borderRadius: 1,
+                    minHeight: 40,
+                    color: 'text.primary',
+                    '&.Mui-selected': {
+                      bgcolor: alpha(
+                        theme.palette.primary.main,
+                        theme.palette.mode === 'dark' ? 0.22 : 0.1
+                      ),
+                    },
+                  }}
                 >
-                  {section.name}
-                </Typography>
-                {section.articles.map(article => (
-                  <ListItemButton
-                    key={article._id}
-                    component={Link}
-                    href={articleHref(article.slug)}
-                    onClick={onNavigate}
-                    selected={activeSlug === article.slug}
-                    sx={{
-                      borderRadius: 1,
-                      minHeight: 40,
-                      pl: 2,
-                      color: 'text.primary',
-                      '&.Mui-selected': {
-                        bgcolor: alpha(
-                          theme.palette.primary.main,
-                          theme.palette.mode === 'dark' ? 0.22 : 0.1
-                        ),
-                      },
-                    }}
+                  <ListItemText
+                    primary={article.title}
+                    primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
+                  />
+                </ListItemButton>
+              ))}
+              {category.sections.map(section => (
+                <Box key={section._id} sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{ px: 1.25, color: 'text.secondary', fontWeight: 850 }}
                   >
-                    <ListItemText
-                      primary={article.title}
-                      primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
-                    />
-                  </ListItemButton>
-                ))}
-              </Box>
-            ))}
-          </Box>
+                    {section.name}
+                  </Typography>
+                  {section.articles.map(article => (
+                    <ListItemButton
+                      key={article._id}
+                      component={Link}
+                      href={articleHref(article.slug)}
+                      onClick={onNavigate}
+                      selected={activeSlug === article.slug}
+                      sx={{
+                        borderRadius: 1,
+                        minHeight: 40,
+                        pl: 2,
+                        color: 'text.primary',
+                        '&.Mui-selected': {
+                          bgcolor: alpha(
+                            theme.palette.primary.main,
+                            theme.palette.mode === 'dark' ? 0.22 : 0.1
+                          ),
+                        },
+                      }}
+                    >
+                      <ListItemText
+                        primary={article.title}
+                        primaryTypographyProps={{ fontSize: 14, fontWeight: 700 }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </Box>
+              ))}
+              {category.articles.length === 0 && category.sections.every(section => section.articles.length === 0) && (
+                <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
+                  No articles.
+                </Typography>
+              )}
+            </AccordionDetails>
+          </Accordion>
         ))}
       </List>
     </Box>
@@ -194,8 +275,8 @@ export default function HelpCenterClient({
   );
   const [sections, setSections] = useState<KnowledgeBaseSection[]>(initialTree?.sections || []);
   const [articles, setArticles] = useState<KnowledgeBaseArticle[]>(initialTree?.articles || []);
-  const [search, setSearch] = useState('');
-  const [results, setResults] = useState<KnowledgeBaseArticle[]>([]);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [heroSearch, setHeroSearch] = useState('');
   const [loading, setLoading] = useState(!hasTreeData(initialTree));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [error, setError] = useState('');
@@ -209,6 +290,8 @@ export default function HelpCenterClient({
     () => grouped.find(category => category.slug === categorySlug),
     [grouped, categorySlug]
   );
+  const headerResults = useKnowledgeBaseSearch(headerSearch);
+  const heroResults = useKnowledgeBaseSearch(heroSearch);
 
   useEffect(() => {
     if (hasTreeData(initialTree)) return;
@@ -235,23 +318,6 @@ export default function HelpCenterClient({
     };
   }, [initialTree]);
 
-  useEffect(() => {
-    let active = true;
-    const run = async () => {
-      if (search.trim().length < 2) {
-        setResults([]);
-        return;
-      }
-      const response = await knowledgeBaseAPI.search(search.trim(), 8);
-      if (active) setResults(response?.data?.articles || []);
-    };
-    const id = window.setTimeout(run, 250);
-    return () => {
-      active = false;
-      window.clearTimeout(id);
-    };
-  }, [search]);
-
   const sidebar = (
     <HelpSidebar
       categories={categories}
@@ -270,12 +336,18 @@ export default function HelpCenterClient({
     ? 'linear-gradient(135deg, #0a1718 0%, #10252c 48%, #223923 100%)'
     : 'linear-gradient(135deg, #092435 0%, #245d80 56%, #d87544 100%)';
 
-  const searchField = (
+  const renderSearchField = (
+    value: string,
+    onChange: (value: string) => void,
+    results: KnowledgeBaseArticle[],
+    elevated = false
+  ) => (
+    <Box sx={{ position: 'relative' }}>
     <TextField
       fullWidth
       size="small"
-      value={search}
-      onChange={event => setSearch(event.target.value)}
+      value={value}
+      onChange={event => onChange(event.target.value)}
       placeholder="Search help articles"
       InputProps={{
         startAdornment: (
@@ -286,9 +358,12 @@ export default function HelpCenterClient({
       }}
       sx={{
         '& .MuiOutlinedInput-root': {
-          minHeight: 44,
-          bgcolor: isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
+          minHeight: elevated ? 56 : 44,
+          bgcolor: elevated ? '#ffffff' : isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
           color: isDark ? '#f8f0df' : '#101820',
+          borderRadius: 1,
+          fontSize: elevated ? 17 : undefined,
+          boxShadow: elevated ? '0 18px 44px rgba(0, 0, 0, 0.2)' : undefined,
         },
         '& .MuiSvgIcon-root': {
           color: isDark ? alpha('#f8f0df', 0.9) : alpha('#101820', 0.72),
@@ -299,6 +374,8 @@ export default function HelpCenterClient({
         },
       }}
     />
+    <SearchResultsPanel results={results} panelBorder={panelBorder} panelBg={elevated ? '#ffffff' : panelBg} />
+    </Box>
   );
 
   return (
@@ -354,7 +431,7 @@ export default function HelpCenterClient({
             sx={{ flex: 1, justifyContent: 'flex-end', minWidth: 0 }}
           >
             <Box sx={{ width: { sm: 280, md: 360 }, display: { xs: 'none', sm: 'block' } }}>
-              {searchField}
+              {renderSearchField(headerSearch, setHeaderSearch, headerResults)}
             </Box>
             <Tooltip title={isDark ? 'Light mode' : 'Dark mode'}>
               <IconButton
@@ -366,7 +443,9 @@ export default function HelpCenterClient({
             </Tooltip>
           </Stack>
         </Stack>
-        <Box sx={{ display: { xs: 'block', sm: 'none' }, px: 2, pb: 1.5 }}>{searchField}</Box>
+        <Box sx={{ display: { xs: 'block', sm: 'none' }, px: 2, pb: 1.5 }}>
+          {renderSearchField(headerSearch, setHeaderSearch, headerResults)}
+        </Box>
       </Box>
 
       {mode === 'article' && (
@@ -425,39 +504,7 @@ export default function HelpCenterClient({
                   How can we help you?
                 </Typography>
                 <Box sx={{ width: '100%', maxWidth: 760 }}>
-                  <TextField
-                    fullWidth
-                    value={search}
-                    onChange={event => setSearch(event.target.value)}
-                    placeholder="Type your question here..."
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        bgcolor: '#ffffff',
-                        color: '#101820',
-                        borderRadius: 1,
-                        minHeight: 56,
-                        fontSize: 17,
-                        boxShadow: '0 18px 44px rgba(0, 0, 0, 0.2)',
-                      },
-                      '& .MuiSvgIcon-root': {
-                        color: alpha('#101820', 0.72),
-                      },
-                      '& .MuiInputBase-input': {
-                        color: '#101820',
-                      },
-                      '& .MuiInputBase-input::placeholder': {
-                        color: alpha('#101820', 0.58),
-                        opacity: 1,
-                      },
-                    }}
-                  />
+                  {renderSearchField(heroSearch, setHeroSearch, heroResults, true)}
                 </Box>
               </Stack>
             </Box>
@@ -466,29 +513,6 @@ export default function HelpCenterClient({
               sx={{ width: '100%', maxWidth: 1500, mx: 'auto', px: { xs: 2, md: 4 } }}
               style={{ paddingBottom: '50px' }}
             >
-              {results.length > 0 && (
-                <Paper
-                  variant="outlined"
-                  sx={{
-                    mb: 3,
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    borderColor: panelBorder,
-                    bgcolor: panelBg,
-                  }}
-                >
-                  {results.map(article => (
-                    <ListItemButton
-                      key={article._id}
-                      component={Link}
-                      href={articleHref(article.slug)}
-                    >
-                      <Article sx={{ mr: 1.5 }} />
-                      <ListItemText primary={article.title} secondary={article.excerpt} />
-                    </ListItemButton>
-                  ))}
-                </Paper>
-              )}
               <Box
                 sx={{
                   display: 'flex',
@@ -664,29 +688,6 @@ export default function HelpCenterClient({
                     </Typography>
                   </Box>
                 </Stack>
-
-                {results.length > 0 && (
-                  <Paper
-                    variant="outlined"
-                    sx={{
-                      borderRadius: 1,
-                      overflow: 'hidden',
-                      borderColor: panelBorder,
-                      bgcolor: panelBg,
-                    }}
-                  >
-                    {results.map(article => (
-                      <ListItemButton
-                        key={article._id}
-                        component={Link}
-                        href={articleHref(article.slug)}
-                      >
-                        <Article sx={{ mr: 1.5 }} />
-                        <ListItemText primary={article.title} secondary={article.excerpt} />
-                      </ListItemButton>
-                    ))}
-                  </Paper>
-                )}
 
                 <Box
                   sx={{

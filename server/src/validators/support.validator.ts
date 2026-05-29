@@ -24,8 +24,18 @@ export const ticketIdValidator = [
 ];
 
 export const createSupportTicketValidator = [
-  body('subject').trim().notEmpty().withMessage('Subject is required').isLength({ max: 180 }),
+  body('subject').optional().trim().isLength({ max: 180 }).withMessage('Subject cannot exceed 180 characters'),
   body('category').isIn(Object.values(SupportTicketCategory)).withMessage('Invalid ticket category'),
+  body('customIssue')
+    .customSanitizer((value) => (typeof value === 'string' ? value.trim() : ''))
+    .custom((value, { req }) => {
+      const text = typeof value === 'string' ? value : '';
+      if (text.length > 180) throw new Error('Custom issue cannot exceed 180 characters');
+      if (req.body.category === SupportTicketCategory.OTHER && !text) {
+        throw new Error('Custom issue is required for Other category');
+      }
+      return true;
+    }),
   body('priority').optional().isIn(Object.values(SupportTicketPriority)).withMessage('Invalid ticket priority'),
   body('message').trim().notEmpty().withMessage('Message is required').isLength({ max: 5000 }),
   body('related.releaseId').optional().isMongoId().withMessage('Invalid release ID'),

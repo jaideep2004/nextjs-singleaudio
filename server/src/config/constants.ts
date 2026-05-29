@@ -103,7 +103,8 @@ export enum SupportTicketCategory {
   DSP_DELIVERY = 'dsp_delivery',
   ROYALTIES_PAYMENTS = 'royalties_payments',
   TECHNICAL_ISSUE = 'technical_issue',
-  ACCOUNT_SUPPORT = 'account_support'
+  ACCOUNT_SUPPORT = 'account_support',
+  OTHER = 'other'
 }
 
 export enum SupportTicketPriority {

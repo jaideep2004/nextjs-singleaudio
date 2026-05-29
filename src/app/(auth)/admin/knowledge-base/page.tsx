@@ -7,6 +7,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Divider,
   IconButton,
   LinearProgress,
@@ -92,6 +93,10 @@ export default function AdminKnowledgeBasePage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingTarget, setUploadingTarget] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [sidebarSection, setSidebarSection] = useState<'articles' | 'structure'>('articles');
+  const [detailSection, setDetailSection] = useState<'seo' | 'faqs' | 'media'>('seo');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -298,9 +303,11 @@ export default function AdminKnowledgeBasePage() {
     if (!file) return;
 
     setUploading(true);
+    setUploadingTarget(mediaType);
+    setUploadProgress(0);
     setError('');
     try {
-      const response = await adminKnowledgeBaseAPI.uploadMedia(file);
+      const response = await adminKnowledgeBaseAPI.uploadMedia(file, setUploadProgress);
       const media = response?.data;
       if (!media) throw new Error('Upload failed');
 
@@ -320,6 +327,8 @@ export default function AdminKnowledgeBasePage() {
       setError(err instanceof Error ? err.message : 'Failed to upload media');
     } finally {
       setUploading(false);
+      setUploadingTarget('');
+      setUploadProgress(0);
     }
   };
 
@@ -329,9 +338,11 @@ export default function AdminKnowledgeBasePage() {
     if (!file) return;
 
     setUploading(true);
+    setUploadingTarget(categoryId ? `category-${categoryId}` : 'category-new');
+    setUploadProgress(0);
     setError('');
     try {
-      const response = await adminKnowledgeBaseAPI.uploadMedia(file);
+      const response = await adminKnowledgeBaseAPI.uploadMedia(file, setUploadProgress);
       const media = response?.data;
       if (!media) throw new Error('Upload failed');
 
@@ -345,6 +356,8 @@ export default function AdminKnowledgeBasePage() {
       setError(err instanceof Error ? err.message : 'Failed to upload category image');
     } finally {
       setUploading(false);
+      setUploadingTarget('');
+      setUploadProgress(0);
     }
   };
 
@@ -412,7 +425,25 @@ export default function AdminKnowledgeBasePage() {
         </Stack>
       </Paper>
 
-      {(loading || saving || uploading) && <LinearProgress sx={{ mb: 2 }} />}
+      {(loading || saving) && <LinearProgress sx={{ mb: 2 }} />}
+      {uploading && (
+        <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 1, bgcolor: surface }}>
+          <Stack spacing={0.75}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography variant="body2" fontWeight={850} color="text.primary">
+                Uploading media
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {uploadProgress > 0 ? `${uploadProgress}%` : 'Preparing...'}
+              </Typography>
+            </Stack>
+            <LinearProgress
+              variant={uploadProgress > 0 ? 'determinate' : 'indeterminate'}
+              value={uploadProgress}
+            />
+          </Stack>
+        </Paper>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -440,6 +471,26 @@ export default function AdminKnowledgeBasePage() {
       >
         <Box sx={{ minWidth: 0 }}>
           <Stack spacing={2} sx={{ position: { lg: 'sticky' }, top: 88 }}>
+            <Paper variant="outlined" sx={{ p: 1, borderRadius: 1, bgcolor: surface }}>
+              <Stack direction="row" spacing={1}>
+                {[
+                  { value: 'articles', label: 'Articles', icon: <Article fontSize="small" /> },
+                  { value: 'structure', label: 'Structure', icon: <ViewModule fontSize="small" /> },
+                ].map(item => (
+                  <Button
+                    key={item.value}
+                    fullWidth
+                    variant={sidebarSection === item.value ? 'contained' : 'text'}
+                    startIcon={item.icon}
+                    onClick={() => setSidebarSection(item.value as 'articles' | 'structure')}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </Stack>
+            </Paper>
+
+            {sidebarSection === 'articles' && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <Search fontSize="small" />
@@ -492,7 +543,9 @@ export default function AdminKnowledgeBasePage() {
                 )}
               </Stack>
             </Paper>
+            )}
 
+            {sidebarSection === 'structure' && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <ViewModule fontSize="small" />
@@ -582,10 +635,18 @@ export default function AdminKnowledgeBasePage() {
                           size="small"
                           variant="outlined"
                           component="label"
-                          startIcon={<ImageIcon />}
+                          startIcon={
+                            uploading && uploadingTarget === `category-${categoryItem._id}` ? (
+                              <CircularProgress size={16} />
+                            ) : (
+                              <ImageIcon />
+                            )
+                          }
                           disabled={uploading || saving}
                         >
-                          Upload
+                          {uploading && uploadingTarget === `category-${categoryItem._id}`
+                            ? `${uploadProgress || 0}%`
+                            : 'Upload'}
                           <input
                             hidden
                             type="file"
@@ -652,10 +713,18 @@ export default function AdminKnowledgeBasePage() {
                   size="small"
                   variant="outlined"
                   component="label"
-                  startIcon={<ImageIcon />}
+                  startIcon={
+                    uploading && uploadingTarget === 'category-new' ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <ImageIcon />
+                    )
+                  }
                   disabled={uploading}
                 >
-                  Upload Category Image
+                  {uploading && uploadingTarget === 'category-new'
+                    ? `${uploadProgress || 0}%`
+                    : 'Upload Category Image'}
                   <input
                     hidden
                     type="file"
@@ -705,6 +774,7 @@ export default function AdminKnowledgeBasePage() {
                 </Button>
               </Stack>
             </Paper>
+            )}
           </Stack>
         </Box>
 
@@ -846,6 +916,26 @@ export default function AdminKnowledgeBasePage() {
 
         <Box sx={{ minWidth: 0, gridColumn: { lg: '1 / -1', xl: 'auto' } }}>
           <Stack spacing={2} sx={{ position: { xl: 'sticky' }, top: 88 }}>
+            <Paper variant="outlined" sx={{ p: 1, borderRadius: 1, bgcolor: surface }}>
+              <Stack direction="row" spacing={1}>
+                {[
+                  { value: 'seo', label: 'SEO' },
+                  { value: 'faqs', label: 'FAQs' },
+                  { value: 'media', label: 'Media' },
+                ].map(item => (
+                  <Button
+                    key={item.value}
+                    fullWidth
+                    variant={detailSection === item.value ? 'contained' : 'text'}
+                    onClick={() => setDetailSection(item.value as 'seo' | 'faqs' | 'media')}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </Stack>
+            </Paper>
+
+            {detailSection === 'seo' && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
                 SEO
@@ -894,7 +984,9 @@ export default function AdminKnowledgeBasePage() {
                 />
               </Stack>
             </Paper>
+            )}
 
+            {detailSection === 'faqs' && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack
                 direction="row"
@@ -966,7 +1058,9 @@ export default function AdminKnowledgeBasePage() {
                 )}
               </Stack>
             </Paper>
+            )}
 
+            {detailSection === 'media' && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
                 Media
@@ -975,10 +1069,16 @@ export default function AdminKnowledgeBasePage() {
                 <Button
                   component="label"
                   variant="outlined"
-                  startIcon={<ImageIcon />}
+                  startIcon={
+                    uploading && uploadingTarget === 'image' ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <ImageIcon />
+                    )
+                  }
                   disabled={uploading}
                 >
-                  Image
+                  {uploading && uploadingTarget === 'image' ? `${uploadProgress || 0}%` : 'Image'}
                   <input
                     hidden
                     type="file"
@@ -989,10 +1089,16 @@ export default function AdminKnowledgeBasePage() {
                 <Button
                   component="label"
                   variant="outlined"
-                  startIcon={<Movie />}
+                  startIcon={
+                    uploading && uploadingTarget === 'video' ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <Movie />
+                    )
+                  }
                   disabled={uploading}
                 >
-                  Video
+                  {uploading && uploadingTarget === 'video' ? `${uploadProgress || 0}%` : 'Video'}
                   <input
                     hidden
                     type="file"
@@ -1101,6 +1207,7 @@ export default function AdminKnowledgeBasePage() {
                 )}
               </Stack>
             </Paper>
+            )}
           </Stack>
         </Box>
       </Box>

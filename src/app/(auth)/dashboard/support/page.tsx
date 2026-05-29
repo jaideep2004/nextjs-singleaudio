@@ -44,8 +44,8 @@ export default function UserSupportPage() {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
-    subject: '',
     category: 'technical_issue' as SupportTicketCategory,
+    customIssue: '',
     priority: 'normal' as SupportTicketPriority,
     message: '',
   });
@@ -99,9 +99,14 @@ export default function UserSupportPage() {
     setSubmitting(true);
     setError('');
     try {
-      const response = await supportAPI.createTicket(form);
+      const response = await supportAPI.createTicket({
+        category: form.category,
+        customIssue: form.category === 'other' ? form.customIssue.trim() : undefined,
+        priority: form.priority,
+        message: form.message,
+      });
       const created = response?.data;
-      setForm({ subject: '', category: 'technical_issue', priority: 'normal', message: '' });
+      setForm({ category: 'technical_issue', customIssue: '', priority: 'normal', message: '' });
       setCreateOpen(false);
       await loadTickets();
       if (created?._id) setSelectedId(created._id);
@@ -118,11 +123,10 @@ export default function UserSupportPage() {
     setSubmitting(true);
     setError('');
     try {
-      if (reply.trim()) {
-        await supportAPI.addMessage(selectedId, reply.trim());
-      }
       if (attachment) {
-        await supportAPI.uploadAttachment(selectedId, attachment);
+        await supportAPI.uploadAttachment(selectedId, attachment, reply.trim() || undefined);
+      } else if (reply.trim()) {
+        await supportAPI.addMessage(selectedId, reply.trim());
       }
       setReply('');
       setAttachment(null);
@@ -168,19 +172,18 @@ export default function UserSupportPage() {
       {createOpen && (
         <Paper component="form" onSubmit={handleCreate} sx={{ p: 2, mb: 2, borderRadius: 2 }}>
           <Stack spacing={2}>
-            <TextField
-              label="Subject"
-              value={form.subject}
-              onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
-              required
-              fullWidth
-            />
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField
                 select
                 label="Category"
                 value={form.category}
-                onChange={(event) => setForm((current) => ({ ...current, category: event.target.value as SupportTicketCategory }))}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    category: event.target.value as SupportTicketCategory,
+                    customIssue: event.target.value === 'other' ? current.customIssue : '',
+                  }))
+                }
                 fullWidth
               >
                 {SUPPORT_CATEGORIES.map((category) => (
@@ -199,6 +202,17 @@ export default function UserSupportPage() {
                 ))}
               </TextField>
             </Stack>
+            {form.category === 'other' && (
+              <TextField
+                label="Custom issue"
+                value={form.customIssue}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, customIssue: event.target.value }))
+                }
+                required
+                fullWidth
+              />
+            )}
             <TextField
               label="Message"
               value={form.message}
@@ -324,8 +338,15 @@ export default function UserSupportPage() {
                     <AttachFile />
                     <input hidden type="file" onChange={handleAttachment} />
                   </IconButton>
-                  <Button type="submit" variant="contained" endIcon={<SendIcon />} disabled={submitting || selectedTicket.status === 'closed'}>
-                    Send
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    endIcon={
+                      submitting && attachment ? <CircularProgress size={16} color="inherit" /> : <SendIcon />
+                    }
+                    disabled={submitting || selectedTicket.status === 'closed'}
+                  >
+                    {submitting && attachment ? 'Sending' : 'Send'}
                   </Button>
                 </Stack>
               </Box>
