@@ -106,10 +106,12 @@ function SearchResultsPanel({
   results,
   panelBorder,
   panelBg,
+  lightSurface = false,
 }: {
   results: KnowledgeBaseArticle[];
   panelBorder: string;
   panelBg: string;
+  lightSurface?: boolean;
 }) {
   if (results.length === 0) return null;
 
@@ -117,18 +119,33 @@ function SearchResultsPanel({
     <Paper
       variant="outlined"
       sx={{
-        mt: 1,
+        position: 'absolute',
+        top: 'calc(100% + 10px)',
+        left: 0,
+        right: 0,
+        zIndex: 60,
         borderRadius: 1,
         overflow: 'hidden',
         borderColor: panelBorder,
         bgcolor: panelBg,
         boxShadow: '0 18px 48px rgba(0, 0, 0, 0.2)',
+        color: lightSurface ? '#101820' : 'text.primary',
       }}
     >
       {results.map(article => (
         <ListItemButton key={article._id} component={Link} href={articleHref(article.slug)}>
-          <Article sx={{ mr: 1.5 }} />
-          <ListItemText primary={article.title} secondary={article.excerpt} />
+          <Article sx={{ mr: 1.5, color: lightSurface ? alpha('#101820', 0.78) : 'inherit' }} />
+          <ListItemText
+            primary={article.title}
+            secondary={article.excerpt}
+            primaryTypographyProps={{
+              color: lightSurface ? '#101820' : 'text.primary',
+              fontWeight: 800,
+            }}
+            secondaryTypographyProps={{
+              color: lightSurface ? alpha('#101820', 0.68) : 'text.secondary',
+            }}
+          />
         </ListItemButton>
       ))}
     </Paper>
@@ -360,21 +377,37 @@ export default function HelpCenterClient({
         '& .MuiOutlinedInput-root': {
           minHeight: elevated ? 56 : 44,
           bgcolor: elevated ? '#ffffff' : isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
-          color: isDark ? '#f8f0df' : '#101820',
+          color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
           borderRadius: 1,
           fontSize: elevated ? 17 : undefined,
           boxShadow: elevated ? '0 18px 44px rgba(0, 0, 0, 0.2)' : undefined,
         },
         '& .MuiSvgIcon-root': {
-          color: isDark ? alpha('#f8f0df', 0.9) : alpha('#101820', 0.72),
+          color: elevated
+            ? alpha('#101820', 0.72)
+            : isDark
+              ? alpha('#f8f0df', 0.9)
+              : alpha('#101820', 0.72),
+        },
+        '& .MuiInputBase-input': {
+          color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
         },
         '& .MuiInputBase-input::placeholder': {
-          color: isDark ? alpha('#f8f0df', 0.7) : alpha('#101820', 0.58),
+          color: elevated
+            ? alpha('#101820', 0.58)
+            : isDark
+              ? alpha('#f8f0df', 0.7)
+              : alpha('#101820', 0.58),
           opacity: 1,
         },
       }}
     />
-    <SearchResultsPanel results={results} panelBorder={panelBorder} panelBg={elevated ? '#ffffff' : panelBg} />
+    <SearchResultsPanel
+      results={results}
+      panelBorder={panelBorder}
+      panelBg={elevated ? '#ffffff' : panelBg}
+      lightSurface={elevated}
+    />
     </Box>
   );
 
