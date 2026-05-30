@@ -50,7 +50,7 @@ const VALID_TRANSITIONS: Record<SupportTicketStatus, SupportTicketStatus[]> = {
     SupportTicketStatus.CLOSED,
   ],
   [SupportTicketStatus.RESOLVED]: [SupportTicketStatus.IN_REVIEW, SupportTicketStatus.CLOSED],
-  [SupportTicketStatus.CLOSED]: [],
+  [SupportTicketStatus.CLOSED]: [SupportTicketStatus.OPEN],
 };
 
 const ALL_SUPPORT_CATEGORIES = Object.values(SupportTicketCategory) as SupportTicketCategory[];
@@ -154,6 +154,43 @@ function ensureTransition(current: SupportTicketStatus, next: SupportTicketStatu
 
 function isAdminActor(actor: Actor) {
   return actor.role === UserRole.ADMIN || actor.role === UserRole.SUBADMIN;
+}
+
+async function addUnreadMessageCounts(
+  tickets: any[],
+  audience: 'admin' | 'user'
+) {
+  const normalized = tickets.map((ticket) =>
+    typeof ticket.toObject === 'function' ? ticket.toObject() : ticket
+  );
+  const ticketIds = normalized.map((ticket) => ticket._id).filter(Boolean);
+  if (ticketIds.length === 0) return normalized;
+
+  const unreadAuthorRole = audience === 'admin' ? 'user' : 'admin';
+  const messages = await SupportMessage.find({
+    ticketId: { $in: ticketIds },
+    visibility: SupportMessageVisibility.PUBLIC,
+    authorRole: unreadAuthorRole,
+  })
+    .select('ticketId createdAt')
+    .lean();
+
+  const counts = new Map<string, number>();
+  for (const ticket of normalized) {
+    const readAt = audience === 'admin' ? ticket.adminReadAt : ticket.userReadAt;
+    const ticketId = String(ticket._id);
+    const count = messages.filter(
+      (message) =>
+        String(message.ticketId) === ticketId &&
+        (!readAt || new Date(message.createdAt).getTime() > new Date(readAt).getTime())
+    ).length;
+    counts.set(ticketId, count);
+  }
+
+  return normalized.map((ticket) => ({
+    ...ticket,
+    unreadMessageCount: counts.get(String(ticket._id)) || 0,
+  }));
 }
 
 async function notifySupportAdmins(message: string, ticketId: mongoose.Types.ObjectId | string) {
@@ -297,7 +334,10 @@ export async function listUserTickets(userId: string, params: { status?: string;
     SupportTicket.countDocuments(query),
   ]);
 
-  return { tickets, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  return {
+    tickets: await addUnreadMessageCounts(tickets, 'user'),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  };
 }
 
 export async function listAdminTickets(params: {
@@ -362,7 +402,7 @@ export async function listAdminTickets(params: {
 
   const [tickets, total] = await Promise.all([
     SupportTicket.find(query)
-      .populate('ownerId', 'name email role artistName')
+      .populate('ownerId', 'name email role artistName profilePicture')
       .populate('assignedTo', 'name email role')
       .sort(getAdminTicketSort(params.sort))
       .skip((page - 1) * limit)
@@ -370,12 +410,15 @@ export async function listAdminTickets(params: {
     SupportTicket.countDocuments(query),
   ]);
 
-  return { tickets, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  return {
+    tickets: await addUnreadMessageCounts(tickets, 'admin'),
+    pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+  };
 }
 
 export async function getTicketWithMessages(ticketId: string, actor: Actor) {
   const ticket = await SupportTicket.findById(ticketId)
-    .populate('ownerId', 'name email role artistName')
+    .populate('ownerId', 'name email role artistName profilePicture')
     .populate('assignedTo', 'name email role');
 
   if (!ticket) throw new ApiError('Support ticket not found', 404);
@@ -397,6 +440,24 @@ export async function getTicketWithMessages(ticketId: string, actor: Actor) {
     .sort({ createdAt: 1 });
 
   return { ticket, messages };
+}
+
+export async function markTicketRead(ticketId: string, actor: Actor) {
+  const ticket = await SupportTicket.findById(ticketId);
+  if (!ticket) throw new ApiError('Support ticket not found', 404);
+
+  const ownerId = ((ticket.ownerId as any)?._id || ticket.ownerId).toString();
+  if (isAdminActor(actor)) {
+    assertCanManageSupportCategory(actor, ticket);
+    ticket.adminReadAt = new Date();
+  } else if (ownerId === String(actor._id)) {
+    ticket.userReadAt = new Date();
+  } else {
+    throw new ApiError('Not authorized to access this support ticket', 403);
+  }
+
+  await ticket.save();
+  return ticket;
 }
 
 export async function addTicketMessage(params: {

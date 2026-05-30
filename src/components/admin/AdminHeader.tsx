@@ -289,6 +289,7 @@ export default function AdminHeader() {
             }}
           >
             <Avatar
+              src={user?.profilePicture || undefined}
               sx={{
                 width: 30,
                 height: 30,

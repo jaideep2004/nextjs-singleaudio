@@ -378,6 +378,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
             }}
           >
             <Avatar
+              src={user?.profilePicture || undefined}
               sx={{
                 width: 30,
                 height: 30,
@@ -425,9 +426,10 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
           >
             <Box sx={{ px: 2, py: 1.5, maxWidth: 300 }}>
               <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center', minWidth: 0 }}>
-                <Avatar
-                  sx={{
-                    width: 36,
+            <Avatar
+              src={user?.profilePicture || undefined}
+              sx={{
+                width: 36,
                     height: 36,
                     bgcolor: isDarkMode ? '#1e293b' : '#e2e8f0',
                     fontSize: '0.9rem',

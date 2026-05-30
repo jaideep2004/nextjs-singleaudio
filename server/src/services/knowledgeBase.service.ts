@@ -72,6 +72,43 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, '&#39;');
 }
 
+function numericDimension(value: unknown, fallback?: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 120 || parsed > 1920) return fallback;
+  return Math.round(parsed);
+}
+
+function normalizeYoutubeEmbedUrl(value: unknown) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\./, '');
+    const nocookieHost = 'www.youtube-nocookie.com';
+
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const embedMatch = url.pathname.match(/^\/embed\/([A-Za-z0-9_-]+)/);
+      if (embedMatch?.[1]) return `https://${nocookieHost}/embed/${embedMatch[1]}`;
+
+      const watchId = url.searchParams.get('v');
+      if (watchId) return `https://${nocookieHost}/embed/${watchId}`;
+
+      const shortsMatch = url.pathname.match(/^\/shorts\/([A-Za-z0-9_-]+)/);
+      if (shortsMatch?.[1]) return `https://${nocookieHost}/embed/${shortsMatch[1]}`;
+    }
+
+    if (host === 'youtu.be') {
+      const id = url.pathname.replace(/^\//, '').split('/')[0];
+      if (id) return `https://${nocookieHost}/embed/${id}`;
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+}
+
 function extractText(node: any): string {
   if (!node) return '';
   if (typeof node.text === 'string') return node.text;
@@ -135,11 +172,16 @@ function renderNode(node: any): string {
     case 'image': {
       const src = escapeHtml(node.attrs?.src);
       const alt = escapeHtml(node.attrs?.alt);
-      return src ? `<figure><img src="${src}" alt="${alt}" /></figure>` : '';
+      const width = numericDimension(node.attrs?.width);
+      const height = numericDimension(node.attrs?.height);
+      const dimensions = `${width ? ` width="${width}" style="max-width:100%;width:${width}px;height:auto;"` : ''}${height ? ` height="${height}"` : ''}`;
+      return src ? `<figure><img src="${src}" alt="${alt}"${dimensions} /></figure>` : '';
     }
     case 'youtube': {
-      const src = escapeHtml(node.attrs?.src);
-      return src ? `<div class="kb-video"><iframe src="${src}" title="Embedded video" allowfullscreen></iframe></div>` : '';
+      const src = escapeHtml(normalizeYoutubeEmbedUrl(node.attrs?.src));
+      const width = numericDimension(node.attrs?.width, 720);
+      const height = numericDimension(node.attrs?.height, Math.round((width || 720) * 0.5625));
+      return src ? `<div class="kb-video" style="max-width:100%;width:${width}px;"><iframe src="${src}" width="${width}" height="${height}" title="Embedded video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>` : '';
     }
     default:
       return children;
@@ -270,7 +312,7 @@ export async function listKnowledgeBaseTree({ includeDrafts = false } = {}) {
     KnowledgeBaseCategory.find(includeDrafts ? {} : { isActive: true }).sort({ sortOrder: 1, name: 1 }).lean(),
     KnowledgeBaseSection.find(includeDrafts ? {} : { isActive: true }).sort({ sortOrder: 1, name: 1 }).lean(),
     KnowledgeBaseArticle.find(articleQuery)
-      .select('categoryId sectionId title slug excerpt status publishedAt updatedAt')
+      .select('categoryId sectionId title slug excerpt status imageRefs publishedAt updatedAt')
       .sort({ publishedAt: -1, updatedAt: -1 })
       .lean(),
   ]);
@@ -563,6 +605,18 @@ export async function deleteArticle(id: string, actor?: Actor) {
   await article.save();
   await createRevision(article, 'archived', actor);
   return article;
+}
+
+export async function bulkDeleteArticles(ids: string[], actor?: Actor) {
+  const uniqueIds = Array.from(new Set(ids.map(String))).filter(Boolean);
+  const archivedIds: string[] = [];
+
+  for (const id of uniqueIds) {
+    const article = await deleteArticle(id, actor);
+    archivedIds.push(String(article._id));
+  }
+
+  return { archivedIds, count: archivedIds.length };
 }
 
 export async function listArticleRevisions(articleId: string) {

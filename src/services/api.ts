@@ -527,6 +527,15 @@ export const supportAPI = {
       return handleApiError(error);
     }
   },
+
+  markRead: async (id: string) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/support/tickets/${id}/read`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 };
 
 export const adminSupportAPI = {
@@ -585,6 +594,15 @@ export const adminSupportAPI = {
   addInternalNote: async (id: string, body: string) => {
     try {
       const response = await api.post<ApiResponse<any>>(`/admin/support/tickets/${id}/internal-notes`, { body });
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  markRead: async (id: string) => {
+    try {
+      const response = await api.patch<ApiResponse<any>>(`/admin/support/tickets/${id}/read`);
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -756,6 +774,18 @@ export const adminKnowledgeBaseAPI = {
   archiveArticle: async (id: string) => {
     try {
       const response = await api.delete<ApiResponse<KnowledgeBaseArticle>>(`/admin/knowledge-base/articles/${id}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  bulkArchiveArticles: async (ids: string[]) => {
+    try {
+      const response = await api.post<ApiResponse<{ archivedIds: string[]; count: number }>>(
+        '/admin/knowledge-base/articles/bulk-archive',
+        { ids }
+      );
       return response.data;
     } catch (error) {
       return handleApiError(error);

@@ -11,27 +11,28 @@ import {
 import type { SupportTicketPriority, SupportTicketStatus } from '@/services/api';
 
 const statusMeta: Record<SupportTicketStatus, { label: string; color: string; bg: string; icon: ChipProps['icon'] }> = {
-  open: { label: 'Open', color: '#0f766e', bg: 'rgba(20,184,166,0.14)', icon: <RadioButtonChecked /> },
-  in_review: { label: 'In Review', color: '#7c3aed', bg: 'rgba(124,58,237,0.14)', icon: <Visibility /> },
-  waiting_for_user: { label: 'Waiting For User', color: '#b45309', bg: 'rgba(245,158,11,0.18)', icon: <Schedule /> },
-  resolved: { label: 'Resolved', color: '#15803d', bg: 'rgba(34,197,94,0.16)', icon: <TaskAlt /> },
-  closed: { label: 'Closed', color: '#475569', bg: 'rgba(100,116,139,0.16)', icon: <TaskAlt /> },
+  open: { label: 'Open', color: '#ffffff', bg: '#0f766e', icon: <RadioButtonChecked /> },
+  in_review: { label: 'In Review', color: '#ffffff', bg: '#6d28d9', icon: <Visibility /> },
+  waiting_for_user: { label: 'Waiting For User', color: '#ffffff', bg: '#b45309', icon: <Schedule /> },
+  resolved: { label: 'Resolved', color: '#ffffff', bg: '#15803d', icon: <TaskAlt /> },
+  closed: { label: 'Closed', color: '#ffffff', bg: '#475569', icon: <TaskAlt /> },
 };
 
 const priorityMeta: Record<SupportTicketPriority, { label: string; color: string; bg: string }> = {
-  low: { label: 'Low', color: '#0f766e', bg: 'rgba(20,184,166,0.12)' },
-  normal: { label: 'Normal', color: '#475569', bg: 'rgba(100,116,139,0.14)' },
-  high: { label: 'High', color: '#b45309', bg: 'rgba(245,158,11,0.18)' },
-  urgent: { label: 'Urgent', color: '#be123c', bg: 'rgba(244,63,94,0.18)' },
+  low: { label: 'Low', color: '#ffffff', bg: '#0f766e' },
+  normal: { label: 'Normal', color: '#ffffff', bg: '#475569' },
+  high: { label: 'High', color: '#ffffff', bg: '#c2410c' },
+  urgent: { label: 'Urgent', color: '#ffffff', bg: '#be123c' },
 };
 
 const chipSx = (color: string, bg: string) => ({
   bgcolor: bg,
   color,
   border: '1px solid',
-  borderColor: color,
+  borderColor: bg,
   fontWeight: 900,
   '& .MuiChip-icon': { color, fontSize: 16 },
+  '& .MuiChip-label': { color },
 });
 
 export function SupportStatusChip({ status, size = 'small' }: { status?: SupportTicketStatus | string; size?: ChipProps['size'] }) {
@@ -54,4 +55,3 @@ export function SupportPriorityChip({ priority, size = 'small' }: { priority?: S
 
   return <Chip size={size} icon={<Flag />} label={meta.label} sx={chipSx(meta.color, meta.bg)} />;
 }
-

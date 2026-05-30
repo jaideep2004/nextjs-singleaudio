@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   archiveAdminKnowledgeBaseArticle,
+  bulkArchiveAdminKnowledgeBaseArticles,
   createAdminKnowledgeBaseArticle,
   createAdminKnowledgeBaseCategory,
   createAdminKnowledgeBaseSection,
@@ -19,6 +20,7 @@ import { authorizeAdminPermission, protect } from '../middleware/auth.middleware
 import { validate } from '../middleware/validator.middleware';
 import {
   articleValidator,
+  bulkArticleIdsValidator,
   categoryValidator,
   kbIdValidator,
   listAdminArticlesValidator,
@@ -42,6 +44,7 @@ router.post('/sections', validate(sectionValidator), createAdminKnowledgeBaseSec
 router.patch('/sections/:id', validate(updateSectionValidator), updateAdminKnowledgeBaseSection);
 router.get('/articles', validate(listAdminArticlesValidator), getAdminKnowledgeBaseArticles);
 router.post('/articles', validate(articleValidator), createAdminKnowledgeBaseArticle);
+router.post('/articles/bulk-archive', validate(bulkArticleIdsValidator), bulkArchiveAdminKnowledgeBaseArticles);
 router.get('/articles/:id', validate(kbIdValidator), getAdminKnowledgeBaseArticle);
 router.patch('/articles/:id', validate(updateArticleValidator), updateAdminKnowledgeBaseArticle);
 router.delete('/articles/:id', validate(kbIdValidator), archiveAdminKnowledgeBaseArticle);

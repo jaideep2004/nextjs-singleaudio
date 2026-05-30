@@ -51,6 +51,39 @@ function hasTreeData(tree?: KnowledgeBaseTree) {
   return Boolean(tree && (tree.categories.length > 0 || tree.sections.length > 0 || tree.articles.length > 0));
 }
 
+function youtubeEmbedUrl(value?: string) {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '');
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const embedMatch = url.pathname.match(/^\/embed\/([A-Za-z0-9_-]+)/);
+      if (embedMatch?.[1]) return `https://www.youtube-nocookie.com/embed/${embedMatch[1]}`;
+
+      const watchId = url.searchParams.get('v');
+      if (watchId) return `https://www.youtube-nocookie.com/embed/${watchId}`;
+
+      const shortsMatch = url.pathname.match(/^\/shorts\/([A-Za-z0-9_-]+)/);
+      if (shortsMatch?.[1]) return `https://www.youtube-nocookie.com/embed/${shortsMatch[1]}`;
+    }
+
+    if (host === 'youtu.be') {
+      const id = url.pathname.replace(/^\//, '').split('/')[0];
+      if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
+function normalizeArticleVideos(html: string) {
+  return html.replace(/<iframe([^>]*?)src="([^"]+)"([^>]*)>/g, (match, before, src, after) => {
+    const embedUrl = youtubeEmbedUrl(src);
+    return embedUrl ? `<iframe${before}src="${embedUrl}"${after}>` : match;
+  });
+}
+
 export default function HelpArticleClient({
   slug,
   initialArticle,
@@ -120,7 +153,10 @@ export default function HelpArticleClient({
     };
   }, [search]);
 
-  const html = useMemo(() => addHeadingIds(article?.contentHtml || ''), [article?.contentHtml]);
+  const html = useMemo(
+    () => normalizeArticleVideos(addHeadingIds(article?.contentHtml || '')),
+    [article?.contentHtml]
+  );
   const headings = useMemo(() => extractHeadings(article?.contentHtml || ''), [article?.contentHtml]);
   const relatedArticles = useMemo(
     () => (article?.relatedArticleIds || []).filter((related): related is KnowledgeBaseArticle => typeof related !== 'string'),
@@ -268,13 +304,12 @@ export default function HelpArticleClient({
           display: 'grid',
           gridTemplateColumns: {
             xs: 'minmax(0, 1fr)',
-            lg: '320px minmax(0, 980px)',
+            lg: '320px minmax(0, 1fr)',
           },
           gap: { xs: 0, lg: 3 },
           px: { xs: 2, md: 4 },
           py: { xs: 3, md: 4 },
-          maxWidth: 1380,
-          mx: 'auto',
+          width: '100%',
         }}
       >
         <Box
@@ -331,6 +366,7 @@ export default function HelpArticleClient({
             '& .kb-article td, & .kb-article th': { border: '1px solid rgba(24,32,31,0.18)', p: 1 },
             '& .kb-article blockquote': { borderLeft: '4px solid #E46D4E', pl: 2, color: 'text.secondary' },
             '& .kb-article img': { maxWidth: '100%', borderRadius: 1 },
+            '& .kb-video': { maxWidth: '100%' },
             '& .kb-video iframe': { width: '100%', aspectRatio: '16 / 9', border: 0 },
           }}
         >
@@ -364,7 +400,22 @@ export default function HelpArticleClient({
                   />
                 ))}
                 {article.videoEmbeds?.map((video, index) => (
-                  video.url.includes('youtube.com') || video.url.includes('youtu.be') ? null : (
+                  youtubeEmbedUrl(video.url) ? (
+                    <Box
+                      key={`${video.url}-${index}`}
+                      className="kb-video"
+                      sx={{ borderRadius: 1, overflow: 'hidden', border: '1px solid', borderColor: panelBorder }}
+                    >
+                      <Box
+                        component="iframe"
+                        src={youtubeEmbedUrl(video.url)}
+                        title={video.title || 'Embedded video'}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        sx={{ display: 'block', width: '100%', aspectRatio: '16 / 9', border: 0 }}
+                      />
+                    </Box>
+                  ) : (
                     <Box
                       key={`${video.url}-${index}`}
                       component="video"

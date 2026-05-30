@@ -8,7 +8,7 @@ import {
   updateProfileValidator,
   changePasswordValidator,
 } from '../validators/auth.validator';
-import { uploadRegistrationFiles } from '../utils/fileUpload';
+import { uploadImage, uploadRegistrationFiles } from '../utils/fileUpload';
 
 const router = Router();
 
@@ -63,6 +63,7 @@ router.put('/me/kyc', protect, uploadRegistrationFiles, authController.submitKyc
  * @access  Private
  */
 router.put('/me', protect, validate(updateProfileValidator), authController.updateProfile);
+router.put('/me/profile-picture', protect, uploadImage.single('profilePicture'), authController.updateProfilePicture);
 
 /**
  * @route   PUT /api/auth/change-password

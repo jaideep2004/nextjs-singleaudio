@@ -79,10 +79,9 @@ export default function MusicPublishingPage() {
           limit: String(rowsPerPage),
         });
         if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
-        const response = await fetch(
-          `/api/music-publishing/tracks?${params.toString()}`,
-          { signal: controller.signal }
-        );
+        const response = await fetch(`/api/music-publishing/tracks?${params.toString()}`, {
+          signal: controller.signal,
+        });
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload?.success) {
           throw new Error(payload?.error || 'Failed to load publishing tracks');
@@ -109,7 +108,7 @@ export default function MusicPublishingPage() {
   };
 
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'hidden' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
       <PremiumHeader
         eyebrow="Publishing"
         title="Music Publishing"
@@ -146,7 +145,13 @@ export default function MusicPublishingPage() {
             ))}
           </Tabs>
 
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} alignItems={{ xs: 'stretch', md: 'center' }} useFlexGap flexWrap="wrap">
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={1.25}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            useFlexGap
+            flexWrap="wrap"
+          >
             <TextField
               label="Search Tracks"
               name="musicPublishingSearch"
@@ -184,7 +189,10 @@ export default function MusicPublishingPage() {
         </Alert>
       ) : null}
 
-      <Paper elevation={0} sx={{ ...premiumSurfaceSx(theme), maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}>
+      <Paper
+        elevation={0}
+        sx={{ ...premiumSurfaceSx(theme), maxWidth: '100%', minWidth: 0, overflow: 'hidden' }}
+      >
         {loading ? (
           <Box sx={{ display: 'grid', placeItems: 'center', minHeight: 320 }}>
             <CircularProgress />

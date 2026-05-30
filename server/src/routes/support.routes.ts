@@ -8,6 +8,7 @@ import {
   getAdminSupportTickets,
   getSupportTicket,
   getUserSupportTickets,
+  markSupportTicketRead,
   updateSupportTicketStatus,
   uploadSupportAttachment,
 } from '../controllers/support.controller';
@@ -56,6 +57,13 @@ router.post(
   addSupportMessage
 );
 
+router.patch(
+  '/tickets/admin/:id/read',
+  authorizeAdminPermission(AdminPermission.SUPPORT),
+  validate(ticketIdValidator),
+  markSupportTicketRead
+);
+
 router.post(
   '/tickets/admin/:id/attachments',
   authorizeAdminPermission(AdminPermission.SUPPORT),
@@ -89,6 +97,12 @@ router.get(
   '/tickets/:id',
   validate(ticketIdValidator),
   getSupportTicket
+);
+
+router.patch(
+  '/tickets/:id/read',
+  validate(ticketIdValidator),
+  markSupportTicketRead
 );
 
 router.post(

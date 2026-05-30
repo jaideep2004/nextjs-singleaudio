@@ -130,6 +130,11 @@ const menuSections = [
         icon: <ArticleIcon />,
         path: '/admin/knowledge-base',
         permission: 'support' as AdminPermission,
+        subItems: [
+          { text: 'Categories', path: '/admin/knowledge-base?view=categories' },
+          { text: 'Articles', path: '/admin/knowledge-base' },
+          { text: 'New Article', path: '/admin/knowledge-base?view=new' },
+        ],
       },
       {
         text: 'Support Queue',
@@ -213,6 +218,9 @@ export default function AdminSidebar() {
     }
     if (pathname.startsWith('/admin/youtube-network')) {
       setOpenSubMenu('/admin/youtube-network');
+    }
+    if (pathname.startsWith('/admin/knowledge-base')) {
+      setOpenSubMenu('/admin/knowledge-base');
     }
   }, [pathname]);
 

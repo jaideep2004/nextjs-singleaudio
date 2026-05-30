@@ -52,6 +52,7 @@ interface AdminUser {
   _id: string;
   name: string;
   email: string;
+  profilePicture?: string;
   role: 'admin' | 'artist' | string;
   artistName?: string;
   isActive: boolean;
@@ -61,6 +62,17 @@ interface AdminUser {
     rejectionReason?: string;
   };
 }
+
+const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
+  .replace(/\/api\/?$/, '')
+  .replace(/\/$/, '');
+
+const toAssetUrl = (value?: string) => {
+  if (!value) return '';
+  if (/^(https?:|data:|blob:)/.test(value)) return value;
+  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
+  return value;
+};
 
 interface AdminUsersResponseData {
   users?: AdminUser[];
@@ -393,7 +405,9 @@ export default function AdminUsersPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              users.map(user => (
+              users.map(user => {
+                const profilePicture = toAssetUrl(user.profilePicture);
+                return (
                 <TableRow 
                   key={user._id} 
                   hover
@@ -403,23 +417,38 @@ export default function AdminUsersPage() {
                 >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          backgroundColor: mode === 'dark' ? 'primary.dark' : 'primary.light',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mr: 1.5,
-                          color: 'white',
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
-                        }}
-                      >
-                        {user.name.charAt(0).toUpperCase()}
-                      </Box>
+                      {profilePicture ? (
+                        <Box
+                          component="img"
+                          src={profilePicture}
+                          alt={`${user.name} profile`}
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            mr: 1.5,
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: '50%',
+                            backgroundColor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mr: 1.5,
+                            color: 'white',
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                          }}
+                        >
+                          {user.name.charAt(0).toUpperCase()}
+                        </Box>
+                      )}
                       <Box>
                         <Typography variant="body2" fontWeight={500}>
                           {user.name}
@@ -560,7 +589,8 @@ export default function AdminUsersPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>

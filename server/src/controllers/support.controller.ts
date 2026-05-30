@@ -11,6 +11,7 @@ import {
   getTicketWithMessages,
   listAdminTickets,
   listUserTickets,
+  markTicketRead,
   updateTicketStatus,
 } from '../services/support.service';
 
@@ -85,6 +86,15 @@ export const getSupportTicket = async (req: AuthRequest, res: Response): Promise
   }
 };
 
+export const markSupportTicketRead = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const ticket = await markTicketRead(req.params.id, req.user);
+    successResponse(res, ticket, 'Support ticket marked as read');
+  } catch (error) {
+    errorResponse(res, 'Failed to mark support ticket as read', error);
+  }
+};
+
 export const addSupportMessage = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const message = await addTicketMessage({
@@ -133,7 +143,7 @@ export const uploadSupportAttachment = async (req: AuthRequest, res: Response): 
     const message = await addTicketMessage({
       ticketId: req.params.id,
       actor: req.user,
-      body: req.body.body || `Attachment uploaded: ${file.originalname}`,
+      body: req.body.body || 'Attachment uploaded',
       visibility: req.body.visibility || SupportMessageVisibility.PUBLIC,
       attachments: [attachment],
     });

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { ChangeEvent, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
   ButtonGroup,
+  CircularProgress,
   Divider,
   IconButton,
   Stack,
@@ -19,6 +20,7 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   OndemandVideo,
+  PhotoSizeSelectLarge,
   TableChart,
   Title,
 } from '@mui/icons-material';
@@ -36,15 +38,26 @@ const emptyDoc = { type: 'doc', content: [] };
 type TiptapEditorProps = {
   value?: Record<string, unknown>;
   onChange: (value: Record<string, unknown>) => void;
+  onUploadImage?: (file: File) => Promise<{ url: string; fileName?: string }>;
 };
 
-export default function TiptapEditor({ value, onChange }: TiptapEditorProps) {
+export default function TiptapEditor({ value, onChange, onUploadImage }: TiptapEditorProps) {
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
-      Image.configure({ HTMLAttributes: { loading: 'lazy' } }),
+      Image.configure({
+        HTMLAttributes: { loading: 'lazy' },
+        resize: {
+          enabled: true,
+          minWidth: 120,
+          minHeight: 80,
+          alwaysPreserveAspectRatio: true,
+        },
+      }),
       Youtube.configure({ width: 720, height: 405, nocookie: true }),
       TableKit.configure({ table: { resizable: true } }),
       Placeholder.configure({ placeholder: 'Write clear operational guidance for artists, labels, and support teams...' }),
@@ -78,16 +91,56 @@ export default function TiptapEditor({ value, onChange }: TiptapEditorProps) {
 
   const setImage = () => {
     if (!editor) return;
-    const src = window.prompt('Image URL');
-    if (!src) return;
-    editor.chain().focus().setImage({ src }).run();
+    imageInputRef.current?.click();
+  };
+
+  const uploadImage = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !editor || !onUploadImage) return;
+
+    setUploadingImage(true);
+    try {
+      const media = await onUploadImage(file);
+      editor.chain().focus().setImage({ src: media.url, alt: media.fileName || file.name }).run();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const setYoutube = () => {
     if (!editor) return;
     const src = window.prompt('YouTube URL');
     if (!src) return;
-    editor.commands.setYoutubeVideo({ src });
+    const width = Number(window.prompt('Width in pixels', '720')) || 720;
+    const height = Math.round(width * 0.5625);
+    editor.commands.setYoutubeVideo({ src, width, height });
+  };
+
+  const resizeSelectedMedia = () => {
+    if (!editor) return;
+    const selectedImage = editor.isActive('image');
+    const selectedYoutube = editor.isActive('youtube');
+    if (!selectedImage && !selectedYoutube) {
+      window.alert('Select an image or YouTube video first.');
+      return;
+    }
+
+    const width = Number(window.prompt('Width in pixels', selectedYoutube ? '720' : '640'));
+    if (!Number.isFinite(width) || width < 120) return;
+
+    if (selectedImage) {
+      editor.chain().focus().updateAttributes('image', { width }).run();
+      return;
+    }
+
+    editor
+      .chain()
+      .focus()
+      .updateAttributes('youtube', { width, height: Math.round(width * 0.5625) })
+      .run();
   };
 
   if (!editor) {
@@ -160,13 +213,25 @@ export default function TiptapEditor({ value, onChange }: TiptapEditorProps) {
           </IconButton>
         </Tooltip>
         <Tooltip title="Image">
-          <IconButton onClick={setImage}>
-            <ImageIcon fontSize="small" />
+          <IconButton onClick={setImage} disabled={!onUploadImage || uploadingImage}>
+            {uploadingImage ? <CircularProgress size={18} /> : <ImageIcon fontSize="small" />}
           </IconButton>
         </Tooltip>
+        <input
+          ref={imageInputRef}
+          hidden
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={uploadImage}
+        />
         <Tooltip title="YouTube">
           <IconButton onClick={setYoutube}>
             <OndemandVideo fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="Resize selected media">
+          <IconButton onClick={resizeSelectedMedia}>
+            <PhotoSizeSelectLarge fontSize="small" />
           </IconButton>
         </Tooltip>
         <Tooltip title="Table">

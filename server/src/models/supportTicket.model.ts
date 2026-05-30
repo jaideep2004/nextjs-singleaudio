@@ -33,6 +33,8 @@ export interface ISupportTicket extends Document {
   idempotencyKey?: string;
   statusHistory: ISupportTicketStatusHistory[];
   lastMessageAt: Date;
+  adminReadAt?: Date;
+  userReadAt?: Date;
   closedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -130,6 +132,8 @@ const SupportTicketSchema = new Schema<ISupportTicket>(
       default: Date.now,
       index: true,
     },
+    adminReadAt: Date,
+    userReadAt: Date,
     closedAt: Date,
   },
   { timestamps: true }

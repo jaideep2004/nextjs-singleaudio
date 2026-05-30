@@ -79,6 +79,10 @@ function hasTreeData(tree?: KnowledgeBaseTree) {
   );
 }
 
+function articleFeaturedImage(article: KnowledgeBaseArticle) {
+  return article.imageRefs?.find(image => image.url)?.url || '';
+}
+
 function useKnowledgeBaseSearch(query: string) {
   const [results, setResults] = useState<KnowledgeBaseArticle[]>([]);
 
@@ -184,7 +188,12 @@ export function HelpSidebar({
         {grouped.map(category => (
           <Accordion
             key={category._id}
-            defaultExpanded={category.articles.some(article => activeSlug === article.slug) || category.sections.some(section => section.articles.some(article => activeSlug === article.slug))}
+            defaultExpanded={
+              category.articles.some(article => activeSlug === article.slug) ||
+              category.sections.some(section =>
+                section.articles.some(article => activeSlug === article.slug)
+              )
+            }
             disableGutters
             elevation={0}
             sx={{
@@ -265,11 +274,12 @@ export function HelpSidebar({
                   ))}
                 </Box>
               ))}
-              {category.articles.length === 0 && category.sections.every(section => section.articles.length === 0) && (
-                <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
-                  No articles.
-                </Typography>
-              )}
+              {category.articles.length === 0 &&
+                category.sections.every(section => section.articles.length === 0) && (
+                  <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
+                    No articles.
+                  </Typography>
+                )}
             </AccordionDetails>
           </Accordion>
         ))}
@@ -349,65 +359,64 @@ export default function HelpCenterClient({
   const headerBg = isDark ? alpha('#081112', 0.95) : alpha('#f6f2ea', 0.96);
   const panelBg = isDark ? alpha('#f8f0df', 0.07) : '#ffffff';
   const panelBorder = isDark ? alpha('#f8f0df', 0.14) : alpha('#101820', 0.12);
-  const heroBg = isDark
-    ? 'linear-gradient(135deg, #0a1718 0%, #10252c 48%, #223923 100%)'
-    : 'linear-gradient(135deg, #092435 0%, #245d80 56%, #d87544 100%)';
+  const heroBg =
+    'radial-gradient(circle 600px at 80% 20%, rgb(166 23 226 / 18%) 0%, transparent 60%), radial-gradient(circle 500px at 10% 80%, rgb(162 25 85 / 22%) 0%, transparent 60%), radial-gradient(circle 700px at 50% 50%, rgba(83, 12, 195, 0.07) 0%, transparent 70%), #05050A';
 
   const renderSearchField = (
     value: string,
     onChange: (value: string) => void,
     results: KnowledgeBaseArticle[],
     elevated = false
-  ) => (
-    <Box sx={{ position: 'relative' }}>
-    <TextField
-      fullWidth
-      size="small"
-      value={value}
-      onChange={event => onChange(event.target.value)}
-      placeholder="Search help articles"
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <Search />
-          </InputAdornment>
-        ),
-      }}
-      sx={{
-        '& .MuiOutlinedInput-root': {
-          minHeight: elevated ? 56 : 44,
-          bgcolor: elevated ? '#ffffff' : isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
-          color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
-          borderRadius: 1,
-          fontSize: elevated ? 17 : undefined,
-          boxShadow: elevated ? '0 18px 44px rgba(0, 0, 0, 0.2)' : undefined,
-        },
-        '& .MuiSvgIcon-root': {
-          color: elevated
-            ? alpha('#101820', 0.72)
-            : isDark
-              ? alpha('#f8f0df', 0.9)
-              : alpha('#101820', 0.72),
-        },
-        '& .MuiInputBase-input': {
-          color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
-        },
-        '& .MuiInputBase-input::placeholder': {
-          color: elevated
-            ? alpha('#101820', 0.58)
-            : isDark
-              ? alpha('#f8f0df', 0.7)
-              : alpha('#101820', 0.58),
-          opacity: 1,
-        },
-      }}
-    />
-    <SearchResultsPanel
-      results={results}
-      panelBorder={panelBorder}
-      panelBg={elevated ? '#ffffff' : panelBg}
-      lightSurface={elevated}
-    />
+  ) => ( 
+    <Box sx={{ position: 'relative' }}>    
+      <TextField
+        fullWidth
+        size="small"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder="Search help articles"
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          '& .MuiOutlinedInput-root': {
+            minHeight: elevated ? 56 : 44,
+            bgcolor: elevated ? '#ffffff' : isDark ? alpha('#f8f0df', 0.08) : '#ffffff',
+            color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
+            borderRadius: 1,
+            fontSize: elevated ? 17 : undefined,
+            boxShadow: elevated ? '0 18px 44px rgba(0, 0, 0, 0.2)' : undefined,
+          },
+          '& .MuiSvgIcon-root': {
+            color: elevated
+              ? alpha('#101820', 0.72)
+              : isDark
+                ? alpha('#f8f0df', 0.9)
+                : alpha('#101820', 0.72),
+          },
+          '& .MuiInputBase-input': {
+            color: elevated ? '#101820' : isDark ? '#f8f0df' : '#101820',
+          },
+          '& .MuiInputBase-input::placeholder': {
+            color: elevated
+              ? alpha('#101820', 0.58)
+              : isDark
+                ? alpha('#f8f0df', 0.7)
+                : alpha('#101820', 0.58),
+            opacity: 1,
+          },
+        }}
+      />
+      <SearchResultsPanel
+        results={results}
+        panelBorder={panelBorder}
+        panelBg={elevated ? '#ffffff' : panelBg}
+        lightSurface={elevated}
+      />
     </Box>
   );
 
@@ -508,9 +517,9 @@ export default function HelpCenterClient({
             <Box
               sx={{
                 color: 'white',
-                bgcolor: '#0d3044',
-                backgroundImage: `${heroBg}, linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(0deg, rgba(255,255,255,0.06) 1px, transparent 1px)`,
-                backgroundSize: 'auto, 42px 42px, 42px 42px',
+                bgcolor: '#05050A',
+                background: heroBg,
+                backgroundSize: 'auto',
                 display: 'grid',
                 placeItems: 'center',
                 px: 2,
@@ -543,7 +552,7 @@ export default function HelpCenterClient({
             </Box>
 
             <Box
-              sx={{ width: '100%', maxWidth: 1500, mx: 'auto', px: { xs: 2, md: 4 } }}
+              sx={{ width: '100%', mx: 'auto', px: { xs: 2, md: 4 } }}
               style={{ paddingBottom: '50px' }}
             >
               <Box
@@ -662,6 +671,21 @@ export default function HelpCenterClient({
                 </Paper>
               )}
             </Box>
+            <Box
+              component="footer"
+              sx={{
+                px: 2,
+                py: 2.25,
+                textAlign: 'center',
+                bgcolor: isDark ? '#06070d' : '#ebe5d9',
+                borderTop: '1px solid',
+                borderColor: panelBorder,
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" fontWeight={700}>
+                Copyright 2026 SingleAudio Distribution. All rights reserved.
+              </Typography>
+            </Box>
           </Stack>
         ) : mode === 'category' ? (
           <Box
@@ -743,17 +767,48 @@ export default function HelpCenterClient({
                         Articles
                       </Typography>
                       <Stack spacing={0.75} sx={{ mt: 1 }}>
-                        {activeCategory.articles.map(article => (
-                          <Button
-                            key={article._id}
-                            component={Link}
-                            href={articleHref(article.slug)}
-                            endIcon={<ArrowForward />}
-                            sx={{ justifyContent: 'space-between', textAlign: 'left' }}
-                          >
-                            {article.title}
-                          </Button>
-                        ))}
+                        {activeCategory.articles.map(article => {
+                          const imageUrl = articleFeaturedImage(article);
+                          return (
+                            <Paper
+                              key={article._id}
+                              component={Link}
+                              href={articleHref(article.slug)}
+                              variant="outlined"
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: imageUrl
+                                  ? '96px minmax(0, 1fr) auto'
+                                  : 'minmax(0, 1fr) auto',
+                                gap: 1.5,
+                                alignItems: 'center',
+                                p: 1,
+                                borderRadius: 1,
+                                borderColor: panelBorder,
+                                color: 'text.primary',
+                                textDecoration: 'none',
+                              }}
+                            >
+                              {imageUrl && (
+                                <Box
+                                  component="img"
+                                  src={imageUrl}
+                                  alt=""
+                                  sx={{
+                                    width: 96,
+                                    height: 64,
+                                    objectFit: 'cover',
+                                    borderRadius: 1,
+                                  }}
+                                />
+                              )}
+                              <Typography fontWeight={850} sx={{ overflowWrap: 'anywhere' }}>
+                                {article.title}
+                              </Typography>
+                              <ArrowForward fontSize="small" color="primary" />
+                            </Paper>
+                          );
+                        })}
                       </Stack>
                     </Paper>
                   )}
@@ -772,17 +827,48 @@ export default function HelpCenterClient({
                         {section.name}
                       </Typography>
                       <Stack spacing={0.75} sx={{ mt: 1 }}>
-                        {section.articles.map(article => (
-                          <Button
-                            key={article._id}
-                            component={Link}
-                            href={articleHref(article.slug)}
-                            endIcon={<ArrowForward />}
-                            sx={{ justifyContent: 'space-between', textAlign: 'left' }}
-                          >
-                            {article.title}
-                          </Button>
-                        ))}
+                        {section.articles.map(article => {
+                          const imageUrl = articleFeaturedImage(article);
+                          return (
+                            <Paper
+                              key={article._id}
+                              component={Link}
+                              href={articleHref(article.slug)}
+                              variant="outlined"
+                              sx={{
+                                display: 'grid',
+                                gridTemplateColumns: imageUrl
+                                  ? '96px minmax(0, 1fr) auto'
+                                  : 'minmax(0, 1fr) auto',
+                                gap: 1.5,
+                                alignItems: 'center',
+                                p: 1,
+                                borderRadius: 1,
+                                borderColor: panelBorder,
+                                color: 'text.primary',
+                                textDecoration: 'none',
+                              }}
+                            >
+                              {imageUrl && (
+                                <Box
+                                  component="img"
+                                  src={imageUrl}
+                                  alt=""
+                                  sx={{
+                                    width: 96,
+                                    height: 64,
+                                    objectFit: 'cover',
+                                    borderRadius: 1,
+                                  }}
+                                />
+                              )}
+                              <Typography fontWeight={850} sx={{ overflowWrap: 'anywhere' }}>
+                                {article.title}
+                              </Typography>
+                              <ArrowForward fontSize="small" color="primary" />
+                            </Paper>
+                          );
+                        })}
                         {section.articles.length === 0 && (
                           <Typography variant="body2" color="text.secondary">
                             No published articles in this section yet.

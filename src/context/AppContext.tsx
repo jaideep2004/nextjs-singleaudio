@@ -33,6 +33,7 @@ interface User {
     details?: Record<string, any>;
     updatedAt?: string;
   };
+  profilePicture?: string;
 }
 
 interface SignupPayload {
@@ -91,6 +92,7 @@ interface AuthResponse {
     verification?: User['verification'];
     onboarding?: User['onboarding'];
     payoutMethod?: User['payoutMethod'];
+    profilePicture?: string;
   };
 }
 
@@ -108,6 +110,7 @@ interface UserPayload {
   verification?: User['verification'];
   onboarding?: User['onboarding'];
   payoutMethod?: User['payoutMethod'];
+  profilePicture?: string;
 }
 
 interface DecodedToken {
@@ -124,6 +127,7 @@ interface DecodedToken {
   verification?: User['verification'];
   onboarding?: User['onboarding'];
   payoutMethod?: User['payoutMethod'];
+  profilePicture?: string;
 }
 
 interface AuthContextType {
@@ -136,6 +140,7 @@ interface AuthContextType {
   verifySignup: (payload: { email: string; emailOtp: string; smsOtp: string }) => Promise<void>;
   logout: () => void;
   getToken: () => string | null;
+  refreshUser: () => Promise<void>;
 }
 
 const AppContext = createContext<AuthContextType | undefined>(undefined);
@@ -163,6 +168,7 @@ const fallbackAuthContext: AuthContextType = {
   },
   logout: () => undefined,
   getToken: () => null,
+  refreshUser: async () => undefined,
 };
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -190,6 +196,7 @@ const toUser = (payload: UserPayload): User => ({
   verification: payload.verification,
   onboarding: payload.onboarding,
   payoutMethod: payload.payoutMethod,
+  profilePicture: payload.profilePicture,
 });
 
 const getSafeLoginReturnUrl = () => {
@@ -231,6 +238,13 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     window.location.assign('/login');
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const response = await axios.get<{ data?: AuthResponse['data'] }>('/auth/me');
+    if (response.data?.data) {
+      setUser(toUser(response.data.data));
+    }
+  }, []);
+
   const checkAuth = useCallback(async () => {
     if (typeof window === 'undefined') return;
 
@@ -251,10 +265,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       setUser(toUser(decoded));
 
       try {
-        const response = await axios.get<{ data?: AuthResponse['data'] }>('/auth/me');
-        if (response.data?.data) {
-          setUser(toUser(response.data.data));
-        }
+        await refreshUser();
       } catch (error) {
         if (axios.isAxiosError(error) && [401, 404].includes(error.response?.status || 0)) {
           logout();
@@ -267,7 +278,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [getToken, logout]);
+  }, [getToken, logout, refreshUser]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -413,6 +424,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     verifySignup,
     logout,
     getToken,
+    refreshUser,
   };
 
   return (

@@ -8,17 +8,20 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  IconButton,
   InputAdornment,
   MenuItem,
   Paper,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import {
   AttachFile,
   AssignmentInd,
   Clear,
+  DoneAll,
   Notes,
   Search,
   Send as SendIcon,
@@ -54,6 +57,22 @@ const sortOptions: Array<{ value: SupportTicketSort; label: string }> = [
   { value: 'status', label: 'Status' },
 ];
 
+const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
+  .replace(/\/api\/?$/, '')
+  .replace(/\/$/, '');
+
+const toAssetUrl = (value?: string) => {
+  if (!value) return '';
+  if (/^(https?:|data:|blob:)/.test(value)) return value;
+  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
+  return value;
+};
+
+const supportMessageBody = (message: any) =>
+  message.attachments?.length && String(message.body || '').startsWith('Attachment uploaded')
+    ? 'Attachment uploaded'
+    : message.body;
+
 export default function AdminSupportPage() {
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
@@ -71,6 +90,7 @@ export default function AdminSupportPage() {
   const [note, setNote] = useState('');
   const [status, setStatus] = useState<SupportTicketStatus>('in_review');
   const [reason, setReason] = useState('');
+  const [queueCollapsed, setQueueCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -80,6 +100,7 @@ export default function AdminSupportPage() {
     () => detail?.ticket || tickets.find(ticket => ticket._id === selectedId),
     [detail, selectedId, tickets]
   );
+  const queueHidden = Boolean(selectedTicket && queueCollapsed);
 
   const loadTickets = useCallback(async () => {
     setLoading(true);
@@ -121,6 +142,33 @@ export default function AdminSupportPage() {
     }
   };
 
+  const clearUnread = (id: string) => {
+    setTickets(current =>
+      current.map(ticket => (ticket._id === id ? { ...ticket, unreadMessageCount: 0 } : ticket))
+    );
+    setDetail(current =>
+      current?.ticket?._id === id
+        ? { ...current, ticket: { ...current.ticket, unreadMessageCount: 0 } }
+        : current
+    );
+  };
+
+  const markTicketRead = async (id: string) => {
+    if (!id) return;
+    clearUnread(id);
+    try {
+      await adminSupportAPI.markRead(id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to mark ticket as read');
+    }
+  };
+
+  const selectTicket = (id: string) => {
+    setSelectedId(id);
+    setQueueCollapsed(true);
+    void markTicketRead(id);
+  };
+
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
@@ -129,6 +177,8 @@ export default function AdminSupportPage() {
     void loadDetail(selectedId);
     setReply('');
     setReplyAttachment(null);
+    if (selectedId) void markTicketRead(selectedId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   const refreshSelected = async () => {
@@ -160,6 +210,21 @@ export default function AdminSupportPage() {
       await refreshSelected();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!selectedId) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await adminSupportAPI.updateStatus(selectedId, 'open', 'Ticket reopened by admin');
+      setStatus('open');
+      await refreshSelected();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reopen ticket');
     } finally {
       setSubmitting(false);
     }
@@ -234,7 +299,7 @@ export default function AdminSupportPage() {
         direction={{ xs: 'column', lg: 'row' }}
         justifyContent="space-between"
         gap={2}
-        sx={{ mb: 2 }} 
+        sx={{ mb: 2 }}
       >
         <Box>
           <Typography variant="h4" fontWeight={900} color="text.primary">
@@ -362,9 +427,18 @@ export default function AdminSupportPage() {
       )}
 
       <Box
-        sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '390px 1fr 340px' }, gap: 2 }}
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            xl: queueHidden ? 'minmax(0, 1fr) 340px' : '390px minmax(0, 1fr) 340px',
+          },
+          gap: 2,
+        }}
       >
-        <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <Paper
+          sx={{ borderRadius: 2, overflow: 'hidden', display: queueHidden ? 'none' : 'block' }}
+        >
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Typography fontWeight={900}>Queue</Typography>
           </Box>
@@ -379,10 +453,12 @@ export default function AdminSupportPage() {
             </Box>
           ) : (
             <Stack divider={<Divider />}>
-              {tickets.map(ticket => (
+              {tickets.map(ticket => {
+                const ownerImage = toAssetUrl(ticket.ownerId?.profilePicture);
+                return (
                 <Box
                   key={ticket._id}
-                  onClick={() => setSelectedId(ticket._id)}
+                  onClick={() => selectTicket(ticket._id)}
                   sx={{
                     p: 2,
                     cursor: 'pointer',
@@ -391,24 +467,81 @@ export default function AdminSupportPage() {
                   }}
                 >
                   <Stack direction="row" justifyContent="space-between" gap={1}>
-                    <Typography fontWeight={850} noWrap>
-                      {ticket.subject}
-                    </Typography>
-                    <SupportPriorityChip priority={ticket.priority} />
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={850} noWrap>
+                        {ticket.subject}
+                      </Typography>
+                      {ticket.unreadMessageCount > 0 && (
+                        <Chip
+                          size="small"
+                          label={ticket.unreadMessageCount}
+                          color="error"
+                          sx={{ height: 22, fontWeight: 900, flexShrink: 0 }}
+                        />
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                      <SupportPriorityChip priority={ticket.priority} />
+                      <Tooltip title="Mark as read">
+                        <IconButton
+                          size="small"
+                          aria-label={`Mark ${ticket.subject} as read`}
+                          onClick={event => {
+                            event.stopPropagation();
+                            void markTicketRead(ticket._id);
+                          }}
+                        >
+                          <DoneAll fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
                   </Stack>
-                  <Box sx={{ mt: 0.5, minWidth: 0 }}>
-                    <Typography variant="body2" color="text.primary" fontWeight={800} noWrap>
-                      {ticket.ownerId?.name || 'Unknown user'}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      noWrap
-                      sx={{ display: 'block' }}
-                    >
-                      {ticket.ownerId?.email || 'No email'} -{' '}
-                      {categoryLabels[ticket.category] || ticket.category}
-                    </Typography>
+                  <Box sx={{ mt: 0.75, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {ownerImage ? (
+                      <Box
+                        component="img"
+                        src={ownerImage}
+                        alt={`${ticket.ownerId?.name || 'User'} profile`}
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: '50%',
+                          display: 'grid',
+                          placeItems: 'center',
+                          bgcolor: 'primary.main',
+                          color: 'primary.contrastText',
+                          fontSize: 12,
+                          fontWeight: 900,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {(ticket.ownerId?.name || 'U').charAt(0).toUpperCase()}
+                      </Box>
+                    )}
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" color="text.primary" fontWeight={800} noWrap>
+                        {ticket.ownerId?.name || 'Unknown user'}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        noWrap
+                        sx={{ display: 'block' }}
+                      >
+                        {ticket.ownerId?.email || 'No email'} -{' '}
+                        {categoryLabels[ticket.category] || ticket.category}
+                      </Typography>
+                    </Box>
                   </Box>
                   <Stack direction="row" gap={1} sx={{ mt: 1 }}>
                     <SupportStatusChip status={ticket.status} />
@@ -420,7 +553,8 @@ export default function AdminSupportPage() {
                     </Typography>
                   </Stack>
                 </Box>
-              ))}
+                );
+              })}
             </Stack>
           )}
         </Paper>
@@ -439,9 +573,21 @@ export default function AdminSupportPage() {
                   gap={1}
                 >
                   <Box>
-                    <Typography variant="h6" fontWeight={900}>
-                      {selectedTicket.subject}
-                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {queueHidden && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<SupportAgent />}
+                          onClick={() => setQueueCollapsed(false)}
+                        >
+                          Queue
+                        </Button>
+                      )}
+                      <Typography variant="h6" fontWeight={900}>
+                        {selectedTicket.subject}
+                      </Typography>
+                    </Stack>
                     <Typography variant="caption" color="text.secondary">
                       {selectedTicket.ticketNumber} -{' '}
                       {categoryLabels[selectedTicket.category] || selectedTicket.category}
@@ -452,14 +598,46 @@ export default function AdminSupportPage() {
                     <SupportPriorityChip priority={selectedTicket.priority} />
                   </Stack>
                 </Stack>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 1, overflowWrap: 'anywhere' }}
-                >
-                  User: <strong>{selectedTicket.ownerId?.name || 'Unknown user'}</strong> (
-                  {selectedTicket.ownerId?.email || 'No email'})
-                </Typography>
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                  {(() => {
+                    const ownerImage = toAssetUrl(selectedTicket.ownerId?.profilePicture);
+                    return ownerImage ? (
+                      <Box
+                        component="img"
+                        src={ownerImage}
+                        alt={`${selectedTicket.ownerId?.name || 'User'} profile`}
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          display: 'grid',
+                          placeItems: 'center',
+                          bgcolor: 'primary.main',
+                          color: 'primary.contrastText',
+                          fontSize: 12,
+                          fontWeight: 900,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {(selectedTicket.ownerId?.name || 'U').charAt(0).toUpperCase()}
+                      </Box>
+                    );
+                  })()}
+                  <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
+                    User: <strong>{selectedTicket.ownerId?.name || 'Unknown user'}</strong> (
+                    {selectedTicket.ownerId?.email || 'No email'})
+                  </Typography>
+                </Stack>
               </Box>
 
               <Stack spacing={1.5} sx={{ p: 2, flex: 1, overflow: 'auto' }}>
@@ -500,7 +678,7 @@ export default function AdminSupportPage() {
                           </Typography>
                         </Stack>
                         <Typography variant="body2" whiteSpace="pre-wrap">
-                          {message.body}
+                          {supportMessageBody(message)}
                         </Typography>
                         {message.attachments?.map((item: any) => (
                           <AttachmentPreview key={item.key} attachment={item} />
@@ -564,7 +742,7 @@ export default function AdminSupportPage() {
                       },
                     }}
                     icon={<AttachFile fontSize="small" />}
-                    label={`${replyAttachment.name} (${(replyAttachment.size / (1024 * 1024)).toFixed(1)} MB)`}
+                    label={`Attachment selected (${(replyAttachment.size / (1024 * 1024)).toFixed(1)} MB)`}
                     onDelete={() => setReplyAttachment(null)}
                     variant="outlined"
                   />
@@ -586,6 +764,16 @@ export default function AdminSupportPage() {
               >
                 Assign To Me
               </Button>
+              {selectedTicket?.status === 'closed' && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  onClick={handleReopen}
+                  disabled={submitting}
+                >
+                  Reopen Ticket
+                </Button>
+              )}
               <Box component="form" onSubmit={handleStatus}>
                 <Stack spacing={1}>
                   <TextField

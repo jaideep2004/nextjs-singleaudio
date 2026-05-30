@@ -32,6 +32,11 @@ import {
 import { AttachmentPreview } from '@/components/support/AttachmentPreview';
 import { SupportPriorityChip, SupportStatusChip } from '@/components/support/SupportLabels';
 
+const supportMessageBody = (message: any) =>
+  message.attachments?.length && String(message.body || '').startsWith('Attachment uploaded')
+    ? 'Attachment uploaded'
+    : message.body;
+
 export default function UserSupportPage() {
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -79,6 +84,12 @@ export default function UserSupportPage() {
     try {
       const response = await supportAPI.getTicket(id);
       setTicketDetail(response?.data || null);
+      setTickets(current =>
+        current.map(ticket =>
+          ticket._id === id ? { ...ticket, unreadMessageCount: 0 } : ticket
+        )
+      );
+      await supportAPI.markRead(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load ticket');
     } finally {
@@ -257,7 +268,17 @@ export default function UserSupportPage() {
                   }}
                 >
                   <Stack direction="row" justifyContent="space-between" gap={1}>
-                    <Typography fontWeight={850} noWrap>{ticket.subject}</Typography>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                      <Typography fontWeight={850} noWrap>{ticket.subject}</Typography>
+                      {ticket.unreadMessageCount > 0 && (
+                        <Chip
+                          size="small"
+                          label={ticket.unreadMessageCount}
+                          color="error"
+                          sx={{ height: 22, fontWeight: 900, flexShrink: 0 }}
+                        />
+                      )}
+                    </Stack>
                     <SupportStatusChip status={ticket.status} />
                   </Stack>
                   <Typography variant="caption" color="text.secondary">{ticket.ticketNumber}</Typography>
@@ -309,7 +330,9 @@ export default function UserSupportPage() {
                         color: message.authorRole === 'user' ? 'primary.contrastText' : 'text.primary',
                       }}
                     >
-                      <Typography variant="body2" whiteSpace="pre-wrap">{message.body}</Typography>
+                      <Typography variant="body2" whiteSpace="pre-wrap">
+                        {supportMessageBody(message)}
+                      </Typography>
                       {message.attachments?.map((item: any) => <AttachmentPreview key={item.key} attachment={item} />)}
                     </Box>
                   ))
@@ -319,7 +342,7 @@ export default function UserSupportPage() {
               <Box component="form" onSubmit={handleReply} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
                 {attachment && (
                   <Chip
-                    label={attachment.name}
+                    label={`Attachment selected (${(attachment.size / (1024 * 1024)).toFixed(1)} MB)`}
                     onDelete={() => setAttachment(null)}
                     deleteIcon={<CloseIcon />}
                     sx={{ mb: 1 }}

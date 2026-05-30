@@ -5,6 +5,11 @@ export const kbIdValidator = [
   param('id').isMongoId().withMessage('Invalid knowledge base ID'),
 ];
 
+export const bulkArticleIdsValidator = [
+  body('ids').isArray({ min: 1, max: 100 }).withMessage('Select 1 to 100 articles'),
+  body('ids.*').isMongoId().withMessage('Invalid article ID'),
+];
+
 export const publicArticleSlugValidator = [
   param('slug').trim().notEmpty().isLength({ max: 200 }).withMessage('Invalid article slug'),
 ];

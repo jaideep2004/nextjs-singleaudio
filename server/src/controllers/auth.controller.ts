@@ -17,6 +17,7 @@ import {
   verifyOtpHash,
 } from '../services/otp.service';
 import { buildDashboardUrl, sendUserAndAdminEmail } from '../services/emailNotification.service';
+import { getFileUrl } from '../utils/fileUpload';
 
 // Escape special regex characters in a string
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -833,6 +834,38 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     }, 'Profile updated successfully');
   } catch (error) {
     errorResponse(res, 'Failed to update profile', error);
+  }
+};
+
+export const updateProfilePicture = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const file = req.file as Express.Multer.File | undefined;
+    if (!file) {
+      throw new ApiError('Profile image is required', 400);
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new ApiError('User not found', 404);
+    }
+
+    user.profilePicture = getFileUrl(file.filename, 'image');
+    await user.save();
+
+    successResponse(res, {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      artistName: user.artistName,
+      accountType: user.accountType,
+      profilePicture: user.profilePicture,
+      verification: user.verification,
+      onboarding: user.onboarding,
+      payoutMethod: user.payoutMethod,
+    }, 'Profile image updated');
+  } catch (error) {
+    errorResponse(res, 'Failed to update profile image', error);
   }
 };
 

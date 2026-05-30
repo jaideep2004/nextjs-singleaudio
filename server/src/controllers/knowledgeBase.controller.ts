@@ -5,6 +5,7 @@ import {
   createArticle,
   createCategory,
   createSection,
+  bulkDeleteArticles,
   deleteArticle,
   getAdminArticle,
   getPublishedArticleBySlug,
@@ -152,6 +153,15 @@ export const archiveAdminKnowledgeBaseArticle = async (req: AuthRequest, res: Re
     successResponse(res, article, 'Knowledge base article archived');
   } catch (error) {
     errorResponse(res, 'Failed to archive knowledge base article', error);
+  }
+};
+
+export const bulkArchiveAdminKnowledgeBaseArticles = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await bulkDeleteArticles(req.body.ids || [], req.user);
+    successResponse(res, result, 'Knowledge base articles archived');
+  } catch (error) {
+    errorResponse(res, 'Failed to archive knowledge base articles', error);
   }
 };
 

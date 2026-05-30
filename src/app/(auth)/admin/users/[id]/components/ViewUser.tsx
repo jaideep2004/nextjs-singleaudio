@@ -113,28 +113,44 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
     verificationStatus === 'rejected' ? 'error' :
     verificationStatus === 'submitted' ? 'warning' :
     'info';
+  const profilePicture = toAssetUrl(user.profilePicture);
 
-  return (
+  return (  
     <Box>
-      {/* User Header */}
+      {/* User Header */}   
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-        <Box
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            backgroundColor: mode === 'dark' ? 'primary.dark' : 'primary.light',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            mr: 3,
-            color: 'white',
-            fontWeight: 600,
-            fontSize: '2rem',
-          }}
-        >
-          {user.name.charAt(0).toUpperCase()}
-        </Box>
+        {profilePicture ? (
+          <Box
+            component="img"
+            src={profilePicture}
+            alt={`${user.name} profile`}
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              mr: 3,
+            }}
+          />
+        ) : (
+          <Box
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              backgroundColor: mode === 'dark' ? 'primary.dark' : 'primary.light',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 3,
+              color: 'white',
+              fontWeight: 600,
+              fontSize: '2rem',
+            }}
+          >
+            {user.name.charAt(0).toUpperCase()}
+          </Box>
+        )}
         <Box>
           <Typography variant="h5" fontWeight={600} sx={{ mb: 1 }}>
             {user.name}

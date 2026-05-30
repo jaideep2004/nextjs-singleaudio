@@ -38,6 +38,59 @@ export function AttachmentPreview({ attachment }: { attachment: SupportAttachmen
   const isImage = attachment.contentType?.startsWith('image/');
   const size = formatBytes(attachment.size);
 
+  if (isImage) {
+    return (
+      <ButtonBase
+        component="a"
+        href={attachment.url}
+        target="_blank"
+        rel="noreferrer"
+        sx={{
+          mt: 1,
+          width: '100%',
+          maxWidth: 560,
+          display: 'block',
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          textAlign: 'left',
+          transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
+          '&:hover': {
+            transform: 'translateY(-1px)',
+            borderColor: 'primary.main',
+            boxShadow: '0 10px 28px rgba(15,23,42,0.14)',
+          },
+        }}
+      >
+        <Box
+          component="img"
+          src={attachment.url}
+          alt="Attachment preview"
+          sx={{
+            width: '100%',
+            maxHeight: 420,
+            objectFit: 'contain',
+            bgcolor: 'action.hover',
+            display: 'block',
+          }}
+        />
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.25, py: 1 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={800}>
+            {[attachment.contentType || 'image', size].filter(Boolean).join(' / ')}
+          </Typography>
+          <Stack direction="row" spacing={0.75} alignItems="center" color="primary.main">
+            <Typography variant="caption" fontWeight={900}>
+              Open In New Tab
+            </Typography>
+            <OpenInNew sx={{ fontSize: 16 }} />
+          </Stack>
+        </Stack>
+      </ButtonBase>
+    );
+  }
+
   return (
     <ButtonBase
       component="a"
@@ -47,7 +100,7 @@ export function AttachmentPreview({ attachment }: { attachment: SupportAttachmen
       sx={{
         mt: 1,
         width: '100%',
-        maxWidth: 320,
+        maxWidth: 360,
         justifyContent: 'flex-start',
         borderRadius: 2,
         overflow: 'hidden',
@@ -64,37 +117,22 @@ export function AttachmentPreview({ attachment }: { attachment: SupportAttachmen
         },
       }}
     >
-      {isImage ? (
-        <Box
-          component="img"
-          src={attachment.url}
-          alt={attachment.fileName}
-          sx={{
-            width: 76,
-            height: 64,
-            objectFit: 'cover',
-            bgcolor: 'action.hover',
-            flex: '0 0 auto',
-          }}
-        />
-      ) : (
-        <Box
-          sx={{
-            width: 76,
-            height: 64,
-            display: 'grid',
-            placeItems: 'center',
-            bgcolor: 'action.hover',
-            color: 'primary.main',
-            flex: '0 0 auto',
-          }}
-        >
-          {getFileIcon(attachment.contentType)}
-        </Box>
-      )}
+      <Box
+        sx={{
+          width: 76,
+          height: 64,
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: 'action.hover',
+          color: 'primary.main',
+          flex: '0 0 auto',
+        }}
+      >
+        {getFileIcon(attachment.contentType)}
+      </Box>
       <Stack spacing={0.25} sx={{ p: 1, minWidth: 0, flex: 1 }}>
         <Typography variant="body2" fontWeight={850} noWrap>
-          {attachment.fileName}
+          Attachment
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap>
           {[attachment.contentType || 'file', size].filter(Boolean).join(' / ')}
@@ -104,4 +142,3 @@ export function AttachmentPreview({ attachment }: { attachment: SupportAttachmen
     </ButtonBase>
   );
 }
-

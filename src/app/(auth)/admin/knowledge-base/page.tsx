@@ -2,13 +2,15 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
-  Divider,
   IconButton,
   LinearProgress,
   MenuItem,
@@ -80,9 +82,16 @@ const createBlankArticle = (categoryId = '', sectionId = ''): ArticleForm => ({
 });
 
 const idOf = (value: unknown) => (typeof value === 'string' ? value : (value as any)?._id || '');
+const slugifyArticleTitle = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 
 export default function AdminKnowledgeBasePage() {
   const theme = useTheme();
+  const searchParams = useSearchParams();
   const [categories, setCategories] = useState<KnowledgeBaseCategory[]>([]);
   const [sections, setSections] = useState<KnowledgeBaseSection[]>([]);
   const [articles, setArticles] = useState<KnowledgeBaseArticle[]>([]);
@@ -90,13 +99,15 @@ export default function AdminKnowledgeBasePage() {
   const [categoryDraft, setCategoryDraft] = useState({ name: '', description: '', iconUrl: '' });
   const [sectionDraft, setSectionDraft] = useState({ categoryId: '', name: '', description: '' });
   const [search, setSearch] = useState('');
+  const [selectedArticleIds, setSelectedArticleIds] = useState<string[]>([]);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingTarget, setUploadingTarget] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [sidebarSection, setSidebarSection] = useState<'articles' | 'structure'>('articles');
   const [detailSection, setDetailSection] = useState<'seo' | 'faqs' | 'media'>('seo');
+  const [articleListOpen, setArticleListOpen] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -115,6 +126,17 @@ export default function AdminKnowledgeBasePage() {
       `${article.title} ${article.slug} ${article.excerpt || ''}`.toLowerCase().includes(query)
     );
   }, [articles, search]);
+  const viewParam = searchParams.get('view');
+  const kbView: 'articles' | 'categories' | 'new' =
+    viewParam === 'categories' || viewParam === 'structure'
+      ? 'categories'
+      : viewParam === 'new'
+        ? 'new'
+        : 'articles';
+  const showEditor = kbView === 'new' || (kbView === 'articles' && Boolean(form._id));
+  const isEditingArticle = kbView === 'articles' && Boolean(form._id);
+  const showArticleList = kbView === 'articles' && (!isEditingArticle || articleListOpen);
+  const showCategories = kbView === 'categories';
 
   const surface =
     theme.palette.mode === 'dark'
@@ -155,6 +177,8 @@ export default function AdminKnowledgeBasePage() {
   }, []);
 
   const selectArticle = (article: KnowledgeBaseArticle) => {
+    setArticleListOpen(false);
+    setSlugTouched(true);
     setForm({
       _id: article._id,
       categoryId: idOf(article.categoryId),
@@ -180,9 +204,27 @@ export default function AdminKnowledgeBasePage() {
 
   const resetForm = () => {
     setForm(createBlankArticle(categories[0]?._id || '', ''));
+    setArticleListOpen(false);
+    setSlugTouched(false);
     setNotice('');
     setError('');
   };
+
+  useEffect(() => {
+    if (kbView === 'new' && form._id) {
+      resetForm();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kbView]);
+
+  useEffect(() => {
+    if (kbView !== 'new' || form._id || slugTouched || !form.title.trim()) return;
+    const timeout = window.setTimeout(() => {
+      setForm(current => ({ ...current, slug: slugifyArticleTitle(current.title) }));
+    }, 450);
+
+    return () => window.clearTimeout(timeout);
+  }, [form.title, form._id, kbView, slugTouched]);
 
   const saveArticle = async (publish = false) => {
     if (!form.title.trim() || !form.categoryId) {
@@ -231,6 +273,35 @@ export default function AdminKnowledgeBasePage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to archive article');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleSelectedArticle = (articleId: string) => {
+    setSelectedArticleIds(current =>
+      current.includes(articleId)
+        ? current.filter(id => id !== articleId)
+        : [...current, articleId]
+    );
+  };
+
+  const bulkArchiveArticles = async () => {
+    if (selectedArticleIds.length === 0) return;
+    const confirmed = window.confirm(`Archive ${selectedArticleIds.length} selected article(s)?`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await adminKnowledgeBaseAPI.bulkArchiveArticles(selectedArticleIds);
+      if (form._id && selectedArticleIds.includes(form._id)) resetForm();
+      setSelectedArticleIds([]);
+      setNotice('Selected articles archived');
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to archive selected articles');
     } finally {
       setSaving(false);
     }
@@ -361,6 +432,27 @@ export default function AdminKnowledgeBasePage() {
     }
   };
 
+  const uploadEditorImage = async (file: File) => {
+    setUploading(true);
+    setUploadingTarget('editor-image');
+    setUploadProgress(0);
+    setError('');
+    try {
+      const response = await adminKnowledgeBaseAPI.uploadMedia(file, setUploadProgress);
+      const media = response?.data;
+      if (!media) throw new Error('Upload failed');
+      setNotice('Image uploaded');
+      return { url: media.url, fileName: media.fileName };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload editor image');
+      throw err;
+    } finally {
+      setUploading(false);
+      setUploadingTarget('');
+      setUploadProgress(0);
+    }
+  };
+
   return (
     <Box sx={{ minHeight: '100vh', overflowX: 'hidden' }}>
       <Paper
@@ -395,32 +487,37 @@ export default function AdminKnowledgeBasePage() {
             sx={{ width: { xs: '100%', lg: 'auto' } }}
           >
             <Button
+              component={Link}
+              href="/admin/knowledge-base?view=new"
               variant="outlined"
               startIcon={<Add />}
-              onClick={resetForm}
               sx={{ minWidth: { sm: 150 } }}
             >
               New Article
             </Button>
-            <Button
-              variant="contained"
-              startIcon={<Save />}
-              onClick={() => saveArticle(false)}
-              disabled={saving}
-              sx={{ minWidth: { sm: 150 } }}
-            >
-              Save Draft
-            </Button>
-            <Button
-              color="success"
-              variant="contained"
-              startIcon={<Publish />}
-              onClick={() => saveArticle(true)}
-              disabled={saving}
-              sx={{ minWidth: { sm: 150 } }}
-            >
-              Publish
-            </Button>
+            {showEditor && (
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={<Save />}
+                  onClick={() => saveArticle(false)}
+                  disabled={saving}
+                  sx={{ minWidth: { sm: 150 } }}
+                >
+                  Save Draft
+                </Button>
+                <Button
+                  color="success"
+                  variant="contained"
+                  startIcon={form._id ? <Save /> : <Publish />}
+                  onClick={() => saveArticle(!form._id)}
+                  disabled={saving}
+                  sx={{ minWidth: { sm: 150 } }}
+                >
+                  {form._id ? 'Update' : 'Publish'}
+                </Button>
+              </>
+            )}
           </Stack>
         </Stack>
       </Paper>
@@ -460,8 +557,22 @@ export default function AdminKnowledgeBasePage() {
           display: 'grid',
           gridTemplateColumns: {
             xs: 'minmax(0, 1fr)',
-            lg: '300px minmax(0, 1fr)',
-            xl: '320px minmax(0, 1fr) 360px',
+            lg:
+              showCategories
+                ? 'minmax(0, 1fr)'
+                : showEditor && ((isEditingArticle && !articleListOpen) || kbView === 'new')
+                  ? 'minmax(0, 1fr)'
+                : showEditor
+                  ? '320px minmax(0, 1fr)'
+                  : 'minmax(0, 520px)',
+            xl:
+              showCategories
+                ? 'minmax(0, 1fr)'
+                : showEditor && ((isEditingArticle && !articleListOpen) || kbView === 'new')
+                  ? 'minmax(0, 1fr) 360px'
+                : showEditor
+                  ? '360px minmax(0, 1fr) 360px'
+                  : 'minmax(0, 560px)',
           },
           alignItems: 'start',
           gap: 2.5,
@@ -469,28 +580,9 @@ export default function AdminKnowledgeBasePage() {
           maxWidth: 'none',
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: kbView === 'new' || (isEditingArticle && !articleListOpen) ? 'none' : 'block' }}>
           <Stack spacing={2} sx={{ position: { lg: 'sticky' }, top: 88 }}>
-            <Paper variant="outlined" sx={{ p: 1, borderRadius: 1, bgcolor: surface }}>
-              <Stack direction="row" spacing={1}>
-                {[
-                  { value: 'articles', label: 'Articles', icon: <Article fontSize="small" /> },
-                  { value: 'structure', label: 'Structure', icon: <ViewModule fontSize="small" /> },
-                ].map(item => (
-                  <Button
-                    key={item.value}
-                    fullWidth
-                    variant={sidebarSection === item.value ? 'contained' : 'text'}
-                    startIcon={item.icon}
-                    onClick={() => setSidebarSection(item.value as 'articles' | 'structure')}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </Stack>
-            </Paper>
-
-            {sidebarSection === 'articles' && (
+            {showArticleList && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <Search fontSize="small" />
@@ -501,6 +593,38 @@ export default function AdminKnowledgeBasePage() {
                   value={search}
                   onChange={event => setSearch(event.target.value)}
                 />
+              </Stack>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1.5 }}
+              >
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() =>
+                    setSelectedArticleIds(
+                      selectedArticleIds.length === filteredArticles.length
+                        ? []
+                        : filteredArticles.map(article => article._id)
+                    )
+                  }
+                  disabled={filteredArticles.length === 0}
+                >
+                  {selectedArticleIds.length === filteredArticles.length ? 'Clear' : 'Select All'}
+                </Button>
+                <Button
+                  size="small"
+                  color="error"
+                  variant="outlined"
+                  startIcon={<Delete />}
+                  onClick={bulkArchiveArticles}
+                  disabled={saving || selectedArticleIds.length === 0}
+                >
+                  Bulk Delete
+                </Button>
               </Stack>
               <Stack spacing={1}>
                 {filteredArticles.map(articleItem => (
@@ -522,9 +646,19 @@ export default function AdminKnowledgeBasePage() {
                       alignItems="center"
                       justifyContent="space-between"
                     >
-                      <Typography fontWeight={850} noWrap color="text.primary">
-                        {articleItem.title || 'Untitled'}
-                      </Typography>
+                      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                        <Checkbox
+                          size="small"
+                          checked={selectedArticleIds.includes(articleItem._id)}
+                          onClick={event => event.stopPropagation()}
+                          onChange={() => toggleSelectedArticle(articleItem._id)}
+                          inputProps={{ 'aria-label': `Select ${articleItem.title || 'article'}` }}
+                          sx={{ p: 0.25 }}
+                        />
+                        <Typography fontWeight={850} noWrap color="text.primary">
+                          {articleItem.title || 'Untitled'}
+                        </Typography>
+                      </Stack>
                       <Chip
                         size="small"
                         label={articleItem.status}
@@ -545,15 +679,180 @@ export default function AdminKnowledgeBasePage() {
             </Paper>
             )}
 
-            {sidebarSection === 'structure' && (
+            {showCategories && (
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <ViewModule fontSize="small" />
                 <Typography fontWeight={900} color="text.primary">
-                  Structure
+                  Categories
                 </Typography>
               </Stack>
-              <Stack spacing={1.25}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', lg: '320px minmax(0, 1fr)' },
+                  gap: 2,
+                  alignItems: 'start',
+                }}
+              >
+                <Stack spacing={2}>
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
+                      Create Category
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      <TextField
+                        size="small"
+                        label="New category"
+                        value={categoryDraft.name}
+                        onChange={event =>
+                          setCategoryDraft(current => ({ ...current, name: event.target.value }))
+                        }
+                      />
+                      <TextField
+                        size="small"
+                        label="Description"
+                        value={categoryDraft.description}
+                        onChange={event =>
+                          setCategoryDraft(current => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
+                        }
+                      />
+                      <TextField
+                        size="small"
+                        label="Category image URL"
+                        value={categoryDraft.iconUrl}
+                        onChange={event =>
+                          setCategoryDraft(current => ({ ...current, iconUrl: event.target.value }))
+                        }
+                      />
+                      {categoryDraft.iconUrl && (
+                        <Box
+                          component="img"
+                          src={categoryDraft.iconUrl}
+                          alt=""
+                          sx={{
+                            width: '100%',
+                            aspectRatio: '16 / 9',
+                            objectFit: 'cover',
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        />
+                      )}
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        component="label"
+                        startIcon={
+                          uploading && uploadingTarget === 'category-new' ? (
+                            <CircularProgress size={16} />
+                          ) : (
+                            <ImageIcon />
+                          )
+                        }
+                        disabled={uploading}
+                        fullWidth
+                      >
+                        {uploading && uploadingTarget === 'category-new'
+                          ? `${uploadProgress || 0}%`
+                          : 'Upload Category Image'}
+                        <input
+                          hidden
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={event => uploadCategoryImage(event)}
+                        />
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={createCategory}
+                        disabled={saving}
+                        fullWidth
+                      >
+                        Create Category
+                      </Button>
+                    </Stack>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      p: 2,
+                      borderRadius: 1,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Typography fontWeight={900} color="text.primary" sx={{ mb: 1.5 }}>
+                      Create Section
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      <TextField
+                        select
+                        size="small"
+                        label="Category"
+                        value={sectionDraft.categoryId}
+                        onChange={event =>
+                          setSectionDraft(current => ({
+                            ...current,
+                            categoryId: event.target.value,
+                          }))
+                        }
+                      >
+                        {categories.map(categoryItem => (
+                          <MenuItem key={categoryItem._id} value={categoryItem._id}>
+                            {categoryItem.name}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                      <TextField
+                        size="small"
+                        label="New section"
+                        value={sectionDraft.name}
+                        onChange={event =>
+                          setSectionDraft(current => ({ ...current, name: event.target.value }))
+                        }
+                      />
+                      <TextField
+                        size="small"
+                        label="Description"
+                        value={sectionDraft.description}
+                        onChange={event =>
+                          setSectionDraft(current => ({
+                            ...current,
+                            description: event.target.value,
+                          }))
+                        }
+                      />
+                      <Button
+                        size="small"
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={createSection}
+                        disabled={saving}
+                        fullWidth
+                      >
+                        Create Section
+                      </Button>
+                    </Stack>
+                  </Box>
+                </Stack>
+
+                <Stack spacing={1.25}>
                 {grouped.map(categoryItem => (
                   <Box
                     key={categoryItem._id}
@@ -668,117 +967,13 @@ export default function AdminKnowledgeBasePage() {
                   </Box>
                 ))}
               </Stack>
-              <Divider sx={{ my: 2 }} />
-              <Stack spacing={1}>
-                <TextField
-                  size="small"
-                  label="New category"
-                  value={categoryDraft.name}
-                  onChange={event =>
-                    setCategoryDraft(current => ({ ...current, name: event.target.value }))
-                  }
-                />
-                <TextField
-                  size="small"
-                  label="Description"
-                  value={categoryDraft.description}
-                  onChange={event =>
-                    setCategoryDraft(current => ({ ...current, description: event.target.value }))
-                  }
-                />
-                <TextField
-                  size="small"
-                  label="Category image URL"
-                  value={categoryDraft.iconUrl}
-                  onChange={event =>
-                    setCategoryDraft(current => ({ ...current, iconUrl: event.target.value }))
-                  }
-                />
-                {categoryDraft.iconUrl && (
-                  <Box
-                    component="img"
-                    src={categoryDraft.iconUrl}
-                    alt=""
-                    sx={{
-                      width: '100%',
-                      aspectRatio: '16 / 9',
-                      objectFit: 'cover',
-                      borderRadius: 1,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  />
-                )}
-                <Button
-                  size="small"
-                  variant="outlined"
-                  component="label"
-                  startIcon={
-                    uploading && uploadingTarget === 'category-new' ? (
-                      <CircularProgress size={16} />
-                    ) : (
-                      <ImageIcon />
-                    )
-                  }
-                  disabled={uploading}
-                >
-                  {uploading && uploadingTarget === 'category-new'
-                    ? `${uploadProgress || 0}%`
-                    : 'Upload Category Image'}
-                  <input
-                    hidden
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={event => uploadCategoryImage(event)}
-                  />
-                </Button>
-                <Button size="small" startIcon={<Add />} onClick={createCategory} disabled={saving}>
-                  Create Category
-                </Button>
-              </Stack>
-              <Divider sx={{ my: 2 }} />
-              <Stack spacing={1}>
-                <TextField
-                  select
-                  size="small"
-                  label="Category"
-                  value={sectionDraft.categoryId}
-                  onChange={event =>
-                    setSectionDraft(current => ({ ...current, categoryId: event.target.value }))
-                  }
-                >
-                  {categories.map(categoryItem => (
-                    <MenuItem key={categoryItem._id} value={categoryItem._id}>
-                      {categoryItem.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  size="small"
-                  label="New section"
-                  value={sectionDraft.name}
-                  onChange={event =>
-                    setSectionDraft(current => ({ ...current, name: event.target.value }))
-                  }
-                />
-                <TextField
-                  size="small"
-                  label="Description"
-                  value={sectionDraft.description}
-                  onChange={event =>
-                    setSectionDraft(current => ({ ...current, description: event.target.value }))
-                  }
-                />
-                <Button size="small" startIcon={<Add />} onClick={createSection} disabled={saving}>
-                  Create Section
-                </Button>
-              </Stack>
+              </Box>
             </Paper>
             )}
           </Stack>
         </Box>
 
-        <Box sx={{ minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, display: showEditor ? 'block' : 'none' }}>
           <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 1, bgcolor: surface }}>
             <Stack
               direction="row"
@@ -793,11 +988,20 @@ export default function AdminKnowledgeBasePage() {
                 </Typography>
               </Stack>
               {form._id && (
-                <Tooltip title="Archive article">
-                  <IconButton color="error" onClick={archiveArticle} disabled={saving}>
-                    <Archive />
-                  </IconButton>
-                </Tooltip>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => setArticleListOpen(true)}
+                  >
+                    Articles
+                  </Button>
+                  <Tooltip title="Archive article">
+                    <IconButton color="error" onClick={archiveArticle} disabled={saving}>
+                      <Archive />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
               )}
             </Stack>
             <Box
@@ -822,7 +1026,10 @@ export default function AdminKnowledgeBasePage() {
                   fullWidth
                   label="Slug"
                   value={form.slug}
-                  onChange={event => setForm(current => ({ ...current, slug: event.target.value }))}
+                  onChange={event => {
+                    setSlugTouched(true);
+                    setForm(current => ({ ...current, slug: event.target.value }));
+                  }}
                   helperText="Blank auto-generates."
                 />
               </Box>
@@ -909,12 +1116,19 @@ export default function AdminKnowledgeBasePage() {
               <TiptapEditor
                 value={form.content}
                 onChange={content => setForm(current => ({ ...current, content }))}
+                onUploadImage={uploadEditorImage}
               />
             </Stack>
           </Paper>
         </Box>
 
-        <Box sx={{ minWidth: 0, gridColumn: { lg: '1 / -1', xl: 'auto' } }}>
+        <Box
+          sx={{
+            minWidth: 0,
+            gridColumn: { lg: showEditor ? '1 / -1' : 'auto', xl: 'auto' },
+            display: showEditor ? 'block' : 'none',
+          }}
+        >
           <Stack spacing={2} sx={{ position: { xl: 'sticky' }, top: 88 }}>
             <Paper variant="outlined" sx={{ p: 1, borderRadius: 1, bgcolor: surface }}>
               <Stack direction="row" spacing={1}>

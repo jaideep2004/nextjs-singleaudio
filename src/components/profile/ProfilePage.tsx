@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import axios from 'axios';
 import {
@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Divider,
   Paper,
   Stack,
@@ -18,7 +19,7 @@ import {
   Typography,
   useTheme,
 } from '@mui/material';
-import { AccountBalance, Badge, Business, LocationOn, LockOutlined, Mail, Person, Save, Shield } from '@mui/icons-material';
+import { AccountBalance, Badge, Business, LocationOn, LockOutlined, Mail, Person, PhotoCamera, Save, Shield } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { useAuth } from '@/context/AppContext';
 import { toast } from 'sonner';
@@ -67,11 +68,13 @@ const LockedChip = () => <Chip icon={<LockOutlined />} label="Locked" size="smal
 
 export default function ProfilePage({ audience }: ProfilePageProps) {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [tab, setTab] = useState(0);
   const [displayName, setDisplayName] = useState('');
   const [artistName, setArtistName] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const onboarding = user?.onboarding || {};
   const payoutMethod = user?.payoutMethod || onboarding?.payoutMethod;
@@ -92,6 +95,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
   useEffect(() => {
     setDisplayName(user?.name || '');
     setArtistName(user?.artistName || '');
+    setProfilePicture(user?.profilePicture || '');
   }, [user]);
 
   const handleSave = async () => {
@@ -101,11 +105,35 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
         name: displayName.trim(),
         ...(audience === 'dashboard' ? { artistName: artistName.trim() } : {}),
       });
+      await refreshUser();
       toast.success('Profile saved.');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save profile');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleProfileImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append('profilePicture', file);
+      const response = await axios.put('/auth/me/profile-picture', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const nextImage = response.data?.data?.profilePicture || '';
+      setProfilePicture(nextImage);
+      await refreshUser();
+      toast.success('Profile image updated.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to upload profile image');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -145,6 +173,7 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
       >
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
           <Avatar
+            src={profilePicture || undefined}
             sx={{
               width: 84,
               height: 84,
@@ -156,6 +185,22 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
           >
             {initials || 'SA'}
           </Avatar>
+          <Button
+            component="label"
+            size="small"
+            variant="outlined"
+            startIcon={uploadingImage ? <CircularProgress size={16} /> : <PhotoCamera />}
+            disabled={uploadingImage}
+            sx={{ flex: '0 0 auto' }}
+          >
+            {uploadingImage ? 'Uploading' : 'Profile Image'}
+            <input
+              hidden
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={handleProfileImageUpload}
+            />
+          </Button>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>
               {displayName || user?.email || 'Profile'}
