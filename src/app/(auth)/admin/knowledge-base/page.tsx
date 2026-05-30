@@ -214,8 +214,11 @@ export default function AdminKnowledgeBasePage() {
     if (kbView === 'new' && form._id) {
       resetForm();
     }
+    if (viewParam === 'articles' && form._id) {
+      resetForm();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kbView]);
+  }, [kbView, viewParam]);
 
   useEffect(() => {
     if (kbView !== 'new' || form._id || slugTouched || !form.title.trim()) return;

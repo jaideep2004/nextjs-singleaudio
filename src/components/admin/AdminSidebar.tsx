@@ -132,7 +132,7 @@ const menuSections = [
         permission: 'support' as AdminPermission,
         subItems: [
           { text: 'Categories', path: '/admin/knowledge-base?view=categories' },
-          { text: 'Articles', path: '/admin/knowledge-base' },
+          { text: 'Articles', path: '/admin/knowledge-base?view=articles' },
           { text: 'New Article', path: '/admin/knowledge-base?view=new' },
         ],
       },
