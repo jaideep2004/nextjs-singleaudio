@@ -18,6 +18,7 @@ import {
 import { Album, CloudUpload, Pause, PlayArrow } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import RouteTabs from '@/components/navigation/RouteTabs';
 import { releaseAPI } from '@/services/api';
 
 type TrackRow = {
@@ -118,6 +119,17 @@ function TracksContent() {
         action={<Button component={Link} href="/dashboard/upload" variant="contained" startIcon={<CloudUpload />}>
           Create New Release
         </Button>}
+      />
+
+      <RouteTabs
+        ariaLabel="release catalog sections"
+        items={[
+          { label: 'All Releases', href: '/dashboard/releases' },
+          { label: 'Pending', href: '/dashboard/releases?status=pending' },
+          { label: 'Approved', href: '/dashboard/releases?status=approved' },
+          { label: 'Rejected', href: '/dashboard/releases?status=rejected' },
+          { label: 'Tracks', href: '/dashboard/tracks' },
+        ]}
       />
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2.5 }}>

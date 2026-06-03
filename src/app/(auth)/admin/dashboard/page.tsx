@@ -355,17 +355,6 @@ export default function AdminDashboard() {
         eyebrow="Admin Command Center"
         title="Admin Dashboard"
         description="Review queues, payout risk, delivery status, and user activity in one focused control room."
-        action={
-          <Button
-            component={Link}
-            href="/admin/users/new"
-            variant="contained"
-            startIcon={<Group />}
-            sx={{ borderRadius: '12px', px: 2.5, py: 1.05, fontWeight: 900 }}
-          >
-            Add User/Subadmin
-          </Button>
-        }
       />
 
       <Box
@@ -495,6 +484,7 @@ export default function AdminDashboard() {
           <Typography sx={{ ...sectionHeadingSx, mb: 2 }}>Fast Actions</Typography>
           <Stack spacing={1.25}>
             {[
+              { title: 'Add User/Subadmin', icon: <Group />, href: '/admin/users/new', primary: true },
               { title: 'Manage Users', icon: <Group />, href: '/admin/users' },
               { title: 'Payout Requests', icon: <MonetizationOn />, href: '/admin/payouts' },
               { title: 'DSP Deliveries', icon: <MusicNote />, href: '/admin/dsp-deliveries' },
@@ -504,7 +494,7 @@ export default function AdminDashboard() {
                 key={item.title}
                 component={Link}
                 href={item.href}
-                variant="outlined"
+                variant={item.primary ? 'contained' : 'outlined'}
                 startIcon={item.icon}
                 endIcon={<ArrowForward />}
                 sx={{
@@ -514,11 +504,12 @@ export default function AdminDashboard() {
                   px: 2,
                   fontWeight: 900,
                   borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)',
-                  color: '#5b5ff7',
+                  color: item.primary ? '#fff' : '#5b5ff7',
+                  bgcolor: item.primary ? '#5b5ff7' : 'transparent',
                   '& .MuiButton-endIcon': { ml: 'auto' },
                   '&:hover': {
                     borderColor: '#5b5ff7',
-                    bgcolor: isDark ? 'rgba(91,95,247,0.08)' : 'rgba(91,95,247,0.06)',
+                    bgcolor: item.primary ? '#4a4fe0' : isDark ? 'rgba(91,95,247,0.08)' : 'rgba(91,95,247,0.06)',
                   },
                 }}
                 fullWidth

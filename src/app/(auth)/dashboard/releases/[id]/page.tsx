@@ -30,6 +30,7 @@ import {
   MusicNote,
   Pause,
   PlayArrow,
+  Replay,
   Store,
   UploadFile,
 } from '@mui/icons-material';
@@ -152,6 +153,7 @@ function ReleaseDetail() {
   const [error, setError] = useState('');
   const [playingTrack, setPlayingTrack] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [resubmitting, setResubmitting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -268,6 +270,38 @@ function ReleaseDetail() {
     nextAudio.play().catch(() => setPlayingTrack(null));
     setAudioElement(nextAudio);
     setPlayingTrack(trackId);
+  };
+
+  const handleResubmit = async () => {
+    if (!releaseId || release?.status !== 'rejected') return;
+    try {
+      setResubmitting(true);
+      const res = await fetch(`/api/releases/${releaseId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'resubmit' }),
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to resubmit release');
+      }
+      setRelease((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'pending',
+              rejectReason: undefined,
+              rejectionReason: undefined,
+              updatedAt: new Date().toISOString(),
+            }
+          : prev
+      );
+      setError('');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to resubmit release');
+    } finally {
+      setResubmitting(false);
+    }
   };
 
   const renderDspIcon = (store: string, index: number) => {
@@ -487,8 +521,22 @@ function ReleaseDetail() {
 
       {rejectedReason && (
         <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>
-          <Typography sx={{ fontWeight: 850, mb: 0.4 }}>Rejection reason</Typography>
-          {rejectedReason}
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Box>
+              <Typography sx={{ fontWeight: 850, mb: 0.4 }}>Rejection reason</Typography>
+              <Typography sx={{ fontSize: '0.88rem' }}>{rejectedReason}</Typography>
+            </Box>
+            <Button
+              variant="contained"
+              color="error"
+              startIcon={resubmitting ? <CircularProgress color="inherit" size={16} /> : <Replay />}
+              onClick={handleResubmit}
+              disabled={resubmitting || release?.status !== 'rejected'}
+              sx={{ borderRadius: '10px', fontWeight: 850, flexShrink: 0 }}
+            >
+              Resubmit
+            </Button>
+          </Stack>
         </Alert>
       )}
 

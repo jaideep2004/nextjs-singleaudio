@@ -140,32 +140,48 @@ function PayoutsContent() {
           eyebrow="Finance"
           title="Payouts"
           description="Add a payment method, request eligible payouts, and review payout history."
-          action={
-            <Button component={Link} href="/dashboard/royalties?tab=payouts" variant="contained" endIcon={<ArrowForward />}>
-              Request Payout
-            </Button>
-          }
         />
 
         {saved && <Alert severity="success" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setSaved(false)}>Payment method saved.</Alert>}
         {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        <PremiumPanel sx={{ mb: 2.5, overflow: 'hidden' }}>
-          <Tabs
-            value={activeView}
-            onChange={handleViewChange}
-            variant="scrollable"
-            allowScrollButtonsMobile
-            aria-label="payout sections"
+        <PremiumPanel sx={{ mb: 2.5, overflow: 'hidden', p: { xs: 1, md: 1.25 } }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            justifyContent="space-between"
+            gap={1}
             sx={{
-              px: 1,
-              '& .MuiTab-root': { textTransform: 'none', fontWeight: 800 },
+              minWidth: 0,
             }}
           >
-            <Tab value="method" label="Payment Method" />
-            <Tab value="statement" label="Statement" />
-            <Tab value="report" label="Report" />
-          </Tabs>
+            <Tabs
+              value={activeView}
+              onChange={handleViewChange}
+              variant="scrollable"
+              allowScrollButtonsMobile
+              aria-label="payout sections"
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                px: 1,
+                '& .MuiTab-root': { textTransform: 'none', fontWeight: 800 },
+              }}
+            >
+              <Tab value="method" label="Payment Method" />
+              <Tab value="statement" label="Statement" />
+              <Tab value="report" label="Report" />
+            </Tabs>
+            <Button
+              component={Link}
+              href="/dashboard/royalties?tab=payouts"
+              variant="contained"
+              endIcon={<ArrowForward />}
+              sx={{ borderRadius: '12px', fontWeight: 900, minHeight: 42 }}
+            >
+              Request Payout
+            </Button>
+          </Stack>
         </PremiumPanel>
 
         {activeView === 'method' && (

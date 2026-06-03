@@ -49,6 +49,7 @@ import {
   YouTube,
 } from '@mui/icons-material';
 import { PremiumHeader, PremiumMetric, premiumTableSx } from '@/components/premium/PremiumSurface';
+import RouteTabs from '@/components/navigation/RouteTabs';
 import {
   formatYoutubeMetric,
   type YoutubeAdminAction,
@@ -213,6 +214,14 @@ function AdminYouTubeNetworkContent() {
         description="Review connected channels, track CMS status, and inspect internal analytics readiness."
       />
 
+      <RouteTabs
+        ariaLabel="admin youtube network sections"
+        items={[
+          { label: 'Channels', href: '/admin/youtube-network' },
+          { label: 'Analytics', href: '/admin/youtube-network/analytics' },
+        ]}
+      />
+
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -252,7 +261,7 @@ function AdminYouTubeNetworkContent() {
         />
       </Box>
 
-      <Paper sx={{ ...premiumTableSx(theme), p: { xs: 2, md: 2.5 } }}>
+      <Paper sx={{ ...premiumTableSx(theme), p: { xs: 1.25, sm: 2, md: 2.5 }, overflow: 'hidden' }}>
         <Stack
           direction={{ xs: 'column', lg: 'row' }}
           spacing={2}
@@ -308,16 +317,16 @@ function AdminYouTubeNetworkContent() {
 
         {loading ? <LinearProgress sx={{ mb: 1 }} /> : null}
 
-        <TableContainer>
-          <Table size="small" sx={{ minWidth: 1240 }}>
+        <TableContainer sx={{ overflowX: 'auto' }}>
+          <Table size="small" sx={{ minWidth: { xs: 760, md: 1120, lg: 1240 } }}>
             <TableHead>
               <TableRow>
                 <TableCell>Channel</TableCell>
                 <TableCell>User</TableCell>
-                <TableCell>Stats</TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>Stats</TableCell>
                 <TableCell>Status</TableCell>
-                <TableCell>Analytics</TableCell>
-                <TableCell>Connected</TableCell>
+                <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Analytics</TableCell>
+                <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>Connected</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -369,7 +378,7 @@ function AdminYouTubeNetworkContent() {
                         Google: {channel.googleAccountEmail}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                       <Stack spacing={0.25}>
                         <Typography variant="body2">
                           {formatYoutubeMetric(channel.subscribers)} subscribers
@@ -380,7 +389,7 @@ function AdminYouTubeNetworkContent() {
                         </Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>
                       <Stack spacing={0.75} alignItems="flex-start">
                         <Chip
                           size="small"
@@ -405,7 +414,7 @@ function AdminYouTubeNetworkContent() {
                         </Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ display: { xs: 'none', lg: 'table-cell' } }}>
                       <Typography variant="body2">{formatDate(channel.connectedAt)}</Typography>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                         Synced {formatDate(channel.lastSyncedAt)}

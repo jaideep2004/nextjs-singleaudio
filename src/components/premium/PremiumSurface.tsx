@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Box, Chip, Paper, Stack, SxProps, Theme, Typography, useTheme } from '@mui/material';
+import { Box, Paper, SxProps, Theme, Typography, useTheme } from '@mui/material';
 
 export function premiumSurfaceSx(theme: Theme): SxProps<Theme> {
   const isDark = theme.palette.mode === 'dark';
@@ -49,9 +49,6 @@ export function PremiumPanel({ children, sx }: { children: ReactNode; sx?: SxPro
 }
 
 export function PremiumHeader({
-  eyebrow,
-  title,
-  description,
   action,
 }: {
   eyebrow?: string;
@@ -59,62 +56,19 @@ export function PremiumHeader({
   description?: string;
   action?: ReactNode;
 }) {
-  const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
+  if (!action) return null;
 
   return (
-    <Paper
+    <Box
       sx={{
-        ...premiumSurfaceSx(theme),
-        p: { xs: 2.5, md: 3.5 },
-        borderRadius: { xs: '24px', md: '32px' },
-        mb: 3,
-        position: 'relative',
-        background: isDark
-          ? 'linear-gradient(135deg, rgba(18,26,43,0.98), rgba(14,20,35,0.96))'
-          : 'linear-gradient(135deg, rgba(255,255,255,0.98), rgba(248,250,252,0.94))',
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          background: isDark
-            ? 'linear-gradient(110deg, rgba(91,95,247,0.16), transparent 34%, rgba(245,165,36,0.10))'
-            : 'linear-gradient(110deg, rgba(91,95,247,0.10), transparent 34%, rgba(245,165,36,0.12))',
-        },
+        mb: 2,
+        display: 'flex',
+        justifyContent: { xs: 'stretch', sm: 'flex-end' },
+        '& > *': { width: { xs: '100%', sm: 'auto' } },
       }}
     >
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        justifyContent="space-between"
-        alignItems={{ xs: 'flex-start', md: 'center' }}
-        spacing={2}
-        sx={{ position: 'relative', zIndex: 1 }}
-      >
-        <Box sx={{ minWidth: 0, maxWidth: 760 }}>
-          {eyebrow ? (
-            <Chip
-              label={eyebrow}
-              size="small"
-              sx={{
-                mb: 1.25,
-                bgcolor: isDark ? 'rgba(91,95,247,0.16)' : 'rgba(91,95,247,0.10)',
-                color: isDark ? '#c6c8ff' : '#3438c7',
-              }}
-            />
-          ) : null}
-          <Typography variant="h4" sx={{ fontWeight: 900, letterSpacing: 0, textWrap: 'balance' }}>
-            {title}
-          </Typography>
-          {description ? (
-            <Typography sx={{ mt: 0.75, color: 'text.secondary', maxWidth: 680 }}>
-              {description}
-            </Typography>
-          ) : null}
-        </Box>
-        {action ? <Box sx={{ flexShrink: 0, width: { xs: '100%', md: 'auto' } }}>{action}</Box> : null}
-      </Stack>
-    </Paper>
+      {action}
+    </Box>
   );
 }
 

@@ -152,10 +152,10 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
     <Paper
       elevation={0}
       sx={{
-        p: { xs: 2, md: 2.5 },
-        width: { xs: '100%', md: 640, lg: 720 },
+        p: { xs: 1.5, md: 2 },
+        width: '100%', 
         maxWidth: '100%',
-        borderRadius: { xs: 4, md: 5 },
+        borderRadius: { xs: '15px', md: '35px' },
         bgcolor: theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.92)',
         border: '1px solid',
         borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.08)',
@@ -172,35 +172,36 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
         textAlign={{ xs: 'center', sm: 'left' }}
       >
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center" sx={{ minWidth: 0 }}>
-          <Avatar
-            src={profilePicture || undefined}
-            sx={{
-              width: 84,
-              height: 84,
-              fontSize: 30,
-              fontWeight: 900,
-              bgcolor: audience === 'admin' ? '#ef4444' : '#4a6cf7',
-              flex: '0 0 auto',
-            }}
-          >
-            {initials || 'SA'}
-          </Avatar>
-          <Button
-            component="label"
-            size="small"
-            variant="outlined"
-            startIcon={uploadingImage ? <CircularProgress size={16} /> : <PhotoCamera />}
-            disabled={uploadingImage}
-            sx={{ flex: '0 0 auto' }}
-          >
-            {uploadingImage ? 'Uploading' : 'Profile Image'}
-            <input
-              hidden
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleProfileImageUpload}
-            />
-          </Button>
+          <Stack spacing={1} alignItems="center" sx={{ flex: '0 0 auto' }}>
+            <Avatar
+              src={profilePicture || undefined}
+              sx={{
+                width: 84,
+                height: 84,
+                fontSize: 30,
+                fontWeight: 900,
+                bgcolor: audience === 'admin' ? '#ef4444' : '#4a6cf7',
+              }}
+            >
+              {initials || 'SA'}
+            </Avatar>
+            <Button
+              component="label"
+              size="small"
+              variant="outlined"
+              startIcon={uploadingImage ? <CircularProgress size={16} /> : <PhotoCamera />}
+              disabled={uploadingImage}
+              sx={{ borderRadius: 999, px: 1.5 }}
+            >
+              {uploadingImage ? 'Uploading' : 'Profile Image'}
+              <input
+                hidden
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleProfileImageUpload}
+              />
+            </Button>
+          </Stack>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="h6" fontWeight={900} sx={{ overflowWrap: 'anywhere' }}>
               {displayName || user?.email || 'Profile'}
@@ -224,11 +225,6 @@ export default function ProfilePage({ audience }: ProfilePageProps) {
       <PremiumHeader
         eyebrow="Account"
         title="Profile"
-        description={
-          audience === 'admin'
-            ? 'Manage administrator identity and account details.'
-            : undefined
-        }
         action={profileSummary}
       />
 

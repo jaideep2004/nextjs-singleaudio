@@ -32,6 +32,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useAuth } from '@/context/AppContext';
+import RouteTabs from '@/components/navigation/RouteTabs';
 import {
   CreateRssEpisodePayload,
   CreateRssPodcastPayload,
@@ -196,7 +197,13 @@ function episodeStepValid(step: number, form: EpisodeFormState, audio: File | nu
   return true;
 }
 
-export function PodcastsContent({ allowPodcastCreation = false }: { allowPodcastCreation?: boolean }) {
+export function PodcastsContent({
+  allowPodcastCreation = false,
+  navigationBase = '/dashboard/podcasts',
+}: {
+  allowPodcastCreation?: boolean;
+  navigationBase?: '/dashboard/podcasts' | '/admin/podcasts';
+}) {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -1115,40 +1122,16 @@ export function PodcastsContent({ allowPodcastCreation = false }: { allowPodcast
   return (
     <Box sx={{ width: '100%' }}>
       {/* Page header */}
-      <Box
-        sx={{
-          p: { xs: 2.5, md: 3.5 },
-          mb: 3,
-          border: '1px solid',
-          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
-          borderRadius: '14px',
-          bgcolor: isDark ? '#111827' : '#ffffff',
-        }}
-      >
-        <Stack spacing={1}>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 800,
-              fontSize: { xs: '1.5rem', sm: '1.85rem' },
-              color: isDark ? '#f1f5f9' : '#0f172a',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Podcasts
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.5)' }}
-          >
-            {workspaceSupervisor
-              ? 'Workspace owner: all podcast workspaces are listed here.'
-              : accessMode === 'owned'
-                ? 'Select any podcast workspace and upload a new episode.'
-                : 'Shared podcast workspace. Add episodes to available podcasts.'}
-          </Typography>
-        </Stack>
-      </Box>
+      
+
+      <RouteTabs
+        ariaLabel="podcast sections"
+        items={[
+          ...(allowPodcastCreation ? [{ label: 'Manage Podcasts', href: navigationBase }] : []),
+          { label: 'Upload Episode', href: `${navigationBase}?view=episodes` },
+          { label: 'Payouts', href: `${navigationBase}?view=payouts` },
+        ]}
+      />
 
       {/* Stats row */}
       <Box

@@ -29,6 +29,7 @@ import {
   Refresh,
 } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import RouteTabs from '@/components/navigation/RouteTabs';
 
 type ExportState = 'queued' | 'running' | 'completed' | 'completed_with_warnings' | 'failed';
 
@@ -204,6 +205,17 @@ export default function AdminExportPage() {
             </Button>
           </Stack>
         }
+      />
+
+      <RouteTabs
+        ariaLabel="admin release sections"
+        items={[
+          { label: 'All Releases', href: '/admin/releases' },
+          { label: 'Pending', href: '/admin/releases?status=pending' },
+          { label: 'Approved', href: '/admin/releases?status=approved' },
+          { label: 'Rejected', href: '/admin/releases?status=rejected' },
+          { label: 'Export Catalog', href: '/admin/export' },
+        ]}
       />
 
       {error ? (

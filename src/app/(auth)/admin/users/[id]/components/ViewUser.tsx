@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import {
   Box,
   Typography,
@@ -14,6 +14,9 @@ import {
   IconButton,
   Paper,
   Stack,
+  TextField,
+  Alert,
+  MenuItem,
 } from '@mui/material';
 import { 
   Edit, 
@@ -62,12 +65,44 @@ const DetailGrid = ({ items }: { items: Array<[string, any]> }) => (
   </Box>
 );
 
+const buildKycDraft = (user: any) => {
+  const payout = user.payoutMethod || user.onboarding?.payoutMethod || {};
+  const details = payout.details || {};
+  return {
+    accountType: user.accountType || user.role || '',
+    artistName: user.artistName || '',
+    legalName: user.onboarding?.legalName || user.onboarding?.labelLegalName || '',
+    labelName: user.onboarding?.labelName || '',
+    phoneNumber: user.onboarding?.phoneNumber || user.verification?.phoneNumber || '',
+    country: user.onboarding?.location?.country || '',
+    state: user.onboarding?.location?.state || '',
+    city: user.onboarding?.location?.city || '',
+    pincode: user.onboarding?.location?.pincode || '',
+    address: user.onboarding?.location?.address || user.onboarding?.legalAddress || '',
+    aadhaarNumber: user.onboarding?.aadhaarNumber || '',
+    panNumber: user.onboarding?.panNumber || '',
+    idNumber: user.onboarding?.idNumber || '',
+    registrationType: user.onboarding?.registrationType || '',
+    payoutMethod: payout.method || 'bank_transfer',
+    accountHolderName: details.accountHolderName || '',
+    accountNumber: details.accountNumber || '',
+    ifscCode: details.ifscCode || '',
+    bankName: details.bankName || '',
+    branch: details.branch || '',
+    paypalEmail: details.paypalEmail || '',
+  };
+};
+
 export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; onUserUpdate: () => void; onEdit?: () => void }) {
   const { mode } = useColorMode();
   
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [reviewingKyc, setReviewingKyc] = useState(false);
   const [kycOpen, setKycOpen] = useState(false);
+  const [kycDraft, setKycDraft] = useState<Record<string, string>>(() => buildKycDraft(user));
+  const [savingKycDetails, setSavingKycDetails] = useState(false);
+  const [kycEditError, setKycEditError] = useState('');
+  const [kycEditSuccess, setKycEditSuccess] = useState('');
 
   const handleStatusToggle = async () => {
     try {
@@ -100,6 +135,78 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
       console.error('Error updating KYC status:', err);
     } finally {
       setReviewingKyc(false);
+    }
+  };
+
+  const openKycFile = () => {
+    setKycDraft(buildKycDraft(user));
+    setKycEditError('');
+    setKycEditSuccess('');
+    setKycOpen(true);
+  };
+
+  const handleDraftChange = (field: string) => (event: ChangeEvent<HTMLInputElement>) => {
+    setKycDraft((current) => ({ ...current, [field]: event.target.value }));
+  };
+
+  const handleSaveKycDetails = async () => {
+    try {
+      setSavingKycDetails(true);
+      setKycEditError('');
+      setKycEditSuccess('');
+
+      const nextPayoutMethod = {
+        method: kycDraft.payoutMethod || 'bank_transfer',
+        details: {
+          accountHolderName: kycDraft.accountHolderName,
+          accountNumber: kycDraft.accountNumber,
+          ifscCode: kycDraft.ifscCode,
+          bankName: kycDraft.bankName,
+          branch: kycDraft.branch,
+          paypalEmail: kycDraft.paypalEmail,
+        },
+      };
+
+      const response = await adminAPI.updateUser(user._id, {
+        accountType: kycDraft.accountType,
+        artistName: kycDraft.artistName,
+        onboarding: {
+          ...(user.onboarding || {}),
+          legalName: kycDraft.legalName,
+          labelName: kycDraft.labelName,
+          phoneNumber: kycDraft.phoneNumber,
+          aadhaarNumber: kycDraft.aadhaarNumber,
+          panNumber: kycDraft.panNumber,
+          idNumber: kycDraft.idNumber,
+          registrationType: kycDraft.registrationType,
+          payoutMethod: nextPayoutMethod,
+          location: {
+            ...(user.onboarding?.location || {}),
+            country: kycDraft.country,
+            state: kycDraft.state,
+            city: kycDraft.city,
+            pincode: kycDraft.pincode,
+            address: kycDraft.address,
+          },
+        },
+        payoutMethod: nextPayoutMethod,
+        verification: {
+          ...(user.verification || {}),
+          phoneNumber: kycDraft.phoneNumber,
+          lastEditedByAdminAt: new Date().toISOString(),
+        },
+      });
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to save KYC details');
+      }
+
+      setKycEditSuccess('KYC details saved.');
+      onUserUpdate();
+    } catch (err: any) {
+      setKycEditError(err?.message || 'Failed to save KYC details');
+    } finally {
+      setSavingKycDetails(false);
     }
   };
 
@@ -199,7 +306,7 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
                 variant="contained"
                 color="info"
                 startIcon={<FactCheck />}
-                onClick={() => setKycOpen(true)}
+                onClick={openKycFile}
               >
                 Review KYC File
               </Button>
@@ -251,6 +358,83 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
         </DialogTitle>
         <DialogContent dividers sx={{ bgcolor: mode === 'dark' ? '#111827' : '#f8fafc' }}>
           <Stack spacing={2.5}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ mb: 2 }}>
+                <Box>
+                  <Typography fontWeight={900}>Editable admin details</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Changes update profile, address, identity, and payout data.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  startIcon={savingKycDetails ? <CircularProgress size={16} color="inherit" /> : <Edit />}
+                  onClick={handleSaveKycDetails}
+                  disabled={savingKycDetails}
+                  sx={{ alignSelf: { xs: 'stretch', md: 'center' }, borderRadius: 2, fontWeight: 850 }}
+                >
+                  Save Details
+                </Button>
+              </Stack>
+              {kycEditError ? <Alert severity="error" sx={{ mb: 2 }}>{kycEditError}</Alert> : null}
+              {kycEditSuccess ? <Alert severity="success" sx={{ mb: 2 }}>{kycEditSuccess}</Alert> : null}
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+                {[
+                  ['artistName', 'Artist name'],
+                  ['legalName', 'Legal name'],
+                  ['labelName', 'Label name'],
+                  ['phoneNumber', 'Phone'],
+                  ['country', 'Country'],
+                  ['state', 'State'],
+                  ['city', 'City'],
+                  ['pincode', 'Pincode'],
+                  ['address', 'Address'],
+                  ['aadhaarNumber', 'Aadhaar'],
+                  ['panNumber', 'PAN'],
+                  ['idNumber', 'National ID'],
+                  ['registrationType', 'Registration type'],
+                  ['accountHolderName', 'Account holder'],
+                  ['accountNumber', 'Account number'],
+                  ['ifscCode', 'IFSC'],
+                  ['bankName', 'Bank name'],
+                  ['branch', 'Branch'],
+                  ['paypalEmail', 'PayPal email'],
+                ].map(([field, label]) => (
+                  <TextField
+                    key={field}
+                    label={label}
+                    value={kycDraft[field] || ''}
+                    onChange={handleDraftChange(field)}
+                    size="small"
+                    fullWidth
+                  />
+                ))}
+                <TextField
+                  select
+                  label="Account type"
+                  value={kycDraft.accountType || ''}
+                  onChange={handleDraftChange('accountType')}
+                  size="small"
+                  fullWidth
+                >
+                  {['artist', 'label', 'admin', 'subadmin'].map((value) => (
+                    <MenuItem key={value} value={value}>{value}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label="Payout method"
+                  value={kycDraft.payoutMethod || 'bank_transfer'}
+                  onChange={handleDraftChange('payoutMethod')}
+                  size="small"
+                  fullWidth
+                >
+                  <MenuItem value="bank_transfer">Bank transfer</MenuItem>
+                  <MenuItem value="paypal">PayPal</MenuItem>
+                </TextField>
+              </Box>
+            </Paper>
+
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography fontWeight={900} sx={{ mb: 1.5 }}>Profile and address</Typography>
               <DetailGrid

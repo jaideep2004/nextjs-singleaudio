@@ -31,7 +31,13 @@ import {
   Visibility,
   YouTube,
 } from '@mui/icons-material';
-import { PremiumHeader, PremiumMetric, PremiumPanel, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import {
+  PremiumHeader,
+  PremiumMetric,
+  PremiumPanel,
+  premiumSurfaceSx,
+} from '@/components/premium/PremiumSurface';
+import RouteTabs from '@/components/navigation/RouteTabs';
 import {
   formatYoutubeMetric,
   type YoutubeChannelCandidate,
@@ -57,7 +63,10 @@ type SessionPayload = {
   error?: string;
 };
 
-const statusTone: Record<YoutubeChannelView['workflowStatus'], { color: 'default' | 'success' | 'warning' | 'error' | 'info'; copy: string }> = {
+const statusTone: Record<
+  YoutubeChannelView['workflowStatus'],
+  { color: 'default' | 'success' | 'warning' | 'error' | 'info'; copy: string }
+> = {
   verification_pending: { color: 'warning', copy: 'Verification Pending' },
   under_review: { color: 'info', copy: 'Under Review' },
   processing: { color: 'info', copy: 'Processing' },
@@ -137,10 +146,13 @@ function YoutubeNetworkContent() {
       setSessionLoading(true);
       setError('');
       try {
-        const response = await fetch(`/api/youtube/oauth/session?sessionId=${encodeURIComponent(sessionId)}`, {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/youtube/oauth/session?sessionId=${encodeURIComponent(sessionId)}`,
+          {
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
         const payload = (await response.json().catch(() => null)) as SessionPayload | null;
         if (!response.ok || !payload?.success || !payload.data) {
           throw new Error(payload?.error || 'Failed to load YouTube channel choices');
@@ -197,20 +209,36 @@ function YoutubeNetworkContent() {
         eyebrow="YouTube"
         title="YouTube Network"
         description="Connect channels, track review state, and monitor internal analytics sync readiness."
+      />
+
+      <RouteTabs
+        ariaLabel="youtube network sections"
         action={
           <Button
             variant="contained"
             startIcon={<AddLink />}
             onClick={handleConnect}
-            sx={{ width: { xs: '100%', md: 'auto' }, minHeight: 44, fontWeight: 800 }}
+            sx={{ minHeight: 42, fontWeight: 900, borderRadius: '12px' }}
           >
             Connect YouTube Channel
           </Button>
         }
+        items={[
+          { label: 'Channels', href: '/dashboard/youtube-network' },
+          { label: 'Analytics', href: '/dashboard/youtube-network/analytics' },
+        ]}
       />
 
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-      {notice ? <Alert severity="success" sx={{ mb: 2 }}>{notice}</Alert> : null}
+      {error ? (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      ) : null}
+      {notice ? (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {notice}
+        </Alert>
+      ) : null}
       {sessionLoading ? <LinearProgress sx={{ mb: 2 }} /> : null}
 
       <Box
@@ -221,9 +249,24 @@ function YoutubeNetworkContent() {
           mb: 3,
         }}
       >
-        <PremiumMetric label="Connected Channels" value={channels.length} hint="Submitted for admin review" accent="#ef4444" />
-        <PremiumMetric label="Subscribers" value={formatYoutubeMetric(totals.subscribers)} hint="Latest synced channel total" accent="#0f766e" />
-        <PremiumMetric label="Views" value={formatYoutubeMetric(totals.views)} hint="Public channel view count" accent="#7c3aed" />
+        <PremiumMetric
+          label="Connected Channels"
+          value={channels.length}
+          hint="Submitted for admin review"
+          accent="#ef4444"
+        />
+        <PremiumMetric
+          label="Subscribers"
+          value={formatYoutubeMetric(totals.subscribers)}
+          hint="Latest synced channel total"
+          accent="#0f766e"
+        />
+        <PremiumMetric
+          label="Views"
+          value={formatYoutubeMetric(totals.views)}
+          hint="Public channel view count"
+          accent="#7c3aed"
+        />
       </Box>
 
       <PremiumPanel sx={{ p: { xs: 2, md: 3 } }}>
@@ -242,7 +285,8 @@ function YoutubeNetworkContent() {
                 No YouTube channels connected
               </Typography>
               <Typography sx={{ mt: 0.75, color: 'text.secondary', maxWidth: 680 }}>
-                Connect a channel with Google OAuth. The admin team will review it and handle any CMS or MCN steps outside the platform.
+                Connect a channel with Google OAuth. The admin team will review it and handle any
+                CMS or MCN steps outside the platform.
               </Typography>
             </Box>
             <Button variant="contained" startIcon={<AddLink />} onClick={handleConnect}>
@@ -251,7 +295,7 @@ function YoutubeNetworkContent() {
           </Stack>
         ) : (
           <Stack spacing={2}>
-            {channels.map((channel) => {
+            {channels.map(channel => {
               const tone = statusTone[channel.workflowStatus];
               return (
                 <Paper
@@ -262,29 +306,73 @@ function YoutubeNetworkContent() {
                     p: { xs: 2, md: 2.5 },
                   }}
                 >
-                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ xs: 'flex-start', md: 'center' }}>
-                    <Avatar src={channel.thumbnail} alt={channel.channelTitle} sx={{ width: 64, height: 64, bgcolor: '#ef4444' }}>
+                  <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={2}
+                    alignItems={{ xs: 'flex-start', md: 'center' }}
+                  >
+                    <Avatar
+                      src={channel.thumbnail}
+                      alt={channel.channelTitle}
+                      sx={{ width: 64, height: 64, bgcolor: '#ef4444' }}
+                    >
                       <YouTube />
                     </Avatar>
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ flexWrap: 'wrap', rowGap: 1 }}
+                      >
                         <Typography variant="h6" sx={{ fontWeight: 900, minWidth: 0 }}>
                           {channel.channelTitle}
                         </Typography>
-                        <Chip size="small" color={tone.color} label={tone.copy} sx={{ fontWeight: 800 }} />
+                        <Chip
+                          size="small"
+                          color={tone.color}
+                          label={tone.copy}
+                          sx={{ fontWeight: 800 }}
+                        />
                       </Stack>
                       <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                        Connected with {channel.googleAccountEmail} on {formatDate(channel.connectedAt)}
+                        Connected with {channel.googleAccountEmail} on{' '}
+                        {formatDate(channel.connectedAt)}
                       </Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 1 }}>
-                        <Chip size="small" variant="outlined" label={`Analytics: ${channel.analyticsAccessStatus.replace(/_/g, ' ')}`} />
-                        <Chip size="small" variant="outlined" label={`Sync: ${channel.analyticsSyncStatus.replace(/_/g, ' ')}`} />
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ mt: 1, flexWrap: 'wrap', rowGap: 1 }}
+                      >
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Analytics: ${channel.analyticsAccessStatus.replace(/_/g, ' ')}`}
+                        />
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Sync: ${channel.analyticsSyncStatus.replace(/_/g, ' ')}`}
+                        />
                       </Stack>
                     </Box>
-                    <Stack direction="row" spacing={1.25} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-                      <MetricChip icon={<PeopleAlt />} label={formatYoutubeMetric(channel.subscribers)} />
-                      <MetricChip icon={<Visibility />} label={formatYoutubeMetric(channel.views)} />
-                      <MetricChip icon={<PlayCircle />} label={formatYoutubeMetric(channel.videos)} />
+                    <Stack
+                      direction="row"
+                      spacing={1.25}
+                      sx={{ flexWrap: 'wrap', rowGap: 1, alignItems: 'center' }}
+                    >
+                      <MetricChip
+                        icon={<PeopleAlt />}
+                        label={formatYoutubeMetric(channel.subscribers)}
+                      />
+                      <MetricChip
+                        icon={<Visibility />}
+                        label={formatYoutubeMetric(channel.views)}
+                      />
+                      <MetricChip
+                        icon={<PlayCircle />}
+                        label={formatYoutubeMetric(channel.videos)}
+                      />
                       <Button
                         size="small"
                         variant="outlined"
@@ -312,18 +400,23 @@ function YoutubeNetworkContent() {
         )}
       </PremiumPanel>
 
-      <Dialog open={Boolean(session)} onClose={() => (!saving ? setSession(null) : undefined)} fullWidth maxWidth="sm">
+      <Dialog
+        open={Boolean(session)}
+        onClose={() => (!saving ? setSession(null) : undefined)}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle sx={{ fontWeight: 900 }}>Select YouTube channel</DialogTitle>
         <DialogContent dividers>
           {session ? (
             <Stack spacing={2}>
-              <Alert severity="info">
-                Google account: {session.googleAccountEmail}
-              </Alert>
+              <Alert severity="info">Google account: {session.googleAccountEmail}</Alert>
               {session.channels.length === 0 ? (
-                <Alert severity="warning">No YouTube channels were found for this Google account.</Alert>
+                <Alert severity="warning">
+                  No YouTube channels were found for this Google account.
+                </Alert>
               ) : (
-                session.channels.map((channel) => (
+                session.channels.map(channel => (
                   <Paper
                     key={channel.channelId}
                     onClick={() => setSelectedChannelId(channel.channelId)}
@@ -332,19 +425,33 @@ function YoutubeNetworkContent() {
                       borderRadius: 2,
                       cursor: 'pointer',
                       border: '1px solid',
-                      borderColor: selectedChannelId === channel.channelId ? 'primary.main' : 'divider',
+                      borderColor:
+                        selectedChannelId === channel.channelId ? 'primary.main' : 'divider',
                     }}
                   >
                     <Stack direction="row" spacing={2} alignItems="center">
                       <Radio checked={selectedChannelId === channel.channelId} />
-                      <Avatar src={channel.thumbnail} alt={channel.channelTitle} sx={{ width: 52, height: 52 }}>
+                      <Avatar
+                        src={channel.thumbnail}
+                        alt={channel.channelTitle}
+                        sx={{ width: 52, height: 52 }}
+                      >
                         <YouTube />
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography sx={{ fontWeight: 900 }}>{channel.channelTitle}</Typography>
-                        <Stack direction="row" spacing={1} divider={<Divider orientation="vertical" flexItem />} sx={{ color: 'text.secondary' }}>
-                          <Typography variant="caption">{formatYoutubeMetric(channel.subscribers)} subscribers</Typography>
-                          <Typography variant="caption">{formatYoutubeMetric(channel.views)} views</Typography>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          divider={<Divider orientation="vertical" flexItem />}
+                          sx={{ color: 'text.secondary' }}
+                        >
+                          <Typography variant="caption">
+                            {formatYoutubeMetric(channel.subscribers)} subscribers
+                          </Typography>
+                          <Typography variant="caption">
+                            {formatYoutubeMetric(channel.views)} views
+                          </Typography>
                         </Stack>
                       </Box>
                     </Stack>
@@ -355,7 +462,9 @@ function YoutubeNetworkContent() {
           ) : null}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setSession(null)} disabled={saving}>Cancel</Button>
+          <Button onClick={() => setSession(null)} disabled={saving}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             startIcon={saving ? <CircularProgress size={18} /> : <CheckCircle />}

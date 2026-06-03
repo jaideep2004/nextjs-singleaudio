@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -10,7 +10,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Collapse,
   Typography,
   useTheme,
   useMediaQuery,
@@ -24,8 +23,6 @@ import {
   People as PeopleIcon,
   Payment as PaymentIcon,
   Settings as SettingsIcon,
-  ExpandLess,
-  ExpandMore,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
@@ -72,13 +69,6 @@ const menuSections = [
         icon: <Album />,
         path: '/admin/releases',
         permission: 'review' as AdminPermission,
-        subItems: [
-          { text: 'All Releases', path: '/admin/releases' },
-          { text: 'Pending', path: '/admin/releases?status=pending' },
-          { text: 'Approved', path: '/admin/releases?status=approved' },
-          { text: 'Rejected', path: '/admin/releases?status=rejected' },
-          { text: 'Export Catalog', path: '/admin/export' },
-        ],
       },
       {
         text: 'DSP Deliveries',
@@ -109,32 +99,18 @@ const menuSections = [
         icon: <YouTube />,
         path: '/admin/youtube-network',
         permission: 'settings' as AdminPermission,
-        subItems: [
-          { text: 'Channels', path: '/admin/youtube-network' },
-          { text: 'Analytics', path: '/admin/youtube-network/analytics' },
-        ],
       },
       {
         text: 'Podcasts',
         icon: <PodcastsIcon />,
         path: '/admin/podcasts',
         permission: 'podcasts' as AdminPermission,
-        subItems: [
-          { text: 'Manage Podcasts', path: '/admin/podcasts' },
-          { text: 'Upload Episode', path: '/admin/podcasts?view=episodes' },
-          { text: 'Payouts', path: '/admin/podcasts?view=payouts' },
-        ],
       },
       {
         text: 'Knowledge Base',
         icon: <ArticleIcon />,
         path: '/admin/knowledge-base',
         permission: 'support' as AdminPermission,
-        subItems: [
-          { text: 'Categories', path: '/admin/knowledge-base?view=categories' },
-          { text: 'Articles', path: '/admin/knowledge-base?view=articles' },
-          { text: 'New Article', path: '/admin/knowledge-base?view=new' },
-        ],
       },
       {
         text: 'Support Queue',
@@ -182,12 +158,10 @@ const menuSections = [
 export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const { user } = useAuth();
   const { notifications } = useNotifications();
 
@@ -202,39 +176,12 @@ export default function AdminSidebar() {
     return hasAdminPermission(user, item.permission);
   };
 
-  // Auto-expand submenus when on matching routes
-  useEffect(() => {
-    if (pathname.startsWith('/admin/releases')) {
-      setOpenSubMenu('/admin/releases');
-    }
-    if (pathname.startsWith('/admin/export')) {
-      setOpenSubMenu('/admin/releases');
-    }
-    if (pathname.startsWith('/admin/podcasts')) {
-      setOpenSubMenu('/admin/podcasts');
-    }
-    if (pathname.startsWith('/admin/support')) {
-      setOpenSubMenu(null);
-    }
-    if (pathname.startsWith('/admin/youtube-network')) {
-      setOpenSubMenu('/admin/youtube-network');
-    }
-    if (pathname.startsWith('/admin/knowledge-base')) {
-      setOpenSubMenu('/admin/knowledge-base');
-    }
-  }, [pathname]);
-
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleSubMenuClick = (item: string) => {
-    setOpenSubMenu(openSubMenu === item ? null : item);
-  };
-
   const handleDesktopCollapse = () => {
     setCollapsed((current) => !current);
-    setOpenSubMenu(null);
   };
 
   const isActive = (path: string) => {
@@ -245,20 +192,6 @@ export default function AdminSidebar() {
       return pathname.startsWith('/admin/releases') || pathname.startsWith('/admin/export');
     }
     return pathname.startsWith(path);
-  };
-
-  const isSubItemActive = (path: string) => {
-    const [subPath, subQuery] = path.split('?');
-    if (!subQuery) {
-      return pathname === subPath && !searchParams.get('view') && !searchParams.get('status');
-    }
-
-    const subParams = new URLSearchParams(subQuery);
-    const subView = subParams.get('view');
-    const subStatus = subParams.get('status');
-    if (subView) return pathname === subPath && searchParams.get('view') === subView;
-    if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
-    return pathname === subPath;
   };
 
   const drawer = (
@@ -365,13 +298,7 @@ export default function AdminSidebar() {
                     <Tooltip title={desktopCollapsed ? item.text : ''} placement="right" disableInteractive>
                       <ListItemButton
                         selected={isActive(item.path)}
-                        onClick={() =>
-                          desktopCollapsed
-                            ? router.push(item.path)
-                            : item.subItems
-                              ? handleSubMenuClick(item.path)
-                              : router.push(item.path)
-                        }
+                        onClick={() => router.push(item.path)}
                         sx={{
                         borderRadius: '10px',
                         mx: 0.75,
@@ -470,79 +397,9 @@ export default function AdminSidebar() {
                           {Math.min(unreadSupportCount, 99)}
                         </Box>
                       )}
-                      {item.subItems && !desktopCollapsed && (
-                        <Box
-                          sx={{
-                            color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
-                            display: 'flex',
-                            '& .MuiSvgIcon-root': { fontSize: 18 },
-                          }}
-                        >
-                          {openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}
-                        </Box>
-                      )}
                       </ListItemButton>
                     </Tooltip>
                   </ListItem>
-                  {item.subItems && !desktopCollapsed && (
-                    <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding sx={{ py: 0.25 }}>
-                        {item.subItems.map((subItem: any) => (
-                          <ListItemButton
-                            key={subItem.path}
-                            selected={isSubItemActive(subItem.path)}
-                            onClick={() => router.push(subItem.path)}
-                            sx={{
-                              borderRadius: '8px',
-                              mx: 1.5,
-                              py: 0.6,
-                              pl: 5.5,
-                              position: 'relative',
-                              '&.Mui-selected': {
-                                backgroundColor: isDark
-                                  ? 'rgba(74, 108, 247, 0.08)'
-                                  : 'rgba(74, 108, 247, 0.06)',
-                                '& .MuiListItemText-primary': {
-                                  color: isDark ? '#93b4ff' : '#3b5fe5',
-                                  fontWeight: 600,
-                                },
-                                '&::before': {
-                                  content: '""',
-                                  position: 'absolute',
-                                  left: 32,
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '50%',
-                                  backgroundColor: '#4a6cf7',
-                                },
-                                '&:hover': {
-                                  backgroundColor: isDark
-                                    ? 'rgba(74, 108, 247, 0.12)'
-                                    : 'rgba(74, 108, 247, 0.08)',
-                                },
-                              },
-                              '&:hover': {
-                                backgroundColor: isDark
-                                  ? 'rgba(255, 255, 255, 0.03)'
-                                  : 'rgba(0, 0, 0, 0.02)',
-                              },
-                            }}
-                          >
-                            <ListItemText
-                              primary={subItem.text}
-                              primaryTypographyProps={{
-                                fontSize: '0.82rem',
-                                fontWeight: 650,
-                                color: isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.76)',
-                              }}
-                            />
-                          </ListItemButton>
-                        ))}
-                      </List>
-                    </Collapse>
-                  )}
                 </div>
               )})}
             </List>

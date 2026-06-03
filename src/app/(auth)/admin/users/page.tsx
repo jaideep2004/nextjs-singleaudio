@@ -306,16 +306,6 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="User Management"
         description="Review artists, labels, KYC state, access rights, and account health from one command surface."
-        action={canCreateUsers ? (
-          <Button
-            variant="contained"
-            startIcon={<PersonAdd />}
-            onClick={handleCreateUser}
-            size={isMobile ? 'small' : 'medium'}
-          >
-            {isMobile ? 'Add' : 'Add New User'}
-          </Button>
-        ) : undefined}
       />
 
       <Paper 
@@ -325,7 +315,17 @@ export default function AdminUsersPage() {
           ...premiumSurfaceSx(theme),
         }}
       >
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 220px' }, gap: 2 }}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: canCreateUsers ? 'minmax(280px, 1fr) auto 220px' : 'minmax(280px, 1fr) 220px',
+            },
+            gap: 2,
+            alignItems: 'center',
+          }}
+        >
           <TextField
             fullWidth
             variant="outlined"
@@ -353,6 +353,24 @@ export default function AdminUsersPage() {
               },
             }}
           />
+          {canCreateUsers && (
+            <Button
+              variant="contained"
+              startIcon={<PersonAdd />}
+              onClick={handleCreateUser}
+              size={isMobile ? 'small' : 'medium'}
+              sx={{
+                minHeight: { md: 56 },
+                borderRadius: 2,
+                textTransform: 'none',
+                fontWeight: 850,
+                px: 2.5,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isMobile ? 'Add User' : 'Add New User'}
+            </Button>
+          )}
           <TextField
             select
             label="KYC status"

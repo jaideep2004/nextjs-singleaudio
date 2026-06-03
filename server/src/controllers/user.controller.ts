@@ -205,7 +205,22 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<void
 export const updateUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, role, artistName, bio, socialLinks, isActive, verification, accountType, adminPreset, permissions, supportCategories } = req.body;
+    const {
+      name,
+      email,
+      role,
+      artistName,
+      bio,
+      socialLinks,
+      isActive,
+      verification,
+      onboarding,
+      payoutMethod,
+      accountType,
+      adminPreset,
+      permissions,
+      supportCategories,
+    } = req.body;
 
     const user = await User.findById(id);
 
@@ -254,6 +269,32 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
       user.verification = {
         ...(user.verification || {}),
         ...verification,
+      };
+    }
+    if (onboarding && typeof onboarding === 'object') {
+      const currentOnboarding = ((user as any).onboarding || {}) as Record<string, any>;
+      (user as any).onboarding = {
+        ...currentOnboarding,
+        ...onboarding,
+        location: {
+          ...(currentOnboarding.location || {}),
+          ...(onboarding.location || {}),
+        },
+        documents: {
+          ...(currentOnboarding.documents || {}),
+          ...(onboarding.documents || {}),
+        },
+      };
+    }
+    if (payoutMethod && typeof payoutMethod === 'object') {
+      const currentPayout = ((user as any).payoutMethod || {}) as Record<string, any>;
+      (user as any).payoutMethod = {
+        ...currentPayout,
+        ...payoutMethod,
+        details: {
+          ...(currentPayout.details || {}),
+          ...(payoutMethod.details || {}),
+        },
       };
     }
 

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
+  Autocomplete,
   Typography,
   Stepper,
   Step,
@@ -66,6 +67,8 @@ import countries from '@/utils/countries';
 import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import languagesData from '@/data/languages.json';
+import genreTaxonomyData from '@/data/genreTaxonomy.json';
 import {
   AcrCloudStatusLike,
   fetchAcrCloudScanResult,
@@ -247,37 +250,17 @@ const releaseTypes: ReleaseTypeOption[] = [
   },
 ];
 
-const genres = [
-  'Pop',
-  'Rock',
-  'Hip-Hop',
-  'Electronic',
-  'Jazz',
-  'Classical',
-  'Country',
-  'Folk',
-  'Reggae',
-  'Blues',
-  'R&B',
-  'Alternative',
-  'Indie',
-  'Metal',
-  'Punk',
-  'Other',
-];
+type LanguageOption = { code: string; name: string };
+type GenreOption = { name: string; subgenres: string[] };
 
-const languages = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'hi', name: 'Hindi' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'it', name: 'Italian' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'ko', name: 'Korean' },
-  { code: 'zh', name: 'Chinese' },
-];
+const languages = languagesData as LanguageOption[];
+const genreTaxonomy = genreTaxonomyData as GenreOption[];
+const genres = genreTaxonomy.map(genre => genre.name);
+const allSubgenres = Array.from(new Set(genreTaxonomy.flatMap(genre => genre.subgenres))).sort();
+const getLanguageOption = (value?: string) =>
+  languages.find(lang => lang.code === value || lang.name === value) || null;
+const getSubgenreOptions = (genre?: string) =>
+  genreTaxonomy.find(item => item.name === genre)?.subgenres || allSubgenres;
 
 // Define steps (combined flow)
 const steps = [
@@ -553,12 +536,13 @@ export default function UploadPage() {
   const [releaseWorldwide, setReleaseWorldwide] = useState(true);
   const [releaseDate, setReleaseDate] = useState<string>('');
   const [originalReleaseDate, setOriginalReleaseDate] = useState<string>('');
-  // Artwork loading indicator
+  const [artworkValidating, setArtworkValidating] = useState<boolean>(false);
   const [artworkUploading, setArtworkUploading] = useState<boolean>(false);
   // Local audio preview URLs for each selected track
   const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
+  const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
 
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
@@ -766,9 +750,17 @@ export default function UploadPage() {
     );
   };
 
+  const allAudioUploadsReady =
+    tracks.length > 0 &&
+    tracks.every(
+      (_, idx) => !trackUploading[idx] && !analysisLoading[idx] && Boolean(audioUploadedUrls[idx])
+    );
+
   const handleApplyTrackInfoToAll = (idx: number) => {
     const source = trackInfos[idx];
     if (!source) return;
+    if (tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll) return;
+    setApplyingTrackInfoToAll(true);
     const shareable = cloneTrackInfo(source);
     delete (shareable as Partial<TrackInfo>).title;
     delete (shareable as Partial<TrackInfo>).originalReleaseDate;
@@ -779,7 +771,10 @@ export default function UploadPage() {
     delete (shareable as Partial<TrackInfo>).explicit;
 
     setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
-    toast.success('Applied to all tracks');
+    window.setTimeout(() => {
+      toast.success('Applied to all tracks');
+      setApplyingTrackInfoToAll(false);
+    }, 0);
   };
 
   // Validation: all required fields for all tracks
@@ -952,23 +947,27 @@ export default function UploadPage() {
     if (!artworkFile) {
       setArtworkPreview(null);
       setArtworkError(null);
-      setArtworkUploading(false);
+      setArtworkValidating(false);
+      setArtworkUploadedUrl(null);
+      setArtworkUploadedFilename(null);
       return;
     }
 
     // Validate type
-    setArtworkUploading(true);
+    setArtworkValidating(true);
+    setArtworkUploadedUrl(null);
+    setArtworkUploadedFilename(null);
     if (!['image/jpeg', 'image/png'].includes(artworkFile.type)) {
       setArtworkError('Artwork must be a JPG or PNG image.');
       setArtworkPreview(null);
-      setArtworkUploading(false);
+      setArtworkValidating(false);
       return;
     }
     // Validate size
     if (artworkFile.size > 10 * 1024 * 1024) {
       setArtworkError('Artwork must be less than or equal to 10MB.');
       setArtworkPreview(null);
-      setArtworkUploading(false);
+      setArtworkValidating(false);
       return;
     }
     // Validate dimensions (must be exactly 3000x3000 and square)
@@ -982,13 +981,13 @@ export default function UploadPage() {
         setArtworkError(null);
         setArtworkPreview(objectUrl);
       }
-      setArtworkUploading(false);
+      setArtworkValidating(false);
       // Do NOT revoke objectUrl here! Only on unmount.
     };
     img.onerror = () => {
       setArtworkError('Invalid image file.');
       setArtworkPreview(null);
-      setArtworkUploading(false);
+      setArtworkValidating(false);
       // Do NOT revoke objectUrl here! Only on unmount.
     };
     img.src = objectUrl;
@@ -1668,7 +1667,13 @@ export default function UploadPage() {
                         }}
                       >
                         <Typography variant="subtitle1" fontWeight={900}>
-                          {artworkPreview ? 'Artwork Ready' : 'Add Cover Artwork'}
+                          {artworkUploading
+                            ? 'Uploading Artwork'
+                            : artworkValidating
+                              ? 'Checking Artwork'
+                              : artworkPreview
+                                ? 'Artwork Ready'
+                                : 'Add Cover Artwork'}
                         </Typography>
                         <Typography
                           variant="body2"
@@ -1695,11 +1700,13 @@ export default function UploadPage() {
                             {artworkPreview ? 'Change Image' : 'Select Image'}
                           </Button>
                         </label>
-                        {artworkUploading && (
+                        {(artworkValidating || artworkUploading) && (
                           <Box sx={{ width: '100%', mt: 2 }}>
-                            <LinearProgress />
+                            <LinearProgress variant="indeterminate" />
                             <Typography variant="caption" color="text.secondary">
-                              Validating artwork…
+                              {artworkUploading
+                                ? 'Uploading image to storage...'
+                                : 'Verifying image dimensions...'}
                             </Typography>
                           </Box>
                         )}
@@ -1744,20 +1751,30 @@ export default function UploadPage() {
               <Button
                 variant="contained"
                 color="primary"
-                disabled={!!artworkError || !artworkPreview || artworkUploading}
+                disabled={!!artworkError || !artworkPreview || artworkValidating || artworkUploading}
                 onClick={async () => {
-                  if (!artworkFile) return;
+                  if (!artworkFile || artworkValidating || artworkUploading) return;
                   try {
+                    setArtworkUploading(true);
                     const { url, filename } = await uploadArtworkToServer(artworkFile);
                     setArtworkUploadedUrl(url);
                     setArtworkUploadedFilename(filename);
                     handleNext();
                   } catch (e: any) {
                     toast.error(e?.message || 'Failed to upload artwork');
+                  } finally {
+                    setArtworkUploading(false);
                   }
                 }}
               >
-                Continue
+                {artworkUploading ? (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <CircularProgress size={16} color="inherit" />
+                    <span>Uploading...</span>
+                  </Stack>
+                ) : (
+                  'Continue'
+                )}
               </Button>
             </Box>
           </Box>
@@ -2216,11 +2233,21 @@ export default function UploadPage() {
                   <Button
                     variant="outlined"
                     size="small"
-                    startIcon={<PlaylistAddCheck />}
+                    startIcon={
+                      applyingTrackInfoToAll ? (
+                        <CircularProgress size={16} color="inherit" />
+                      ) : (
+                        <PlaylistAddCheck />
+                      )
+                    }
                     onClick={() => handleApplyTrackInfoToAll(selectedTrackIdx)}
-                    disabled={tracks.length < 2}
+                    disabled={tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll}
                   >
-                    Apply to all
+                    {applyingTrackInfoToAll
+                      ? 'Applying...'
+                      : !allAudioUploadsReady && tracks.length > 1
+                        ? 'Waiting for uploads'
+                        : 'Apply to all'}
                   </Button>
                 </Box>
                 {tracks.length === 0 ? (
@@ -2333,15 +2360,6 @@ export default function UploadPage() {
                           <Typography variant="overline" sx={{ color: 'text.secondary' }}>
                             Contributors
                           </Typography>
-                          <Tooltip title="Add contributor">
-                            <IconButton
-                              size="small"
-                              color="primary"
-                              onClick={() => addContributor(selectedTrackIdx)}
-                            >
-                              <Add fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
                         </Box>
                         <Typography
                           variant="caption"
@@ -2455,6 +2473,15 @@ export default function UploadPage() {
                             )
                           )}
                         </Box>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          startIcon={<Add />}
+                          onClick={() => addContributor(selectedTrackIdx)}
+                          sx={{ mt: 1.5, fontWeight: 850 }}
+                        >
+                          Add Contributor
+                        </Button>
                       </Box>
 
                       <Box>
@@ -2469,77 +2496,75 @@ export default function UploadPage() {
                             mt: 1,
                           }}
                         >
-                          <TextField
-                            select
-                            label="Metadata Language *"
-                            fullWidth
-                            required
-                            value={trackInfos[selectedTrackIdx]?.metadataLanguage || ''}
-                            onChange={e =>
+                          <Autocomplete
+                            options={languages}
+                            value={getLanguageOption(trackInfos[selectedTrackIdx]?.metadataLanguage)}
+                            getOptionLabel={option => `${option.name} (${option.code})`}
+                            isOptionEqualToValue={(option, value) => option.code === value.code}
+                            onChange={(_event, option) =>
                               handleTrackInfoChange(
                                 selectedTrackIdx,
                                 'metadataLanguage',
-                                e.target.value
+                                option?.code || ''
                               )
                             }
-                            error={
-                              trackValidationAttempted &&
-                              !trackInfos[selectedTrackIdx]?.metadataLanguage
-                            }
-                            helperText={
-                              trackValidationAttempted &&
-                              !trackInfos[selectedTrackIdx]?.metadataLanguage
-                                ? 'Metadata language is required.'
-                                : ''
-                            }
-                          >
-                            {languages.map(lang => (
-                              <MenuItem key={lang.code} value={lang.code}>
-                                {lang.name}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                          <TextField
-                            select
-                            label="Audio Language *"
-                            fullWidth
-                            required
-                            value={
+                            renderInput={params => (
+                              <TextField
+                                {...params}
+                                label="Metadata Language *"
+                                fullWidth
+                                required
+                                error={
+                                  trackValidationAttempted &&
+                                  !trackInfos[selectedTrackIdx]?.metadataLanguage
+                                }
+                                helperText={
+                                  trackValidationAttempted &&
+                                  !trackInfos[selectedTrackIdx]?.metadataLanguage
+                                    ? 'Metadata language is required.'
+                                    : ''
+                                }
+                              />
+                            )}
+                          />
+                          <Autocomplete
+                            options={languages}
+                            value={getLanguageOption(
                               trackInfos[selectedTrackIdx]?.audioLanguage ||
-                              trackInfos[selectedTrackIdx]?.language ||
-                              ''
-                            }
-                            onChange={e => {
-                              handleTrackInfoChange(
-                                selectedTrackIdx,
-                                'audioLanguage',
-                                e.target.value
-                              );
-                              handleTrackInfoChange(selectedTrackIdx, 'language', e.target.value);
+                                trackInfos[selectedTrackIdx]?.language
+                            )}
+                            getOptionLabel={option => `${option.name} (${option.code})`}
+                            isOptionEqualToValue={(option, value) => option.code === value.code}
+                            onChange={(_event, option) => {
+                              const code = option?.code || '';
+                              handleTrackInfoChange(selectedTrackIdx, 'audioLanguage', code);
+                              handleTrackInfoChange(selectedTrackIdx, 'language', code);
                             }}
-                            error={
-                              trackValidationAttempted &&
-                              !(
-                                trackInfos[selectedTrackIdx]?.audioLanguage ||
-                                trackInfos[selectedTrackIdx]?.language
-                              )
-                            }
-                            helperText={
-                              trackValidationAttempted &&
-                              !(
-                                trackInfos[selectedTrackIdx]?.audioLanguage ||
-                                trackInfos[selectedTrackIdx]?.language
-                              )
-                                ? 'Audio language is required.'
-                                : ''
-                            }
-                          >
-                            {languages.map(lang => (
-                              <MenuItem key={lang.code} value={lang.code}>
-                                {lang.name}
-                              </MenuItem>
-                            ))}
-                          </TextField>
+                            renderInput={params => (
+                              <TextField
+                                {...params}
+                                label="Audio Language *"
+                                fullWidth
+                                required
+                                error={
+                                  trackValidationAttempted &&
+                                  !(
+                                    trackInfos[selectedTrackIdx]?.audioLanguage ||
+                                    trackInfos[selectedTrackIdx]?.language
+                                  )
+                                }
+                                helperText={
+                                  trackValidationAttempted &&
+                                  !(
+                                    trackInfos[selectedTrackIdx]?.audioLanguage ||
+                                    trackInfos[selectedTrackIdx]?.language
+                                  )
+                                    ? 'Audio language is required.'
+                                    : ''
+                                }
+                              />
+                            )}
+                          />
                         </Box>
                         <Box
                           sx={{
@@ -2549,35 +2574,44 @@ export default function UploadPage() {
                             mt: 2,
                           }}
                         >
-                          <TextField
-                            select
-                            label="Genre *"
-                            fullWidth
-                            required
-                            value={trackInfos[selectedTrackIdx]?.genre || ''}
-                            onChange={e =>
-                              handleTrackInfoChange(selectedTrackIdx, 'genre', e.target.value)
+                          <Autocomplete
+                            options={genres}
+                            value={trackInfos[selectedTrackIdx]?.genre || null}
+                            onChange={(_event, value) => {
+                              handleTrackInfoChange(selectedTrackIdx, 'genre', value || '');
+                              if (
+                                trackInfos[selectedTrackIdx]?.subgenre &&
+                                !getSubgenreOptions(value || '').includes(
+                                  trackInfos[selectedTrackIdx]?.subgenre
+                                )
+                              ) {
+                                handleTrackInfoChange(selectedTrackIdx, 'subgenre', '');
+                              }
+                            }}
+                            renderInput={params => (
+                              <TextField
+                                {...params}
+                                label="Genre *"
+                                fullWidth
+                                required
+                                error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre}
+                                helperText={
+                                  trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre
+                                    ? 'Genre is required.'
+                                    : ''
+                                }
+                              />
+                            )}
+                          />
+                          <Autocomplete
+                            options={getSubgenreOptions(trackInfos[selectedTrackIdx]?.genre)}
+                            value={trackInfos[selectedTrackIdx]?.subgenre || null}
+                            onChange={(_event, value) =>
+                              handleTrackInfoChange(selectedTrackIdx, 'subgenre', value || '')
                             }
-                            error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre}
-                            helperText={
-                              trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre
-                                ? 'Genre is required.'
-                                : ''
-                            }
-                          >
-                            {genres.map(g => (
-                              <MenuItem key={g} value={g}>
-                                {g}
-                              </MenuItem>
-                            ))}
-                          </TextField>
-                          <TextField
-                            label="Subgenre"
-                            fullWidth
-                            value={trackInfos[selectedTrackIdx]?.subgenre || ''}
-                            onChange={e =>
-                              handleTrackInfoChange(selectedTrackIdx, 'subgenre', e.target.value)
-                            }
+                            renderInput={params => (
+                              <TextField {...params} label="Subgenre" fullWidth />
+                            )}
                           />
                         </Box>
                         <Box

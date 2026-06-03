@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Typography,
   Paper,
@@ -12,25 +12,29 @@ import {
   Chip,
   CircularProgress,
   Box,
-  Divider,
   Button,
   Tabs,
   Tab,
   useTheme,
   useMediaQuery,
-  IconButton,
   Tooltip,
   Avatar,
-  Card,
-  CardContent,
+  InputAdornment,
+  MenuItem,
+  Stack,
+  TablePagination,
+  TextField,
+  alpha,
 } from '@mui/material';
 import {
+  Album,
   Link as LinkIcon,
   CheckCircle,
   Pending,
   Cancel,
   MusicNote,
-  TrendingUp,
+  Search,
+  UploadFile,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import { releaseAPI } from '@/services/api';
@@ -77,6 +81,11 @@ export default function AdminReleasesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [storeFilter, setStoreFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const { mode } = useColorMode();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -123,7 +132,12 @@ export default function AdminReleasesPage() {
   }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    if (newValue === 4) {
+      router.push('/admin/export');
+      return;
+    }
     setTabValue(newValue);
+    setPage(0);
     const nextStatus = ['', 'pending', 'approved', 'rejected'][newValue];
     setStatusFilter(nextStatus || null);
     router.push(nextStatus ? `/admin/releases?status=${nextStatus}` : '/admin/releases');
@@ -137,8 +151,15 @@ export default function AdminReleasesPage() {
     });
   };
 
-  // Filter releases based on tab
-  const getFilteredReleases = () => {
+  const getTrackCount = (release: any) =>
+    Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
+  const getReleaseArtwork = (release: any) =>
+    release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
+  const pendingCount = releases.filter(r => r.status === 'pending').length;
+  const approvedCount = releases.filter(r => r.status === 'approved').length;
+  const rejectedCount = releases.filter(r => r.status === 'rejected').length;
+
+  const statusFilteredReleases = useMemo(() => {
     switch (tabValue) {
       case 1: // Pending
         return releases.filter(r => r.status === 'pending');
@@ -149,22 +170,56 @@ export default function AdminReleasesPage() {
       default: // All
         return releases;
     }
-  };
+  }, [releases, tabValue]);
 
-  const filteredReleases = getFilteredReleases();
-  const getTrackCount = (release: any) =>
-    Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
-  const getReleaseArtwork = (release: any) =>
-    release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
-  const pendingCount = releases.filter(r => r.status === 'pending').length;
-  const approvedCount = releases.filter(r => r.status === 'approved').length;
-  const rejectedCount = releases.filter(r => r.status === 'rejected').length;
-  const totalTracks = releases.reduce(
-    (sum, release) => sum + getTrackCount(release),
-    0
+  const storeOptions = useMemo(() => {
+    const values = new Set<string>();
+    releases.forEach((release) => {
+      (Array.isArray(release.stores) ? release.stores : []).forEach((store: string) => values.add(store));
+    });
+    return Array.from(values).sort((a, b) => getDspDisplayName(a).localeCompare(getDspDisplayName(b)));
+  }, [releases]);
+
+  const releaseTypeOptions = useMemo(() => {
+    const values = new Set<string>();
+    releases.forEach((release) => {
+      if (release.releaseType || release.type) values.add(String(release.releaseType || release.type));
+    });
+    return Array.from(values).sort();
+  }, [releases]);
+
+  const filteredReleases = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return statusFilteredReleases.filter((release) => {
+      const haystack = [
+        release.releaseTitle,
+        release.title,
+        release.primaryArtist,
+        release.artist,
+        release.label,
+        release.upc,
+      ].filter(Boolean).join(' ').toLowerCase();
+      const matchesSearch = !query || haystack.includes(query);
+      const matchesType = typeFilter === 'all' || String(release.releaseType || release.type || '') === typeFilter;
+      const stores = Array.isArray(release.stores) ? release.stores : [];
+      const matchesStore = storeFilter === 'all' || stores.includes(storeFilter);
+      return matchesSearch && matchesType && matchesStore;
+    });
+  }, [searchTerm, statusFilteredReleases, storeFilter, typeFilter]);
+
+  const paginatedReleases = useMemo(
+    () => filteredReleases.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
+    [filteredReleases, page, rowsPerPage]
   );
-  const approvalRate = releases.length ? Math.round((approvedCount / releases.length) * 100) : 0;
-  const maxStatusCount = Math.max(pendingCount, approvedCount, rejectedCount, 1);
+
+  const resetPage = () => setPage(0);
+  const tabItems = [
+    { label: 'All', count: releases.length, icon: <Album fontSize="small" />, color: '#5b5ff7' },
+    { label: 'Pending', count: pendingCount, icon: <Pending fontSize="small" />, color: '#f59e0b' },
+    { label: 'Approved', count: approvedCount, icon: <CheckCircle fontSize="small" />, color: '#10b981' },
+    { label: 'Rejected', count: rejectedCount, icon: <Cancel fontSize="small" />, color: '#ef4444' },
+    { label: 'Export Catalog', count: null, icon: <UploadFile fontSize="small" />, color: '#0ea5e9' },
+  ];
 
   // Get status chip with proper styling
   const getStatusChip = (status: string) => {
@@ -239,94 +294,6 @@ export default function AdminReleasesPage() {
         description="Review, approve, reject, and inspect delivery-ready releases across all DSPs."
       />
 
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' },
-          gap: 2,
-          mb: 3,
-        }}
-      >
-        {[
-          {
-            label: 'Pipeline Load',
-            value: `${pendingCount} Pending`,
-            accent: '#f5a524',
-            bars: [pendingCount, approvedCount, rejectedCount],
-          },
-          {
-            label: 'Approval Rate',
-            value: `${approvalRate}%`,
-            accent: '#21c58b',
-            bars: [approvedCount, Math.max(releases.length - approvedCount, 0)],
-          },
-          {
-            label: 'Track Volume',
-            value: `${totalTracks} Tracks`,
-            accent: '#5b5ff7',
-            bars: releases
-              .slice(0, 8)
-              .map(release => getTrackCount(release)),
-          },
-        ].map(metric => (
-          <Paper
-            key={metric.label}
-            elevation={0}
-            sx={{
-              ...premiumSurfaceSx(theme),
-              p: 2.25,
-              borderRadius: '24px',
-              minHeight: 126,
-            }}
-          >
-            <Box
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 2,
-              }}
-            >
-              <Box>
-                <Typography variant="caption" color="text.secondary" fontWeight={850}>
-                  {metric.label}
-                </Typography>
-                <Typography variant="h5" fontWeight={950} sx={{ mt: 0.5 }}>
-                  {metric.value}
-                </Typography>
-              </Box>
-              <Box
-                sx={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: '14px',
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: metric.accent,
-                  bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.045)',
-                }}
-              >
-                <TrendingUp fontSize="small" />
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'end', gap: 0.75, height: 34, mt: 2 }}>
-              {(metric.bars.length ? metric.bars : [0]).map((value, index) => (
-                <Box
-                  key={`${metric.label}-${index}`}
-                  sx={{
-                    flex: 1,
-                    height: `${Math.max(18, Math.round((Number(value) / maxStatusCount) * 34))}px`,
-                    borderRadius: '6px 6px 2px 2px',
-                    bgcolor: metric.accent,
-                    opacity: 0.26 + index * 0.09,
-                  }}
-                />
-              ))}
-            </Box>
-          </Paper>
-        ))}
-      </Box>
-
       <Paper
         elevation={0}
         sx={{
@@ -347,38 +314,109 @@ export default function AdminReleasesPage() {
             borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
             '& .MuiTab-root': {
               textTransform: 'none',
-              fontWeight: 600,
+              fontWeight: 850,
               minHeight: 54,
               borderRadius: 2,
               mx: 0.5,
-              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'rgba(15,23,42,0.72)',
+              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'white',
               '&.Mui-selected': {
-                color: mode === 'dark' ? '#b7c5ff' : '#2841c6',
-                backgroundColor:
-                  mode === 'dark' ? 'rgba(120,141,255,0.14)' : 'rgba(74,108,247,0.10)',
+                color: '#fff',
               },
             },
             '& .MuiTabs-indicator': {
               height: 3,
               borderRadius: 999,
-              backgroundColor: mode === 'dark' ? '#9bafff' : '#4a6cf7',
+              backgroundColor: '#fff',
             },
           }}
         >
-          <Tab label={`All (${releases.length})`} {...a11yProps(0)} />
-          <Tab
-            label={`Pending (${releases.filter(r => r.status === 'pending').length})`}
-            {...a11yProps(1)}
-          />
-          <Tab
-            label={`Approved (${releases.filter(r => r.status === 'approved').length})`}
-            {...a11yProps(2)}
-          />
-          <Tab
-            label={`Rejected (${releases.filter(r => r.status === 'rejected').length})`}
-            {...a11yProps(3)}
-          />
+          {tabItems.map((item, index) => (
+            <Tab
+              key={item.label}
+              icon={item.icon}
+              iconPosition="start"
+              label={item.count === null ? item.label : `${item.label} (${item.count})`}
+              {...a11yProps(index)}
+              sx={{
+                minHeight: 46,
+                mx: 0.5,
+                mb: 0.75,
+                borderRadius: '14px',
+                bgcolor: item.color,
+                color: '#fff',
+                opacity: tabValue === index ? 1 : 0.88,
+                boxShadow: tabValue === index ? `0 14px 28px ${alpha(item.color, 0.34)}` : 'none',
+                transition: 'transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease',
+                '&.Mui-selected': {
+                  bgcolor: item.color,
+                  color: '#fff',
+                  opacity: 1,
+                },
+                '&:hover': {
+                  opacity: 1,
+                  transform: 'translateY(-1px)',
+                },
+                '& .MuiTab-iconWrapper': { mr: 0.75 },
+              }}
+            />
+          ))}
         </Tabs>
+
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={1.5}
+          sx={{ p: 1.5, alignItems: { md: 'center' } }}
+        >
+          <TextField
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value);
+              resetPage();
+            }}
+            placeholder="Filter by release, artist, label, UPC..."
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <TextField
+            select
+            label="Type"
+            value={typeFilter}
+            onChange={(event) => {
+              setTypeFilter(event.target.value);
+              resetPage();
+            }}
+            size="small"
+            sx={{ minWidth: { xs: '100%', md: 170 } }}
+          >
+            <MenuItem value="all">All types</MenuItem>
+            {releaseTypeOptions.map((type) => (
+              <MenuItem key={type} value={type}>{type}</MenuItem>
+            ))}
+          </TextField>
+          <TextField
+            select
+            label="DSP"
+            value={storeFilter}
+            onChange={(event) => {
+              setStoreFilter(event.target.value);
+              resetPage();
+            }}
+            size="small"
+            sx={{ minWidth: { xs: '100%', md: 190 } }}
+          >
+            <MenuItem value="all">All stores</MenuItem>
+            {storeOptions.map((store) => (
+              <MenuItem key={store} value={store}>{getDspDisplayName(store)}</MenuItem>
+            ))}
+          </TextField>
+        </Stack>
 
         <TabPanel value={tabValue} index={0}>
           {renderReleasesTable()}
@@ -435,90 +473,6 @@ export default function AdminReleasesPage() {
 
     return (
       <Box sx={{ px: 0 }}>
-        {/* Stats Summary */}
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
-          <Box sx={{ flex: 1 }}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor:
-                  mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.02)',
-              }}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
-                <Typography variant="h5" fontWeight={700}>
-                  {filteredReleases.length}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Total Releases
-                </Typography>
-              </CardContent>
-            </Card>
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor:
-                  mode === 'dark' ? 'rgba(255, 183, 0, 0.1)' : 'rgba(255, 183, 0, 0.1)',
-              }}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
-                <Typography variant="h5" fontWeight={700} color="warning.main">
-                  {filteredReleases.filter(r => r.status === 'pending').length}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Pending
-                </Typography>
-              </CardContent>
-            </Card>
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor:
-                  mode === 'dark' ? 'rgba(76, 175, 80, 0.1)' : 'rgba(76, 175, 80, 0.1)',
-              }}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
-                <Typography variant="h5" fontWeight={700} color="success.main">
-                  {filteredReleases.filter(r => r.status === 'approved').length}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Approved
-                </Typography>
-              </CardContent>
-            </Card>
-          </Box>
-          <Box sx={{ flex: 1 }}>
-            <Card
-              elevation={0}
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)'}`,
-                backgroundColor:
-                  mode === 'dark' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(244, 67, 54, 0.1)',
-              }}
-            >
-              <CardContent sx={{ textAlign: 'center', py: 1.5 }}>
-                <Typography variant="h5" fontWeight={700} color="error.main">
-                  {filteredReleases.filter(r => r.status === 'rejected').length}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Rejected
-                </Typography>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-
         {/* Releases Table */}
         <TableContainer
           sx={{
@@ -529,7 +483,7 @@ export default function AdminReleasesPage() {
             bgcolor: mode === 'dark' ? 'rgba(11,16,32,0.32)' : 'rgba(255,255,255,0.72)',
           }}
         >
-          <Table size="small">
+          <Table size="small" sx={{ minWidth: 960 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Release</TableCell>
@@ -545,7 +499,7 @@ export default function AdminReleasesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredReleases.map(release => (
+              {paginatedReleases.map(release => (
                 <TableRow
                   key={release._id}
                   sx={{
@@ -626,6 +580,18 @@ export default function AdminReleasesPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={filteredReleases.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          onPageChange={(_, nextPage) => setPage(nextPage)}
+          onRowsPerPageChange={(event) => {
+            setRowsPerPage(Number(event.target.value));
+            setPage(0);
+          }}
+        />
       </Box>
     );
   }

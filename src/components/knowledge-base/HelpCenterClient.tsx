@@ -44,6 +44,7 @@ import {
   type KnowledgeBaseTree,
 } from '@/services/api';
 import { groupKnowledgeBase } from '@/components/knowledge-base/kbUtils';
+import HelpCopyrightFooter from '@/components/knowledge-base/HelpCopyrightFooter';
 import { useColorMode } from '@/context/ColorModeContext';
 
 type HelpCenterClientProps = {
@@ -671,80 +672,67 @@ export default function HelpCenterClient({
                 </Paper>
               )}
             </Box>
-            <Box
-              component="footer"
-              sx={{
-                px: 2,
-                py: 2.25,
-                textAlign: 'center',
-                bgcolor: isDark ? '#06070d' : '#ebe5d9',
-                borderTop: '1px solid',
-                borderColor: panelBorder,
-              }}
-            >
-              <Typography variant="caption" color="text.secondary" fontWeight={700}>
-                Copyright 2026 SingleAudio Distribution. All rights reserved.
-              </Typography>
-            </Box>
+            <HelpCopyrightFooter />
           </Stack>
         ) : mode === 'category' ? (
-          <Box
-            sx={{
-              width: '100%',
-              maxWidth: 1180,
-              mx: 'auto',
-              px: { xs: 2, md: 4 },
-              py: { xs: 4, md: 6 },
-            }}
-          >
-            {activeCategory ? (
-              <Stack spacing={3}>
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={2}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                >
-                  <Box
-                    sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: activeCategory.iconUrl ? 1 : '50%',
-                      overflow: 'hidden',
-                      display: 'grid',
-                      placeItems: 'center',
-                      color: '#ffffff',
-
-                      flexShrink: 0,
-                    }}
+          <Stack spacing={0}>
+            <Box
+              sx={{
+                width: '100%',
+                maxWidth: 1180,
+                mx: 'auto',
+                px: { xs: 2, md: 4 },
+                py: { xs: 4, md: 6 },
+              }}
+            >
+              {activeCategory ? (
+                <Stack spacing={3}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={2}
+                    alignItems={{ xs: 'flex-start', sm: 'center' }}
                   >
-                    {activeCategory.iconUrl ? (
-                      <Box
-                        component="img"
-                        src={activeCategory.iconUrl}
-                        alt=""
-                        sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <GraphicEq fontSize="large" />
-                    )}
-                  </Box>
-                  <Box>
-                    <Typography
-                      component="h1"
+                    <Box
                       sx={{
-                        fontSize: { xs: '2.1rem', md: '3rem' },
-                        lineHeight: 1.05,
-                        fontWeight: 950,
-                        letterSpacing: 0,
+                        width: 64,
+                        height: 64,
+                        borderRadius: activeCategory.iconUrl ? 1 : '50%',
+                        overflow: 'hidden',
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: '#ffffff',
+
+                        flexShrink: 0,
                       }}
                     >
-                      {activeCategory.name}
-                    </Typography>
-                    <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: 16, md: 18 } }}>
-                      {activeCategory.description || 'Guides and reference material.'}
-                    </Typography>
-                  </Box>
-                </Stack>
+                      {activeCategory.iconUrl ? (
+                        <Box
+                          component="img"
+                          src={activeCategory.iconUrl}
+                          alt=""
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <GraphicEq fontSize="large" />
+                      )}
+                    </Box>
+                    <Box>
+                      <Typography
+                        component="h1"
+                        sx={{
+                          fontSize: { xs: '2.1rem', md: '3rem' },
+                          lineHeight: 1.05,
+                          fontWeight: 950,
+                          letterSpacing: 0,
+                        }}
+                      >
+                        {activeCategory.name}
+                      </Typography>
+                      <Typography color="text.secondary" sx={{ mt: 1, fontSize: { xs: 16, md: 18 } }}>
+                        {activeCategory.description || 'Guides and reference material.'}
+                      </Typography>
+                    </Box>
+                  </Stack>
 
                 <Box
                   sx={{
@@ -889,19 +877,21 @@ export default function HelpCenterClient({
                       </Typography>
                     </Paper>
                   )}
-              </Stack>
-            ) : (
-              <Paper
-                variant="outlined"
-                sx={{ p: 4, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
-              >
-                <Typography fontWeight={900}>Category not found.</Typography>
-                <Button component={Link} href="/help" sx={{ mt: 1 }}>
-                  Back to help center
-                </Button>
-              </Paper>
-            )}
-          </Box>
+                </Stack>
+              ) : (
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 4, borderRadius: 1, bgcolor: panelBg, borderColor: panelBorder }}
+                >
+                  <Typography fontWeight={900}>Category not found.</Typography>
+                  <Button component={Link} href="/help" sx={{ mt: 1 }}>
+                    Back to help center
+                  </Button>
+                </Paper>
+              )}
+            </Box>
+            <HelpCopyrightFooter />
+          </Stack>
         ) : null}
       </Box>
     </Box>

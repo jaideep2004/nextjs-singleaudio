@@ -199,7 +199,7 @@ export default function AdminReleaseDetailPage() {
       setSaving(true);
       const resp = await releaseAPI.updateReleaseStatus(releaseId, "approved");
       if (resp?.success) {
-        setRelease((r: any) => (r ? { ...r, status: "approved" } : r));
+        setRelease((r: any) => (r ? { ...r, status: "approved", rejectReason: undefined, rejectionReason: undefined } : r));
       } else {
         setError(resp?.message || resp?.error || "Failed to approve release");
       }
@@ -853,28 +853,30 @@ export default function AdminReleaseDetailPage() {
               </Card>
             )}
             
-            {release.status === "pending" && (
-              <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+            {release.status !== "approved" && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
                 <Button
                   variant="contained"
                   color="success"
                   startIcon={<ThumbUp />}
                   onClick={handleApprove}
                   disabled={saving}
-                  sx={{ minWidth: 120 }}
+                  sx={{ minWidth: 140 }}
                 >
-                  {saving ? <CircularProgress size={20} /> : 'Approve'}
+                  {saving ? <CircularProgress size={20} /> : release.status === 'rejected' ? 'Approve Again' : 'Approve'}
                 </Button>
-                <Button
-                  variant="contained"
-                  color="error"
-                  startIcon={<ThumbDown />}
-                  onClick={() => setRejectOpen(true)}
-                  disabled={saving}
-                  sx={{ minWidth: 120 }}
-                >
-                  Reject
-                </Button>
+                {release.status !== 'rejected' && (
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<ThumbDown />}
+                    onClick={() => setRejectOpen(true)}
+                    disabled={saving}
+                    sx={{ minWidth: 120 }}
+                  >
+                    Reject
+                  </Button>
+                )}
               </Box>
             )}
           </Box>

@@ -1,10 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, Stack, Typography, useTheme } from '@mui/material';
-import { ArrowBack, Album, CheckCircle, Lock, Person, RequestQuote } from '@mui/icons-material';
+import {
+  AccountBalance,
+  ArrowBack,
+  Album,
+  CheckCircle,
+  Edit,
+  Paid,
+  Person,
+  Phone,
+  RequestQuote,
+  Security,
+} from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { PremiumHeader, PremiumPanel, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 
@@ -16,6 +27,7 @@ export default function UserPreviewPage() {
   const [releases, setReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const surfaceSx = {
     ...premiumSurfaceSx(theme),
@@ -26,6 +38,33 @@ export default function UserPreviewPage() {
   };
   const headingText = isDark ? '#f1f5f9' : '#0f172a';
   const mutedText = isDark ? 'rgba(255,255,255,0.54)' : 'rgba(15,23,42,0.54)';
+  const releasesStats = useMemo(() => {
+    const approved = releases.filter((release) => release.status === 'approved').length;
+    const rejected = releases.filter((release) => release.status === 'rejected').length;
+    const pending = releases.filter((release) => release.status === 'pending').length;
+    const tracks = releases.reduce((sum, release) => sum + Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0)), 0);
+    const revenue = releases.reduce(
+      (sum, release) => sum + Number(release.revenue || release.totalRevenue || release.royaltyAmount || release.earnings || 0),
+      0
+    );
+    return { approved, rejected, pending, tracks, revenue };
+  }, [releases]);
+  const payout = user?.payoutMethod || user?.onboarding?.payoutMethod || {};
+  const payoutDetails = payout.details || {};
+  const location = user?.onboarding?.location || {};
+
+  const handleStatusToggle = async () => {
+    if (!user?._id) return;
+    try {
+      setStatusSaving(true);
+      const response = await adminAPI.updateUser(user._id, { isActive: !user.isActive });
+      if (response.success) {
+        setUser((current: any) => ({ ...current, isActive: !current.isActive }));
+      }
+    } finally {
+      setStatusSaving(false);
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -65,7 +104,7 @@ export default function UserPreviewPage() {
     <Box sx={{ width: '100%', minWidth: 0 }}>
       <Alert
         severity="info"
-        icon={<Lock />}
+        icon={<Security />}
         sx={{
           mb: 2.5,
           borderRadius: '999px',
@@ -76,23 +115,49 @@ export default function UserPreviewPage() {
           '& .MuiAlert-icon': { color: '#38bdf8' },
         }}
       >
-        Read-only admin preview. Create, edit, delete, and payout actions are disabled.
+        Admin operations view. Profile edits, release review, status control, and payout review actions are enabled from here.
       </Alert>
       <PremiumHeader
         eyebrow="View As User"
         title={user?.artistName || user?.name || 'User Preview'}
         description={`Inspecting ${user?.email || 'user'} profile, catalog, payouts, and account state.`}
         action={
-          <Button component={Link} href={`/admin/users/${params.id}`} variant="outlined" startIcon={<ArrowBack />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
-            Back
-          </Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button component={Link} href={`/admin/users/${params.id}`} variant="contained" startIcon={<Edit />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+              Edit User
+            </Button>
+            <Button component={Link} href={`/admin/users/${params.id}`} variant="outlined" startIcon={<ArrowBack />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+              Back
+            </Button>
+          </Stack>
         }
       />
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} sx={{ mb: 2.5 }}>
+        <Button
+          variant={user?.isActive ? 'outlined' : 'contained'}
+          color={user?.isActive ? 'error' : 'success'}
+          onClick={handleStatusToggle}
+          disabled={statusSaving}
+          startIcon={statusSaving ? <CircularProgress size={16} /> : <Security />}
+          sx={{ borderRadius: '12px', fontWeight: 900 }}
+        >
+          {user?.isActive ? 'Deactivate User' : 'Activate User'}
+        </Button>
+        <Button component={Link} href={`/admin/releases?status=rejected`} variant="outlined" startIcon={<Album />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+          Review Releases
+        </Button>
+        <Button component={Link} href={`/admin/payouts`} variant="outlined" startIcon={<Paid />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+          Payout Tools
+        </Button>
+      </Stack>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2.5 }}>
         {[
           { icon: <Person />, title: 'Profile', text: `${user?.role || 'artist'} account`, meta: `${user?.verification?.status || 'pending'} KYC · ${user?.accountType || 'artist'}`, color: '#5b5ff7' },
-          { icon: <Album />, title: 'Releases', text: `${releases.length} matched`, meta: `release${releases.length === 1 ? '' : 's'} by artist/profile name`, color: '#f59e0b' },
+          { icon: <Album />, title: 'Releases', text: `${releases.length} matched`, meta: `${releasesStats.approved} approved · ${releasesStats.rejected} rejected · ${releasesStats.pending} pending`, color: '#f59e0b' },
           { icon: <RequestQuote />, title: 'Payouts', text: user?.payoutMethod?.method ? 'Method Saved' : 'No Method', meta: user?.payoutMethod?.method ? user.payoutMethod.method.replace('_', ' ') : 'No saved payout method yet', color: '#10b981' },
+          { icon: <Phone />, title: 'Contact', text: user?.onboarding?.phoneNumber || user?.verification?.phoneNumber || 'No phone', meta: user?.email || 'No email', color: '#0ea5e9' },
+          { icon: <Paid />, title: 'Revenue', text: `$${releasesStats.revenue.toFixed(2)}`, meta: `${releasesStats.tracks} total tracks`, color: '#ec4899' },
+          { icon: <AccountBalance />, title: 'Bank', text: payoutDetails.bankName || payoutDetails.accountNumber ? 'Details Saved' : 'No Bank', meta: payoutDetails.accountHolderName || payout.method || 'No payout method', color: '#14b8a6' },
         ].map((item) => (
           <Box key={item.title} sx={{ ...surfaceSx, p: 3, minHeight: 170 }}>
             <Stack spacing={1.75}>
@@ -121,8 +186,51 @@ export default function UserPreviewPage() {
               ['Email', user?.email || '-'],
               ['Artist / Label', user?.artistName || user?.onboarding?.labelName || '-'],
               ['KYC', user?.verification?.status || 'pending'],
-              ['Mobile', user?.verification?.phoneNumber || '-'],
+              ['Mobile', user?.onboarding?.phoneNumber || user?.verification?.phoneNumber || '-'],
               ['Joined', user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '-'],
+              ['Legal name', user?.onboarding?.legalName || '-'],
+              ['Country', location.country || '-'],
+              ['State', location.state || '-'],
+              ['City', location.city || '-'],
+              ['Address', location.address || user?.onboarding?.legalAddress || '-'],
+              ['PAN', user?.onboarding?.panNumber || '-'],
+              ['Aadhaar', user?.onboarding?.aadhaarNumber || '-'],
+            ].map(([label, value]) => (
+              <Box
+                key={label}
+                sx={{
+                  p: 2.25,
+                  borderRadius: '14px',
+                  bgcolor: isDark ? 'rgba(255,255,255,0.035)' : 'rgba(248,250,252,0.86)',
+                  border: '1px solid',
+                  borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)',
+                }}
+              >
+                <Typography variant="caption" sx={{ color: mutedText, fontWeight: 900 }}>{label}</Typography>
+                <Typography sx={{ fontWeight: 900, color: headingText, wordBreak: 'break-word', mt: 0.35 }}>{value}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Stack>
+      </PremiumPanel>
+
+      <PremiumPanel sx={{ mt: 2.5, p: { xs: 3, md: 4 }, borderRadius: '16px' }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: headingText }}>Bank and Permissions</Typography>
+            <Typography sx={{ color: mutedText, mt: 0.5 }}>Payout identity plus writable admin controls for this account.</Typography>
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+            {[
+              ['Payout method', payout.method || '-'],
+              ['Account holder', payoutDetails.accountHolderName || '-'],
+              ['Account number', payoutDetails.accountNumber || '-'],
+              ['IFSC', payoutDetails.ifscCode || '-'],
+              ['Bank name', payoutDetails.bankName || '-'],
+              ['Branch', payoutDetails.branch || '-'],
+              ['PayPal', payoutDetails.paypalEmail || '-'],
+              ['Status write', user?.isActive ? 'Can deactivate' : 'Can activate'],
+              ['Release write', 'Can review and change status'],
             ].map(([label, value]) => (
               <Box
                 key={label}

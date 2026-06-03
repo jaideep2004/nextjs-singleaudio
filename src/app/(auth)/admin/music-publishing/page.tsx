@@ -365,9 +365,9 @@ export default function AdminMusicPublishingPage() {
         elevation={0}
         sx={{
           ...premiumSurfaceSx(theme),
-          p: { xs: 2, md: 2.5 },
+          p: { xs: 1.25, sm: 2, md: 2.5 },
           mb: 2,
-          overflow: 'visible',
+          overflow: 'hidden',
         }}
       >
         <Stack direction="column" spacing={2} alignItems="stretch" sx={{ minWidth: 0 }}>
@@ -514,7 +514,7 @@ export default function AdminMusicPublishingPage() {
           <>
             <TableContainer
               sx={{
-                maxHeight: 'calc(100vh - 310px)',
+                maxHeight: { xs: 'calc(100vh - 260px)', md: 'calc(100vh - 310px)' },
                 overflowX: 'auto',
                 overflowY: 'auto',
                 overscrollBehaviorX: 'contain',
@@ -543,7 +543,7 @@ export default function AdminMusicPublishingPage() {
                 sx={{
                   tableLayout: 'fixed',
                   width: '100%',
-                  minWidth: { xs: 600, sm: 850, md: 1080, lg: 1220 },
+                  minWidth: { xs: 520, sm: 760, md: 1080, lg: 1220 },
                 }}
               >
                 <TableHead>

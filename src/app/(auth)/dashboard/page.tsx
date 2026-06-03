@@ -29,6 +29,7 @@ import {
   CalendarToday,
   Error as ErrorIcon,
 } from '@mui/icons-material';
+import {Stack} from '@mui/material';
 import { useAuth } from '@/context/AppContext';
 import { trackAPI, releaseAPI } from '@/services/api';
 import AuthGuard from '@/components/AuthGuard';
@@ -170,6 +171,13 @@ function DashboardPage() {
       color: '#f59e0b',
       bgColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
     },
+    {
+      label: 'Rejected',
+      value: rejectedTracks + rejectedReleases,
+      icon: <ErrorIcon />,
+      color: '#ef4444',
+      bgColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.08)',
+    },
   ];
 
   const getStatusChip = (status: string) => {
@@ -199,8 +207,8 @@ function DashboardPage() {
       <Box sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
         <Skeleton variant="text" width={280} height={40} sx={{ mb: 1 }} />
         <Skeleton variant="text" width={200} height={24} sx={{ mb: 4 }} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 4 }}>
-          {[1, 2, 3, 4].map(i => (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 2, mb: 4 }}>
+          {[1, 2, 3, 4, 5].map(i => (
             <Skeleton key={i} variant="rounded" height={110} sx={{ borderRadius: '14px' }} />
           ))}
         </Box>
@@ -215,14 +223,6 @@ function DashboardPage() {
         eyebrow="Artist Command Center"
         title={`Welcome back, ${user?.artistName || user?.name || 'Artist'}`}
         description="Watch your catalog, release pipeline, track health, and next actions from one premium operations view."
-        action={<Button
-            component={Link}
-            href="/dashboard/upload"
-            variant="contained"
-            startIcon={<CloudUploadIcon />}
-          >
-            Create New Release
-          </Button>}
       />
 
       {error && <Alert severity="error" sx={{ mb: 3, borderRadius: '12px' }}>{error}</Alert>}
@@ -251,11 +251,27 @@ function DashboardPage() {
                 Live catalog, review queue, and issues that need attention.
               </Typography>
             </Box>
-            <Chip
-              label={`${liveCatalogRate}% Live`}
-              color={liveCatalogRate >= 70 ? 'success' : pendingReleases > 0 ? 'warning' : 'default'}
-              sx={{ fontWeight: 900 }}
-            />
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1}
+              alignItems={{ xs: 'stretch', sm: 'center' }}
+            >
+              <Chip
+                label={`${liveCatalogRate}% Live`}
+                color={liveCatalogRate >= 70 ? 'success' : pendingReleases > 0 ? 'warning' : 'default'}
+                sx={{ fontWeight: 900 }}
+              />
+              <Button
+                component={Link}
+                href="/dashboard/upload"
+                variant="contained"
+                size="small"
+                startIcon={<CloudUploadIcon />}
+                sx={{ borderRadius: '10px', fontWeight: 900, minHeight: 36 }}
+              >
+                Create New Release
+              </Button>
+            </Stack>
           </Box>
           <LinearProgress
             variant="determinate"
@@ -323,7 +339,7 @@ function DashboardPage() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' },
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' },
           gap: 2,
           mb: 4,
         }}

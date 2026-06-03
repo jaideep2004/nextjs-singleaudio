@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import {
   Box,
   Typography,
@@ -11,8 +11,6 @@ import {
   Chip,
   Skeleton,
   useTheme,
-  Tab,
-  Tabs,
   Button,
 } from '@mui/material';
 import {
@@ -24,14 +22,8 @@ import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { DspLogo } from '@/components/dsp/DspLogo';
+import RouteTabs from '@/components/navigation/RouteTabs';
 import { getDspDisplayName } from '@/lib/platforms';
-
-const statusTabs = [
-  { label: 'All', value: '' },
-  { label: 'Pending', value: 'pending' },
-  { label: 'Approved', value: 'approved' },
-  { label: 'Rejected', value: 'rejected' },
-];
 
 export default function ReleasesPage() {
   return (
@@ -42,7 +34,6 @@ export default function ReleasesPage() {
 }
 
 function ReleasesContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -128,14 +119,6 @@ function ReleasesContent() {
     );
   };
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: string) => {
-    if (newValue === '') {
-      router.push('/dashboard/releases');
-    } else {
-      router.push(`/dashboard/releases?status=${newValue}`);
-    }
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -156,70 +139,30 @@ function ReleasesContent() {
         eyebrow="Distribution"
         title="Releases"
         description="Manage your release pipeline across drafts, review, approval, delivery, and takedown states."
-        action={<Button
-          component={Link}
-          href="/dashboard/upload"
-          variant="contained"
-          size="small"
-          startIcon={<CloudUpload />}
-        >
-          New Release
-        </Button>}
       />
 
-      {/* Status Tabs */}
-      <Box
-        sx={{
-          mb: 3,
-          borderBottom: '1px solid',
-          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-        }}
-      >
-        <Tabs
-          value={currentStatus}
-          onChange={handleTabChange}
-          sx={{
-            minHeight: 42,
-            '& .MuiTab-root': {
-              minHeight: 42,
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              textTransform: 'none',
-              color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(15,23,42,0.45)',
-              '&.Mui-selected': { color: '#4a6cf7' },
-            },
-            '& .MuiTabs-indicator': {
-              height: 2,
-              borderRadius: '1px 1px 0 0',
-              bgcolor: '#4a6cf7',
-            },
-          }}
-        >
-          {statusTabs.map(tab => (
-            <Tab
-              key={tab.value}
-              value={tab.value}
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  {tab.label}
-                  <Box
-                    sx={{
-                      px: 0.75, py: 0.15,
-                      borderRadius: '4px',
-                      bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {tabCounts[tab.value as keyof typeof tabCounts]}
-                  </Box>
-                </Box>
-              }
-            />
-          ))}
-        </Tabs>
-      </Box>
+      <RouteTabs
+        ariaLabel="release catalog sections"
+        action={
+          <Button
+            component={Link}
+            href="/dashboard/upload"
+            variant="contained"
+            size="small"
+            startIcon={<CloudUpload />}
+            sx={{ borderRadius: '12px', fontWeight: 900, minHeight: 40 }}
+          >
+            New Release
+          </Button>
+        }
+        items={[
+          { label: `All (${tabCounts['']})`, href: '/dashboard/releases' },
+          { label: `Pending (${tabCounts.pending})`, href: '/dashboard/releases?status=pending' },
+          { label: `Approved (${tabCounts.approved})`, href: '/dashboard/releases?status=approved' },
+          { label: `Rejected (${tabCounts.rejected})`, href: '/dashboard/releases?status=rejected' },
+          { label: 'Tracks', href: '/dashboard/tracks' },
+        ]}
+      />
 
       {/* Content */}
       {loading ? (

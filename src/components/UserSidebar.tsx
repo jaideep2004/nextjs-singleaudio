@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Drawer,
@@ -10,7 +10,6 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  Collapse,
   Typography,
   useTheme,
   useMediaQuery,
@@ -21,8 +20,6 @@ import {
 import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
-  ExpandLess,
-  ExpandMore,
   Menu as MenuIcon,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
@@ -65,13 +62,6 @@ const menuSections = [
         text: 'Releases',
         icon: <Album />,
         path: '/dashboard/releases',
-        subItems: [
-          { text: 'All Releases', path: '/dashboard/releases' },
-          { text: 'Pending', path: '/dashboard/releases?status=pending' },
-          { text: 'Approved', path: '/dashboard/releases?status=approved' },
-          { text: 'Rejected', path: '/dashboard/releases?status=rejected' },
-          { text: 'Tracks', path: '/dashboard/tracks' },
-        ],
       },
       {
         text: 'Analytics',
@@ -92,19 +82,11 @@ const menuSections = [
         text: 'YouTube Network',
         icon: <YouTube />,
         path: '/dashboard/youtube-network',
-        subItems: [
-          { text: 'Channels', path: '/dashboard/youtube-network' },
-          { text: 'Analytics', path: '/dashboard/youtube-network/analytics' },
-        ],
       },
       {
         text: 'Podcasts',
         icon: <PodcastsIcon />,
         path: '/dashboard/podcasts',
-        subItems: [
-          { text: 'Upload Episode', path: '/dashboard/podcasts' },
-          { text: 'Payouts', path: '/dashboard/podcasts?view=payouts' },
-        ],
       },
     ],
   },
@@ -130,18 +112,11 @@ const menuSections = [
         text: 'Royalties',
         icon: <TrendingUp />,
         path: '/dashboard/royalties',
-        subItems: [
-          { text: 'Statement', path: '/dashboard/royalties?view=statement' },
-          { text: 'Report', path: '/dashboard/royalties?view=report' },
-        ],
       },
       {
         text: 'Payouts',
         icon: <AccountBalanceWallet />,
         path: '/dashboard/payouts',
-        subItems: [
-          { text: 'Payment Method', path: '/dashboard/payouts?view=method' },
-        ],
       }, 
     ],
   },
@@ -150,12 +125,10 @@ const menuSections = [
 export default function UserSidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const auth = useAuth();
   const { notifications } = useNotifications();
   const user = auth?.user;
@@ -166,60 +139,22 @@ export default function UserSidebar() {
   const desktopCollapsed = collapsed && !isMobile;
   const currentDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : drawerWidth;
 
-  // Auto-expand submenus when on matching routes
-  useEffect(() => {
-    if (pathname.startsWith('/dashboard/podcasts')) {
-      setOpenSubMenu('/dashboard/podcasts');
-    }
-    if (pathname.startsWith('/dashboard/releases')) {
-      setOpenSubMenu('/dashboard/releases');
-    }
-    if (pathname.startsWith('/dashboard/royalties')) {
-      setOpenSubMenu('/dashboard/royalties');
-    }
-    if (pathname.startsWith('/dashboard/payouts')) {
-      setOpenSubMenu('/dashboard/payouts');
-    }
-    if (pathname.startsWith('/dashboard/youtube-network')) {
-      setOpenSubMenu('/dashboard/youtube-network');
-    }
-  }, [pathname]);
-
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleSubMenuClick = (item: string) => {
-    setOpenSubMenu(openSubMenu === item ? null : item);
-  };
-
   const handleDesktopCollapse = () => {
     setCollapsed((current) => !current);
-    setOpenSubMenu(null);
   };
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return pathname === path;
     }
-    return pathname.startsWith(path);
-  };
-
-  // For sub-items that may include query params
-  const isSubItemActive = (path: string) => {
-    const [subPath, subQuery] = path.split('?');
-    if (!subQuery) {
-      // No query param — active only when pathname matches and no view/status param set
-      return pathname === subPath && !searchParams.get('view') && !searchParams.get('status');
+    if (path === '/dashboard/releases') {
+      return pathname.startsWith('/dashboard/releases') || pathname.startsWith('/dashboard/tracks');
     }
-    const subParams = new URLSearchParams(subQuery);
-    const subView = subParams.get('view');
-    const subStatus = subParams.get('status');
-    const subTab = subParams.get('tab');
-    if (subView) return pathname === subPath && searchParams.get('view') === subView;
-    if (subStatus) return pathname === subPath && searchParams.get('status') === subStatus;
-    if (subTab) return pathname === subPath && searchParams.get('tab') === subTab;
-    return pathname === subPath;
+    return pathname.startsWith(path);
   };
 
   const isUnlockedDuringReview = (path: string) => {
@@ -334,11 +269,7 @@ export default function UserSidebar() {
                         onClick={() =>
                           lockedItem
                             ? undefined
-                            : desktopCollapsed
-                              ? router.push(item.path)
-                              : item.subItems
-                                ? handleSubMenuClick(item.path)
-                                : router.push(item.path)
+                            : router.push(item.path)
                         }
                         sx={{
                         borderRadius: '10px',
@@ -442,87 +373,9 @@ export default function UserSidebar() {
                       {lockedItem && !desktopCollapsed && (
                         <LockOutlined sx={{ fontSize: 15, color: isDark ? 'rgba(255,255,255,0.28)' : 'rgba(15,23,42,0.32)', mr: 0.5 }} />
                       )}
-                      {item.subItems && !desktopCollapsed && (
-                        <Box
-                          sx={{
-                            color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
-                            display: 'flex',
-                            '& .MuiSvgIcon-root': { fontSize: 18 },
-                          }}
-                        >
-                          {openSubMenu === item.path ? <ExpandLess /> : <ExpandMore />}
-                        </Box>
-                      )}
                       </ListItemButton>
                     </Tooltip>
                   </ListItem>
-                  {item.subItems && !desktopCollapsed && (
-                    <Collapse in={openSubMenu === item.path} timeout="auto" unmountOnExit>
-                      <List component="div" disablePadding sx={{ py: 0.25 }}>
-                        {item.subItems.map((subItem: any) => {
-                          const lockedSubItem = kycUnderReview && !isUnlockedDuringReview(subItem.path);
-                          return (
-                          <ListItemButton
-                            key={subItem.path}
-                            selected={isSubItemActive(subItem.path)}
-                            disabled={lockedSubItem}
-                            onClick={() => {
-                              if (!lockedSubItem) router.push(subItem.path);
-                            }}
-                            sx={{
-                              borderRadius: '8px',
-                              mx: 1.5,
-                              py: 0.6,
-                              pl: 5.5,
-                              position: 'relative',
-                              '&.Mui-selected': {
-                                backgroundColor: isDark
-                                  ? 'rgba(74, 108, 247, 0.08)'
-                                  : 'rgba(74, 108, 247, 0.06)',
-                                '& .MuiListItemText-primary': {
-                                  color: isDark ? '#93b4ff' : '#3b5fe5',
-                                  fontWeight: 600,
-                                },
-                                '&::before': {
-                                  content: '""',
-                                  position: 'absolute',
-                                  left: 32,
-                                  top: '50%',
-                                  transform: 'translateY(-50%)',
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '50%',
-                                  backgroundColor: '#4a6cf7',
-                                },
-                                '&:hover': {
-                                  backgroundColor: isDark
-                                    ? 'rgba(74, 108, 247, 0.12)'
-                                    : 'rgba(74, 108, 247, 0.08)',
-                                },
-                              },
-                              '&:hover': {
-                                backgroundColor: isDark
-                                  ? 'rgba(255, 255, 255, 0.03)'
-                                  : 'rgba(0, 0, 0, 0.02)',
-                              },
-                            }}
-                          >
-                            <ListItemText
-                              primary={subItem.text}
-                              primaryTypographyProps={{
-                                fontSize: '0.82rem',
-                                fontWeight: 650,
-                                color: isDark ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.76)',
-                              }}
-                            />
-                            {lockedSubItem && (
-                              <LockOutlined sx={{ fontSize: 14, color: 'text.disabled', mr: 1 }} />
-                            )}
-                          </ListItemButton>
-                        )})}
-                      </List>
-                    </Collapse>
-                  )}
                 </div>
               )})}
             </List>
