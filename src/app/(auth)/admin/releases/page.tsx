@@ -460,7 +460,7 @@ export default function AdminReleasesPage() {
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
             {tabValue === 1
-              ? 'There are no pending releases at the moment.'
+              ? 'There are no pending release at the moment.'
               : tabValue === 2
                 ? 'No releases have been approved yet.'
                 : tabValue === 3
