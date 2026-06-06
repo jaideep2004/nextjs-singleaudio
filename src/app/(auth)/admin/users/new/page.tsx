@@ -262,7 +262,7 @@ export default function NewUserPage() {
                 onChange={handleChange}
                 disabled={loading}
               >
-                {['users', 'review', 'payouts', 'delivery', 'podcasts', 'settings', 'analytics', 'support'].map((preset) => (
+                {['users', 'review', 'payouts', 'delivery', 'settings', 'analytics', 'support'].map((preset) => (
                   <MenuItem key={preset} value={preset}>
                     {preset.replace('-', ' ')}
                   </MenuItem>
@@ -271,7 +271,7 @@ export default function NewUserPage() {
               <FormControl component="fieldset" sx={{ mt: 2 }}>
                 <FormLabel component="legend">Extra Permissions</FormLabel>
                 <FormGroup row>
-                  {['users', 'review', 'payouts', 'dsp_delivery', 'podcasts', 'settings', 'analytics', 'support'].map((permission) => (
+                  {['users', 'review', 'payouts', 'dsp_delivery', 'settings', 'analytics', 'support'].map((permission) => (
                     <FormControlLabel
                       key={permission}
                       control={

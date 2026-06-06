@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
-import { isRssWorkspaceSupervisor } from '@/lib/rssAccess';
 import { sanitizeDspKeys } from '@/lib/platforms';
 
 const COLLECTION = 'userPlatformAccess';
@@ -14,8 +13,7 @@ async function requireAdmin() {
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   const isAdmin =
     (user as any)?.role === 'admin' ||
-    ((user as any)?.role === 'subadmin' && permissions.includes('users')) ||
-    isRssWorkspaceSupervisor(user.email);
+    ((user as any)?.role === 'subadmin' && permissions.includes('users'));
   if (!isAdmin) {
     return { ok: false as const };
   }

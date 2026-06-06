@@ -31,6 +31,7 @@ import {
   Close,
   FactCheck,
   ImageOutlined,
+  Save,
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
@@ -54,14 +55,84 @@ const formatLabel = (value: string) =>
     .replace(/\b\w/g, (char) => char.toUpperCase())
     .trim();
 
-const DetailGrid = ({ items }: { items: Array<[string, any]> }) => (
+type EditableDetailItem = {
+  label: string;
+  field: string;
+  value: any;
+  options?: Array<{ value: string; label: string }>;
+};
+
+const EditableDetailGrid = ({
+  items,
+  draft,
+  editingField,
+  saving,
+  onEdit,
+  onCancel,
+  onChange,
+  onSave,
+}: {
+  items: EditableDetailItem[];
+  draft: Record<string, string>;
+  editingField: string;
+  saving: boolean;
+  onEdit: (field: string) => void;
+  onCancel: () => void;
+  onChange: (field: string) => (event: ChangeEvent<HTMLInputElement>) => void;
+  onSave: () => void;
+}) => (
   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 1.25 }}>
-    {items.filter(([, value]) => value !== undefined && value !== null && value !== '').map(([label, value]) => (
-      <Box key={label} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: 'rgba(15,23,42,0.04)' }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>{label}</Typography>
-        <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>{String(value)}</Typography>
-      </Box>
-    ))}
+    {items.map((item) => {
+      const isEditing = editingField === item.field;
+      return (
+        <Box key={item.field} sx={{ p: 1.25, borderRadius: 1.5, bgcolor: 'rgba(15,23,42,0.04)' }}>
+          <Stack direction="row" spacing={1} justifyContent="space-between" alignItems="flex-start">
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800 }}>
+                {item.label}
+              </Typography>
+              {isEditing ? (
+                <TextField
+                  select={Boolean(item.options?.length)}
+                  value={draft[item.field] || ''}
+                  onChange={onChange(item.field)}
+                  size="small"
+                  fullWidth
+                  sx={{ mt: 0.75 }}
+                >
+                  {item.options?.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                  ))}
+                </TextField>
+              ) : (
+                <Typography sx={{ fontWeight: 700, overflowWrap: 'anywhere' }}>
+                  {String(item.value || 'Not set')}
+                </Typography>
+              )}
+            </Box>
+            {!isEditing ? (
+              <Button size="small" startIcon={<Edit />} onClick={() => onEdit(item.field)} sx={{ flexShrink: 0 }}>
+                Edit
+              </Button>
+            ) : null}
+          </Stack>
+          {isEditing ? (
+            <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 1 }}>
+              <Button size="small" onClick={onCancel} disabled={saving}>Cancel</Button>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <Save />}
+                onClick={onSave}
+                disabled={saving}
+              >
+                Save
+              </Button>
+            </Stack>
+          ) : null}
+        </Box>
+      );
+    })}
   </Box>
 );
 
@@ -101,6 +172,7 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
   const [kycOpen, setKycOpen] = useState(false);
   const [kycDraft, setKycDraft] = useState<Record<string, string>>(() => buildKycDraft(user));
   const [savingKycDetails, setSavingKycDetails] = useState(false);
+  const [editingKycField, setEditingKycField] = useState('');
   const [kycEditError, setKycEditError] = useState('');
   const [kycEditSuccess, setKycEditSuccess] = useState('');
 
@@ -140,6 +212,7 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
 
   const openKycFile = () => {
     setKycDraft(buildKycDraft(user));
+    setEditingKycField('');
     setKycEditError('');
     setKycEditSuccess('');
     setKycOpen(true);
@@ -147,6 +220,13 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
 
   const handleDraftChange = (field: string) => (event: ChangeEvent<HTMLInputElement>) => {
     setKycDraft((current) => ({ ...current, [field]: event.target.value }));
+  };
+
+  const handleCancelKycFieldEdit = () => {
+    setKycDraft(buildKycDraft(user));
+    setEditingKycField('');
+    setKycEditError('');
+    setKycEditSuccess('');
   };
 
   const handleSaveKycDetails = async () => {
@@ -201,7 +281,8 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
         throw new Error(response.message || 'Failed to save KYC details');
       }
 
-      setKycEditSuccess('KYC details saved.');
+      setKycEditSuccess(editingKycField ? `${formatLabel(editingKycField)} saved.` : 'KYC details saved.');
+      setEditingKycField('');
       onUserUpdate();
     } catch (err: any) {
       setKycEditError(err?.message || 'Failed to save KYC details');
@@ -221,6 +302,24 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
     verificationStatus === 'submitted' ? 'warning' :
     'info';
   const profilePicture = toAssetUrl(user.profilePicture);
+  const accountTypeOptions = ['artist', 'label', 'admin', 'subadmin'].map((value) => ({ value, label: value }));
+  const payoutMethodOptions = [
+    { value: 'bank_transfer', label: 'Bank transfer' },
+    { value: 'paypal', label: 'PayPal' },
+  ];
+  const editableGridProps = {
+    draft: kycDraft,
+    editingField: editingKycField,
+    saving: savingKycDetails,
+    onEdit: (field: string) => {
+      setKycEditError('');
+      setKycEditSuccess('');
+      setEditingKycField(field);
+    },
+    onCancel: handleCancelKycFieldEdit,
+    onChange: handleDraftChange,
+    onSave: handleSaveKycDetails,
+  };
 
   return (  
     <Box>
@@ -358,128 +457,53 @@ export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; on
         </DialogTitle>
         <DialogContent dividers sx={{ bgcolor: mode === 'dark' ? '#111827' : '#f8fafc' }}>
           <Stack spacing={2.5}>
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" gap={1.5} sx={{ mb: 2 }}>
-                <Box>
-                  <Typography fontWeight={900}>Editable admin details</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Changes update profile, address, identity, and payout data.
-                  </Typography>
-                </Box>
-                <Button
-                  variant="contained"
-                  startIcon={savingKycDetails ? <CircularProgress size={16} color="inherit" /> : <Edit />}
-                  onClick={handleSaveKycDetails}
-                  disabled={savingKycDetails}
-                  sx={{ alignSelf: { xs: 'stretch', md: 'center' }, borderRadius: 2, fontWeight: 850 }}
-                >
-                  Save Details
-                </Button>
-              </Stack>
-              {kycEditError ? <Alert severity="error" sx={{ mb: 2 }}>{kycEditError}</Alert> : null}
-              {kycEditSuccess ? <Alert severity="success" sx={{ mb: 2 }}>{kycEditSuccess}</Alert> : null}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
-                {[
-                  ['artistName', 'Artist name'],
-                  ['legalName', 'Legal name'],
-                  ['labelName', 'Label name'],
-                  ['phoneNumber', 'Phone'],
-                  ['country', 'Country'],
-                  ['state', 'State'],
-                  ['city', 'City'],
-                  ['pincode', 'Pincode'],
-                  ['address', 'Address'],
-                  ['aadhaarNumber', 'Aadhaar'],
-                  ['panNumber', 'PAN'],
-                  ['idNumber', 'National ID'],
-                  ['registrationType', 'Registration type'],
-                  ['accountHolderName', 'Account holder'],
-                  ['accountNumber', 'Account number'],
-                  ['ifscCode', 'IFSC'],
-                  ['bankName', 'Bank name'],
-                  ['branch', 'Branch'],
-                  ['paypalEmail', 'PayPal email'],
-                ].map(([field, label]) => (
-                  <TextField
-                    key={field}
-                    label={label}
-                    value={kycDraft[field] || ''}
-                    onChange={handleDraftChange(field)}
-                    size="small"
-                    fullWidth
-                  />
-                ))}
-                <TextField
-                  select
-                  label="Account type"
-                  value={kycDraft.accountType || ''}
-                  onChange={handleDraftChange('accountType')}
-                  size="small"
-                  fullWidth
-                >
-                  {['artist', 'label', 'admin', 'subadmin'].map((value) => (
-                    <MenuItem key={value} value={value}>{value}</MenuItem>
-                  ))}
-                </TextField>
-                <TextField
-                  select
-                  label="Payout method"
-                  value={kycDraft.payoutMethod || 'bank_transfer'}
-                  onChange={handleDraftChange('payoutMethod')}
-                  size="small"
-                  fullWidth
-                >
-                  <MenuItem value="bank_transfer">Bank transfer</MenuItem>
-                  <MenuItem value="paypal">PayPal</MenuItem>
-                </TextField>
-              </Box>
-            </Paper>
+            {kycEditError ? <Alert severity="error">{kycEditError}</Alert> : null}
+            {kycEditSuccess ? <Alert severity="success">{kycEditSuccess}</Alert> : null}
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography fontWeight={900} sx={{ mb: 1.5 }}>Profile and address</Typography>
-              <DetailGrid
+              <EditableDetailGrid
+                {...editableGridProps}
                 items={[
-                  ['Account type', user.accountType || user.role],
-                  ['Region', user.onboarding?.region],
-                  ['Artist name', user.artistName],
-                  ['Label name', user.onboarding?.labelName],
-                  ['Legal name', user.onboarding?.legalName],
-                  ['Phone', user.onboarding?.phoneNumber || user.verification?.phoneNumber],
-                  ['Country', user.onboarding?.location?.country],
-                  ['State', user.onboarding?.location?.state],
-                  ['City', user.onboarding?.location?.city],
-                  ['Pincode', user.onboarding?.location?.pincode],
-                  ['Address', user.onboarding?.location?.address || user.onboarding?.legalAddress],
+                  { label: 'Account type', field: 'accountType', value: kycDraft.accountType, options: accountTypeOptions },
+                  { label: 'Artist name', field: 'artistName', value: kycDraft.artistName },
+                  { label: 'Label name', field: 'labelName', value: kycDraft.labelName },
+                  { label: 'Legal name', field: 'legalName', value: kycDraft.legalName },
+                  { label: 'Phone', field: 'phoneNumber', value: kycDraft.phoneNumber },
+                  { label: 'Country', field: 'country', value: kycDraft.country },
+                  { label: 'State', field: 'state', value: kycDraft.state },
+                  { label: 'City', field: 'city', value: kycDraft.city },
+                  { label: 'Pincode', field: 'pincode', value: kycDraft.pincode },
+                  { label: 'Address', field: 'address', value: kycDraft.address },
                 ]}
               />
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography fontWeight={900} sx={{ mb: 1.5 }}>Identity</Typography>
-              <DetailGrid
+              <EditableDetailGrid
+                {...editableGridProps}
                 items={[
-                  ['Aadhaar', user.onboarding?.aadhaarNumber],
-                  ['PAN', user.onboarding?.panNumber],
-                  ['National ID', user.onboarding?.idNumber],
-                  ['Registration type', user.onboarding?.registrationType],
-                  ['Total artists', user.onboarding?.totalArtists],
-                  ['Catalog size', user.onboarding?.catalogSize],
-                  ['Rights type', user.onboarding?.rightsType],
+                  { label: 'Aadhaar', field: 'aadhaarNumber', value: kycDraft.aadhaarNumber },
+                  { label: 'PAN', field: 'panNumber', value: kycDraft.panNumber },
+                  { label: 'National ID', field: 'idNumber', value: kycDraft.idNumber },
+                  { label: 'Registration type', field: 'registrationType', value: kycDraft.registrationType },
                 ]}
               />
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
               <Typography fontWeight={900} sx={{ mb: 1.5 }}>Payout</Typography>
-              <DetailGrid
+              <EditableDetailGrid
+                {...editableGridProps}
                 items={[
-                  ['Method', user.payoutMethod?.method || user.onboarding?.payoutMethod?.method],
-                  ['Account holder', user.payoutMethod?.details?.accountHolderName],
-                  ['Account number', user.payoutMethod?.details?.accountNumber],
-                  ['IFSC', user.payoutMethod?.details?.ifscCode],
-                  ['Bank', user.payoutMethod?.details?.bankName],
-                  ['Branch', user.payoutMethod?.details?.branch],
-                  ['PayPal email', user.payoutMethod?.details?.paypalEmail],
+                  { label: 'Method', field: 'payoutMethod', value: kycDraft.payoutMethod, options: payoutMethodOptions },
+                  { label: 'Account holder', field: 'accountHolderName', value: kycDraft.accountHolderName },
+                  { label: 'Account number', field: 'accountNumber', value: kycDraft.accountNumber },
+                  { label: 'IFSC', field: 'ifscCode', value: kycDraft.ifscCode },
+                  { label: 'Bank', field: 'bankName', value: kycDraft.bankName },
+                  { label: 'Branch', field: 'branch', value: kycDraft.branch },
+                  { label: 'PayPal email', field: 'paypalEmail', value: kycDraft.paypalEmail },
                 ]}
               />
             </Paper>

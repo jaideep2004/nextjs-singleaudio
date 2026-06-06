@@ -26,7 +26,6 @@ export enum AdminPermission {
   REVIEW = 'review',
   PAYOUTS = 'payouts',
   DSP_DELIVERY = 'dsp_delivery',
-  PODCASTS = 'podcasts',
   SETTINGS = 'settings',
   ANALYTICS = 'analytics',
   SUPPORT = 'support'
@@ -37,7 +36,6 @@ export const SUBADMIN_PERMISSION_PRESETS: Record<string, AdminPermission[]> = {
   review: [AdminPermission.REVIEW],
   payouts: [AdminPermission.PAYOUTS],
   delivery: [AdminPermission.DSP_DELIVERY],
-  podcasts: [AdminPermission.PODCASTS],
   settings: [AdminPermission.SETTINGS],
   analytics: [AdminPermission.ANALYTICS],
   support: [AdminPermission.SUPPORT],

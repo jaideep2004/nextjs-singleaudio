@@ -29,7 +29,6 @@ import {
   Album,
   TrendingUp,
   CloudUpload as CloudUploadIcon,
-  Podcasts as PodcastsIcon,
   LibraryMusic,
   VideoLibrary,
   YouTube,
@@ -99,12 +98,6 @@ const menuSections = [
         icon: <YouTube />,
         path: '/admin/youtube-network',
         permission: 'settings' as AdminPermission,
-      },
-      {
-        text: 'Podcasts',
-        icon: <PodcastsIcon />,
-        path: '/admin/podcasts',
-        permission: 'podcasts' as AdminPermission,
       },
       {
         text: 'Knowledge Base',

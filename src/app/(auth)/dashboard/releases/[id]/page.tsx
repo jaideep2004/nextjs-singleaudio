@@ -23,6 +23,7 @@ import {
   ArrowBack,
   CalendarToday,
   CheckCircle,
+  Edit,
   ErrorOutline,
   Fingerprint,
   GraphicEq,
@@ -526,6 +527,16 @@ function ReleaseDetail() {
               <Typography sx={{ fontWeight: 850, mb: 0.4 }}>Rejection reason</Typography>
               <Typography sx={{ fontSize: '0.88rem' }}>{rejectedReason}</Typography>
             </Box>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Edit />}
+              onClick={() => router.push(`/dashboard/upload?editReleaseId=${releaseId}`)}
+              disabled={release?.status !== 'rejected'}
+              sx={{ borderRadius: '10px', fontWeight: 850, flexShrink: 0 }}
+            >
+              Edit Details
+            </Button>
             <Button
               variant="contained"
               color="error"

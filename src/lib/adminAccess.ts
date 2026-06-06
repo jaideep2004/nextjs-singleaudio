@@ -5,7 +5,6 @@ export type AdminPermission =
   | 'review'
   | 'payouts'
   | 'dsp_delivery'
-  | 'podcasts'
   | 'settings'
   | 'analytics'
   | 'support';
@@ -30,7 +29,6 @@ const ADMIN_ROUTE_RULES: Array<{ prefix: string; access: AdminRouteAccess }> = [
   { prefix: '/admin/analytics', access: { kind: 'permission', permission: 'analytics' } },
   { prefix: '/admin/payouts', access: { kind: 'permission', permission: 'payouts' } },
   { prefix: '/admin/royalties', access: { kind: 'permission', permission: 'payouts' } },
-  { prefix: '/admin/podcasts', access: { kind: 'permission', permission: 'podcasts' } },
   { prefix: '/admin/support', access: { kind: 'permission', permission: 'support' } },
   { prefix: '/admin/knowledge-base', access: { kind: 'permission', permission: 'support' } },
   { prefix: '/admin/music-publishing', access: { kind: 'permission', permission: 'settings' } },
@@ -46,7 +44,6 @@ const FIRST_ALLOWED_PATH_BY_PERMISSION: Record<AdminPermission, string> = {
   dsp_delivery: '/admin/dsp-deliveries',
   analytics: '/admin/analytics',
   payouts: '/admin/payouts',
-  podcasts: '/admin/podcasts',
   settings: '/admin/settings',
   support: '/admin/support',
 };
@@ -57,7 +54,6 @@ const SUBADMIN_PERMISSION_ORDER: AdminPermission[] = [
   'dsp_delivery',
   'analytics',
   'payouts',
-  'podcasts',
   'support',
   'settings',
 ];

@@ -470,11 +470,81 @@ const defaultTrackInfo: TrackInfo = {
   contributors: [{ role: 'artist', name: '' }],
 };
 
+const splitNames = (value?: string) =>
+  String(value || '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(Boolean);
+
+const namesToContributors = (role: ContributorRole, value?: string): TrackContributor[] =>
+  splitNames(value).map(name => ({ role, name }));
+
+const toDateInputValue = (value?: string) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+};
+
+const trackToTrackInfo = (track: any, index: number): TrackInfo => {
+  const contributors =
+    Array.isArray(track?.contributors) && track.contributors.length
+      ? track.contributors
+          .filter((contributor: any) => contributor?.name)
+          .map((contributor: any) => ({
+            role: (contributor.role || 'performer') as ContributorRole,
+            name: String(contributor.name || ''),
+          }))
+      : [
+          ...namesToContributors('artist', track?.artist),
+          ...namesToContributors('performer', track?.featuring),
+          ...namesToContributors('composer', track?.composers),
+          ...namesToContributors('publisher', track?.publishers),
+          ...namesToContributors('producer', track?.producers),
+          ...namesToContributors('remixer', track?.remixer),
+        ];
+
+  return {
+    ...createDefaultTrackInfo(),
+    title: track?.title || '',
+    version: track?.version || '',
+    artist: track?.artist || '',
+    featuring: track?.featuring || '',
+    remixer: track?.remixer || '',
+    isrc: track?.isrc || '',
+    upc: track?.upc || '',
+    language: track?.language || track?.audioLanguage || '',
+    metadataLanguage: track?.metadataLanguage || '',
+    audioLanguage: track?.audioLanguage || track?.language || '',
+    explicit: Boolean(track?.explicit),
+    genre: track?.genre || '',
+    subgenre: track?.subgenre || track?.subGenre || '',
+    trackNumber: Number(track?.trackNumber || index + 1),
+    discNumber: Number(track?.discNumber || 1),
+    duration: String(track?.duration || ''),
+    composers: track?.composers || '',
+    publishers: track?.publishers || '',
+    producers: track?.producers || '',
+    lyrics: track?.lyrics || '',
+    copyrightC: track?.copyrightC || '',
+    copyrightP: track?.copyrightP || '',
+    copyrightCYear: String(track?.copyrightCYear || currentYear),
+    copyrightPYear: String(track?.copyrightPYear || currentYear),
+    recordingYear: String(track?.recordingYear || ''),
+    originalReleaseDate: toDateInputValue(track?.originalReleaseDate),
+    parentalAdvisory: track?.parentalAdvisory || 'none',
+    instrumental: Boolean(track?.instrumental),
+    contributors: contributors.length ? contributors : [{ role: 'artist', name: track?.artist || '' }],
+  };
+};
+
 export default function UploadPage() {
   const theme = useTheme();
   const router = useRouter();
   // ...existing state
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [editReleaseId, setEditReleaseId] = useState('');
+  const isEditMode = Boolean(editReleaseId);
   const [releaseTitle, setReleaseTitle] = useState('');
   const [label, setLabel] = useState('');
   const [upc, setUpc] = useState('');
@@ -543,6 +613,7 @@ export default function UploadPage() {
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
   const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
+  const [editReleaseLoading, setEditReleaseLoading] = useState(false);
 
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
@@ -599,6 +670,62 @@ export default function UploadPage() {
       .map(contributor => contributor.name.trim())
       .join(', ');
 
+  useEffect(() => {
+    if (!editReleaseId) return;
+
+    let cancelled = false;
+    const loadRejectedRelease = async () => {
+      try {
+        setEditReleaseLoading(true);
+        const response = await fetch(`/api/releases/${editReleaseId}`, { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.success || !payload?.release) {
+          throw new Error(payload?.error || 'Failed to load rejected release');
+        }
+        if (cancelled) return;
+
+        const release = payload.release;
+        const releaseTracks = Array.isArray(release.tracks) ? release.tracks : [];
+        setReleaseType((release.releaseType || 'single') as ReleaseType);
+        setReleaseTitle(release.releaseTitle || release.title || '');
+        setLabel(release.label || '');
+        setUpc(release.upc || '');
+        setAutoGenerateCodes(!release.upc);
+        setReleaseDate(toDateInputValue(release.releaseDate));
+        setOriginalReleaseDate(toDateInputValue(release.originalReleaseDate));
+        setArtworkUploadedUrl(release.artworkUrl || null);
+        setArtworkUploadedFilename(release.artworkFile || null);
+        setTerritoryCountries(Array.isArray(release.territories) ? release.territories : []);
+        setSelectedDSPs(Array.isArray(release.stores) ? release.stores : []);
+        setTrackInfos(releaseTracks.map(trackToTrackInfo));
+        setTracks(
+          releaseTracks.map((track: any, index: number) => {
+            const filename = track.audioFile || track.filename || `${track.title || `track-${index + 1}`}.mp3`;
+            return new File([], filename, { type: 'audio/mpeg' });
+          })
+        );
+        setAudioUploadedUrls(releaseTracks.map((track: any) => track.audioUrl || null));
+        setAudioUploadedFilenames(releaseTracks.map((track: any) => track.audioFile || track.filename || null));
+        setAudioAcrCloudStatuses(releaseTracks.map((track: any) => track.acrCloud || null));
+        setTrackPreviewUrls(releaseTracks.map((track: any) => track.audioUrl || null));
+        setAudioUploadPct(releaseTracks.map((track: any) => (track.audioUrl ? 100 : 0)));
+        setTrackUploading(releaseTracks.map(() => false));
+        setAnalysisLoading(releaseTracks.map(() => false));
+        setAcrCloudProgressPct(releaseTracks.map((track: any) => track.acrCloud ? 100 : 0));
+        setActiveStep(0);
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to load rejected release');
+      } finally {
+        if (!cancelled) setEditReleaseLoading(false);
+      }
+    };
+
+    void loadRejectedRelease();
+    return () => {
+      cancelled = true;
+    };
+  }, [editReleaseId]);
+
   // Simulate release submission to DSPs
   const handleSubmitRelease = async () => {
     setSubmitState('loading');
@@ -652,15 +779,15 @@ export default function UploadPage() {
       })),
     };
     try {
-      const res = await fetch('/api/releases', {
-        method: 'POST',
+      const res = await fetch(isEditMode ? `/api/releases/${editReleaseId}` : '/api/releases', {
+        method: isEditMode ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(releasePayload),
+        body: JSON.stringify(isEditMode ? { ...releasePayload, action: 'update_and_resubmit' } : releasePayload),
       });
       const data = await res.json();
       if (data.success) {
         setSubmitState('success');
-        toast.success('Release submitted for admin review.');
+        toast.success(isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.');
         setTimeout(() => router.push('/dashboard/releases'), 700);
       } else {
         setSubmitState('idle');
@@ -770,11 +897,11 @@ export default function UploadPage() {
     delete (shareable as Partial<TrackInfo>).upc;
     delete (shareable as Partial<TrackInfo>).explicit;
 
-    setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
     window.setTimeout(() => {
+      setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
       toast.success('Applied to all tracks');
       setApplyingTrackInfoToAll(false);
-    }, 0);
+    }, 1200);
   };
 
   // Validation: all required fields for all tracks
@@ -887,6 +1014,7 @@ export default function UploadPage() {
   // Set mounted state to true after component mounts
   useEffect(() => {
     setMounted(true);
+    setEditReleaseId(new URLSearchParams(window.location.search).get('editReleaseId') || '');
     return () => {
       acrCloudPollRef.current = {};
     };
@@ -1811,7 +1939,22 @@ export default function UploadPage() {
             </Typography>
 
             {showAggBar && (
-              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, borderRadius: 2 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2.5,
+                  mb: 3,
+                  borderRadius: 2,
+                  position: 'sticky',
+                  top: { xs: 8, md: 12 },
+                  zIndex: theme => theme.zIndex.appBar - 1,
+                  backdropFilter: 'blur(14px)',
+                  bgcolor: theme =>
+                    theme.palette.mode === 'dark'
+                      ? 'rgba(15,23,42,0.92)'
+                      : 'rgba(255,255,255,0.92)',
+                }}
+              >
                 <Box
                   sx={{
                     display: 'flex',
@@ -2230,25 +2373,37 @@ export default function UploadPage() {
                   <Typography variant="h6" fontWeight="bold">
                     Track Information
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={
-                      applyingTrackInfoToAll ? (
-                        <CircularProgress size={16} color="inherit" />
-                      ) : (
-                        <PlaylistAddCheck />
-                      )
-                    }
-                    onClick={() => handleApplyTrackInfoToAll(selectedTrackIdx)}
-                    disabled={tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll}
-                  >
-                    {applyingTrackInfoToAll
-                      ? 'Applying...'
-                      : !allAudioUploadsReady && tracks.length > 1
-                        ? 'Waiting for uploads'
-                        : 'Apply to all'}
-                  </Button>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+                    <Tooltip title="Waiting for track uploading. Apply to all becomes active after uploading finishes.">
+                      <IconButton
+                        size="small"
+                        aria-label="Apply to all availability"
+                        sx={{ width: 30, height: 30, color: 'text.secondary' }}
+                      >
+                        <Info sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={
+                        applyingTrackInfoToAll ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <PlaylistAddCheck />
+                        )
+                      }
+                      onClick={() => handleApplyTrackInfoToAll(selectedTrackIdx)}
+                      disabled={tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll}
+                      sx={{ minWidth: 142 }}
+                    >
+                      {applyingTrackInfoToAll
+                        ? 'Applying...'
+                        : !allAudioUploadsReady && tracks.length > 1
+                          ? 'Waiting for uploads'
+                          : 'Apply to all'}
+                    </Button>
+                  </Box>
                 </Box>
                 {tracks.length === 0 ? (
                   <Paper
@@ -3620,16 +3775,18 @@ export default function UploadPage() {
                   onClick={handleSubmitRelease}
                   disabled={!isTrackInfoListValid}
                 >
-                  Submit Release
+                  {isEditMode ? 'Update & Resubmit' : 'Submit Release'}
                 </Button>
               </Box>
             ) : submitState === 'loading' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
                 <CircularProgress sx={{ mb: 2 }} />
-                <Typography>Submitting your release...</Typography>
+                <Typography>{isEditMode ? 'Updating and resubmitting your release...' : 'Submitting your release...'}</Typography>
               </Box>
             ) : (
-              <Alert severity="success">Your release has been queued for distribution!</Alert>
+              <Alert severity="success">
+                {isEditMode ? 'Your release changes were sent for review.' : 'Your release has been queued for distribution!'}
+              </Alert>
             )}
           </Box>
         );
@@ -3656,9 +3813,19 @@ export default function UploadPage() {
     <Box sx={{ width: '100%' }}>
       <PremiumHeader
         eyebrow="Release Studio"
-        title="Create New Release"
-        description="A guided release room for audio, artwork, metadata, territories, rights, and final checks before distribution."
+        title={isEditMode ? 'Edit Rejected Release' : 'Create New Release'}
+        description={
+          isEditMode
+            ? 'Fix rejected release details and resubmit for admin review.'
+            : 'A guided release room for audio, artwork, metadata, territories, rights, and final checks before distribution.'
+        }
       />
+
+      {editReleaseLoading ? (
+        <Alert severity="info" icon={<CircularProgress size={18} />} sx={{ mb: 2, borderRadius: 2 }}>
+          Loading rejected release details...
+        </Alert>
+      ) : null}
 
       <Paper
         variant="outlined"

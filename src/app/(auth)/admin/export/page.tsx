@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  alpha,
   Box,
   Button,
   Chip,
@@ -10,6 +11,8 @@ import {
   LinearProgress,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -22,14 +25,19 @@ import {
 } from '@mui/material';
 import {
   Archive,
+  Album,
+  Cancel,
+  CheckCircle,
   CloudDownload,
   ErrorOutline,
   Inventory2,
+  Pending,
   PlayArrow,
   Refresh,
+  UploadFile,
 } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
-import RouteTabs from '@/components/navigation/RouteTabs';
+import Link from 'next/link';
 
 type ExportState = 'queued' | 'running' | 'completed' | 'completed_with_warnings' | 'failed';
 
@@ -176,6 +184,13 @@ export default function AdminExportPage() {
   );
 
   const downloadable = latestJob?.parts?.length ? latestJob.parts : [];
+  const tabItems = [
+    { label: 'All', href: '/admin/releases', icon: <Album fontSize="small" />, color: '#5b5ff7' },
+    { label: 'Pending', href: '/admin/releases?status=pending', icon: <Pending fontSize="small" />, color: '#f59e0b' },
+    { label: 'Approved', href: '/admin/releases?status=approved', icon: <CheckCircle fontSize="small" />, color: '#10b981' },
+    { label: 'Rejected', href: '/admin/releases?status=rejected', icon: <Cancel fontSize="small" />, color: '#ef4444' },
+    { label: 'Export Catalog', href: '/admin/export', icon: <UploadFile fontSize="small" />, color: '#0ea5e9' },
+  ];
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', minWidth: 0 }}>
@@ -207,16 +222,69 @@ export default function AdminExportPage() {
         }
       />
 
-      <RouteTabs
-        ariaLabel="admin release sections"
-        items={[
-          { label: 'All Releases', href: '/admin/releases' },
-          { label: 'Pending', href: '/admin/releases?status=pending' },
-          { label: 'Approved', href: '/admin/releases?status=approved' },
-          { label: 'Rejected', href: '/admin/releases?status=rejected' },
-          { label: 'Export Catalog', href: '/admin/export' },
-        ]}
-      />
+      <Paper elevation={0} sx={{ ...premiumSurfaceSx(theme), mb: 4, p: '10px' }}>
+        <Tabs
+          value={4}
+          aria-label="admin release sections"
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            px: 1,
+            pt: 1,
+            borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 850,
+              minHeight: 54,
+              borderRadius: 2,
+              mx: 0.5,
+              color: '#fff',
+              '&.Mui-selected': {
+                color: '#fff',
+              },
+            },
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: 999,
+              backgroundColor: '#fff',
+            },
+          }}
+        >
+          {tabItems.map((item, index) => (
+            <Tab
+              key={item.label}
+              component={Link}
+              href={item.href}
+              icon={item.icon}
+              iconPosition="start"
+              label={item.label}
+              id={`admin-export-tab-${index}`}
+              aria-controls={`admin-export-tabpanel-${index}`}
+              sx={{
+                minHeight: 46,
+                mx: 0.5,
+                mb: 0.75,
+                borderRadius: '14px',
+                bgcolor: item.color,
+                color: '#fff',
+                opacity: index === 4 ? 1 : 0.88,
+                boxShadow: index === 4 ? `0 14px 28px ${alpha(item.color, 0.34)}` : 'none',
+                transition: 'transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease',
+                '&.Mui-selected': {
+                  bgcolor: item.color,
+                  color: '#fff',
+                  opacity: 1,
+                },
+                '&:hover': {
+                  opacity: 1,
+                  transform: 'translateY(-1px)',
+                },
+                '& .MuiTab-iconWrapper': { mr: 0.75 },
+              }}
+            />
+          ))}
+        </Tabs>
+      </Paper>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }} icon={<ErrorOutline />}>

@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
-import { findReleaseByIdRaw, findReleaseByIdWithTracks, releasesCollection } from '@/lib/repositories/releases';
+import {
+  findReleaseByIdRaw,
+  findReleaseByIdWithTracks,
+  releasesCollection,
+  updateReleaseTracksSnapshot,
+} from '@/lib/repositories/releases';
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -49,7 +54,7 @@ export async function PATCH(
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action || '').trim();
 
-    if (action !== 'resubmit') {
+    if (action !== 'resubmit' && action !== 'update_and_resubmit') {
       return NextResponse.json({ success: false, error: 'Unsupported release action' }, { status: 400 });
     }
 
@@ -68,6 +73,64 @@ export async function PATCH(
     }
 
     const now = new Date();
+
+    if (action === 'update_and_resubmit') {
+      const allowedFields = [
+        'releaseType',
+        'releaseTitle',
+        'primaryArtist',
+        'label',
+        'upc',
+        'autoGenerateCodes',
+        'releaseDate',
+        'originalReleaseDate',
+        'artworkUrl',
+        'artworkFile',
+        'territories',
+        'stores',
+      ];
+      const releaseUpdate = allowedFields.reduce<Record<string, any>>((next, field) => {
+        if (Object.prototype.hasOwnProperty.call(body, field)) next[field] = body[field];
+        return next;
+      }, {});
+      const tracks = Array.isArray(body.tracks) ? body.tracks : [];
+
+      await updateReleaseTracksSnapshot(
+        db,
+        release,
+        tracks,
+        {
+          ...releaseUpdate,
+          status: 'pending',
+          updatedAt: now,
+          resubmittedAt: now,
+          resubmittedBy: String(user._id),
+          editLockedByStatus: false,
+        }
+      );
+
+      await releasesCollection(db).updateOne(
+        { _id: release._id },
+        {
+          $unset: {
+            rejectReason: '',
+            rejectionReason: '',
+          },
+          $push: {
+            auditEvents: {
+              type: 'release_updated_and_resubmitted',
+              actorId: String(user._id),
+              actorEmail: user.email || '',
+              createdAt: now,
+            },
+          },
+        } as any,
+      );
+
+      const updatedRelease = await findReleaseByIdRaw(db, release._id);
+      return NextResponse.json({ success: true, release: updatedRelease });
+    }
+
     const result = await releasesCollection(db).findOneAndUpdate(
       { _id: release._id },
       {
@@ -89,7 +152,7 @@ export async function PATCH(
             createdAt: now,
           },
         },
-      },
+      } as any,
       { returnDocument: 'after' }
     );
 
