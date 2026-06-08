@@ -3250,12 +3250,7 @@ export default function UploadPage() {
                         border: 'none',
                         background: 'transparent',
                         backgroundColor: 'transparent',
-                        // borderColor: selected ? 'primary.main' : 'divider',
-                        // bgcolor: selected
-                        //   ? theme.palette.mode === 'dark'
-                        //     ? 'rgba(74,108,247,0.16)'
-                        //     : 'rgba(74,108,247,0.07)'
-                        //   : 'background.paper',
+                       
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
