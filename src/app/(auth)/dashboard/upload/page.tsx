@@ -534,7 +534,9 @@ const trackToTrackInfo = (track: any, index: number): TrackInfo => {
     originalReleaseDate: toDateInputValue(track?.originalReleaseDate),
     parentalAdvisory: track?.parentalAdvisory || 'none',
     instrumental: Boolean(track?.instrumental),
-    contributors: contributors.length ? contributors : [{ role: 'artist', name: track?.artist || '' }],
+    contributors: contributors.length
+      ? contributors
+      : [{ role: 'artist', name: track?.artist || '' }],
   };
 };
 
@@ -552,6 +554,7 @@ export default function UploadPage() {
   const [autoGenerateIsrcs, setAutoGenerateIsrcs] = useState(true);
   const [allowedDspKeys, setAllowedDspKeys] = useState<DspKey[] | null>(null);
   const [platformAccessError, setPlatformAccessError] = useState('');
+  const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(100);
   // ...existing state
 
   // All hooks must be at the top and called unconditionally
@@ -618,6 +621,24 @@ export default function UploadPage() {
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
+
+  useEffect(() => {
+    let mounted = true;
+    const loadUploadLimit = async () => {
+      try {
+        const response = await fetch('/api/settings/upload-limit', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        const nextLimit = Math.min(200, Math.max(1, Number(payload?.maxUploadSize || 100)));
+        if (mounted) setMaxUploadSizeMb(nextLimit);
+      } catch {
+        if (mounted) setMaxUploadSizeMb(100);
+      }
+    };
+    void loadUploadLimit();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const ensureTrackStateLength = (length: number) => {
     setAnalysisResults(arr => resizeList(arr, length, null));
@@ -700,18 +721,21 @@ export default function UploadPage() {
         setTrackInfos(releaseTracks.map(trackToTrackInfo));
         setTracks(
           releaseTracks.map((track: any, index: number) => {
-            const filename = track.audioFile || track.filename || `${track.title || `track-${index + 1}`}.mp3`;
+            const filename =
+              track.audioFile || track.filename || `${track.title || `track-${index + 1}`}.mp3`;
             return new File([], filename, { type: 'audio/mpeg' });
           })
         );
         setAudioUploadedUrls(releaseTracks.map((track: any) => track.audioUrl || null));
-        setAudioUploadedFilenames(releaseTracks.map((track: any) => track.audioFile || track.filename || null));
+        setAudioUploadedFilenames(
+          releaseTracks.map((track: any) => track.audioFile || track.filename || null)
+        );
         setAudioAcrCloudStatuses(releaseTracks.map((track: any) => track.acrCloud || null));
         setTrackPreviewUrls(releaseTracks.map((track: any) => track.audioUrl || null));
         setAudioUploadPct(releaseTracks.map((track: any) => (track.audioUrl ? 100 : 0)));
         setTrackUploading(releaseTracks.map(() => false));
         setAnalysisLoading(releaseTracks.map(() => false));
-        setAcrCloudProgressPct(releaseTracks.map((track: any) => track.acrCloud ? 100 : 0));
+        setAcrCloudProgressPct(releaseTracks.map((track: any) => (track.acrCloud ? 100 : 0)));
         setActiveStep(0);
       } catch (error: any) {
         toast.error(error?.message || 'Failed to load rejected release');
@@ -782,12 +806,16 @@ export default function UploadPage() {
       const res = await fetch(isEditMode ? `/api/releases/${editReleaseId}` : '/api/releases', {
         method: isEditMode ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isEditMode ? { ...releasePayload, action: 'update_and_resubmit' } : releasePayload),
+        body: JSON.stringify(
+          isEditMode ? { ...releasePayload, action: 'update_and_resubmit' } : releasePayload
+        ),
       });
       const data = await res.json();
       if (data.success) {
         setSubmitState('success');
-        toast.success(isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.');
+        toast.success(
+          isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.'
+        );
         setTimeout(() => router.push('/dashboard/releases'), 700);
       } else {
         setSubmitState('idle');
@@ -1160,7 +1188,8 @@ export default function UploadPage() {
     if (!file) return 'No file selected';
     if (!['audio/mpeg', 'audio/wav', 'audio/flac'].includes(file.type))
       return 'Invalid audio format (mp3, wav, flac only)';
-    if (file.size > 100 * 1024 * 1024) return 'File size must be <= 100MB';
+    if (file.size > maxUploadSizeMb * 1024 * 1024)
+      return `File size must be <= ${maxUploadSizeMb}MB`;
     return '';
   };
 
@@ -1630,7 +1659,7 @@ export default function UploadPage() {
                 </Typography>
               </Box>
               <Grid container spacing={2.5} sx={{ mt: 2.5, maxWidth: 760 }}>
-                <Grid xs={12} style={{marginBottom:"10px"}}>
+                <Grid xs={12} style={{ marginBottom: '10px' }}>
                   <TextField
                     label="Release Title"
                     fullWidth
@@ -1640,7 +1669,7 @@ export default function UploadPage() {
                     inputProps={{ 'aria-label': 'Release Title' }}
                   />
                 </Grid>
-                <Grid xs={12} style={{marginBottom:"10px"}}>
+                <Grid xs={12} style={{ marginBottom: '10px' }}>
                   <TextField
                     label="Label"
                     fullWidth
@@ -1879,7 +1908,9 @@ export default function UploadPage() {
               <Button
                 variant="contained"
                 color="primary"
-                disabled={!!artworkError || !artworkPreview || artworkValidating || artworkUploading}
+                disabled={
+                  !!artworkError || !artworkPreview || artworkValidating || artworkUploading
+                }
                 onClick={async () => {
                   if (!artworkFile || artworkValidating || artworkUploading) return;
                   try {
@@ -2373,7 +2404,14 @@ export default function UploadPage() {
                   <Typography variant="h6" fontWeight="bold">
                     Track Information
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, alignSelf: { xs: 'flex-start', sm: 'center' } }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
+                      alignSelf: { xs: 'flex-start', sm: 'center' },
+                    }}
+                  >
                     <Tooltip title="Waiting for track uploading. Apply to all becomes active after uploading finishes.">
                       <IconButton
                         size="small"
@@ -2394,7 +2432,9 @@ export default function UploadPage() {
                         )
                       }
                       onClick={() => handleApplyTrackInfoToAll(selectedTrackIdx)}
-                      disabled={tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll}
+                      disabled={
+                        tracks.length < 2 || !allAudioUploadsReady || applyingTrackInfoToAll
+                      }
                       sx={{ minWidth: 142 }}
                     >
                       {applyingTrackInfoToAll
@@ -2653,7 +2693,9 @@ export default function UploadPage() {
                         >
                           <Autocomplete
                             options={languages}
-                            value={getLanguageOption(trackInfos[selectedTrackIdx]?.metadataLanguage)}
+                            value={getLanguageOption(
+                              trackInfos[selectedTrackIdx]?.metadataLanguage
+                            )}
                             getOptionLabel={option => `${option.name} (${option.code})`}
                             isOptionEqualToValue={(option, value) => option.code === value.code}
                             onChange={(_event, option) =>
@@ -2749,7 +2791,9 @@ export default function UploadPage() {
                                 label="Genre *"
                                 fullWidth
                                 required
-                                error={trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre}
+                                error={
+                                  trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre
+                                }
                                 helperText={
                                   trackValidationAttempted && !trackInfos[selectedTrackIdx]?.genre
                                     ? 'Genre is required.'
@@ -3204,12 +3248,14 @@ export default function UploadPage() {
                         minHeight: 96,
                         borderRadius: 2,
                         border: 'none',
+                        background: 'transparent',
+                        backgroundColor: 'transparent',
                         // borderColor: selected ? 'primary.main' : 'divider',
-                        bgcolor: selected
-                          ? theme.palette.mode === 'dark'
-                            ? 'rgba(74,108,247,0.16)'
-                            : 'rgba(74,108,247,0.07)'
-                          : 'background.paper',
+                        // bgcolor: selected
+                        //   ? theme.palette.mode === 'dark'
+                        //     ? 'rgba(74,108,247,0.16)'
+                        //     : 'rgba(74,108,247,0.07)'
+                        //   : 'background.paper',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1.5,
@@ -3781,11 +3827,17 @@ export default function UploadPage() {
             ) : submitState === 'loading' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
                 <CircularProgress sx={{ mb: 2 }} />
-                <Typography>{isEditMode ? 'Updating and resubmitting your release...' : 'Submitting your release...'}</Typography>
+                <Typography>
+                  {isEditMode
+                    ? 'Updating and resubmitting your release...'
+                    : 'Submitting your release...'}
+                </Typography>
               </Box>
             ) : (
               <Alert severity="success">
-                {isEditMode ? 'Your release changes were sent for review.' : 'Your release has been queued for distribution!'}
+                {isEditMode
+                  ? 'Your release changes were sent for review.'
+                  : 'Your release has been queued for distribution!'}
               </Alert>
             )}
           </Box>
@@ -3822,7 +3874,11 @@ export default function UploadPage() {
       />
 
       {editReleaseLoading ? (
-        <Alert severity="info" icon={<CircularProgress size={18} />} sx={{ mb: 2, borderRadius: 2 }}>
+        <Alert
+          severity="info"
+          icon={<CircularProgress size={18} />}
+          sx={{ mb: 2, borderRadius: 2 }}
+        >
           Loading rejected release details...
         </Alert>
       ) : null}

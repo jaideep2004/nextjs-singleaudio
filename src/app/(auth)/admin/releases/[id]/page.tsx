@@ -38,6 +38,7 @@ import {
   Pause,
   PlaylistAddCheck,
   Delete,
+  Replay,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -83,6 +84,7 @@ export default function AdminReleaseDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lifecycleSaving, setLifecycleSaving] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [release, setRelease] = useState<any | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
@@ -200,6 +202,9 @@ export default function AdminReleaseDetailPage() {
       const resp = await releaseAPI.updateReleaseStatus(releaseId, "approved");
       if (resp?.success) {
         setRelease((r: any) => (r ? { ...r, status: "approved", rejectReason: undefined, rejectionReason: undefined } : r));
+        const list = await releaseAPI.getReleases({ summary: '1' });
+        const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => item.status === 'pending');
+        router.push(hasPending ? '/admin/releases?status=pending' : '/admin/releases');
       } else {
         setError(resp?.message || resp?.error || "Failed to approve release");
       }
@@ -207,6 +212,54 @@ export default function AdminReleaseDetailPage() {
       setError(e?.message || "Failed to approve release");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleMoveToPending = async () => {
+    try {
+      setSaving(true);
+      const resp = await releaseAPI.updateReleaseStatus(releaseId, "pending");
+      if (resp?.success) {
+        setRelease((r: any) => (r ? { ...r, status: "pending", rejectReason: undefined, rejectionReason: undefined } : r));
+      } else {
+        setError(resp?.message || resp?.error || "Failed to move release to pending");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Failed to move release to pending");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getNextLifecycleStatus = (status?: string) => {
+    if (status === 'takedown_requested') return { status: 'taken_down', label: 'Mark Taken Down' };
+    if (status === 'taken_down') return { status: 'redelivery_requested', label: 'Redeliver' };
+    if (status === 'redelivery_requested') return { status: 'redelivered', label: 'Mark Redelivered' };
+    return { status: 'takedown_requested', label: 'Takedown' };
+  };
+
+  const handleLifecycleAction = async (target: 'release' | 'track', nextStatus: string, trackIndex?: number) => {
+    const savingKey = target === 'release' ? 'release' : `track:${trackIndex}`;
+    try {
+      setLifecycleSaving(savingKey);
+      setError(null);
+      const response = await fetch(`/api/releases/${releaseId}/lifecycle`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: nextStatus,
+          trackIndex: target === 'track' ? trackIndex : undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to update DSP lifecycle status');
+      }
+      setRelease(payload.release || release);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to update DSP lifecycle status');
+    } finally {
+      setLifecycleSaving('');
     }
   };
 
@@ -603,8 +656,9 @@ export default function AdminReleaseDetailPage() {
                 <Box 
                   key={trackId} 
                   sx={{ 
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr) auto' },
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
                     gap: 2,
                     p: { xs: 1.5, md: 2 },
                     borderRadius: '18px',
@@ -613,7 +667,7 @@ export default function AdminReleaseDetailPage() {
                     bgcolor: mode === 'dark' ? 'rgba(11, 16, 32, 0.42)' : 'rgba(248, 250, 252, 0.92)',
                   }}
                 >
-                  <Box sx={{ display: 'flex', gap: 1.5, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', gap: 1.5, flex: '1 1 360px', minWidth: { xs: 0, sm: 320 } }}>
                     <Avatar
                       sx={{
                         width: 44,
@@ -625,7 +679,7 @@ export default function AdminReleaseDetailPage() {
                       <MusicNote />
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body1" fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>
+                      <Typography variant="body1" fontWeight={750} sx={{ overflowWrap: 'break-word' }}>
                         {title}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -638,7 +692,7 @@ export default function AdminReleaseDetailPage() {
                       )}
                     </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flex: '1 1 320px', minWidth: 0, flexWrap: 'wrap' }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                       {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}
                     </Typography>
@@ -651,6 +705,31 @@ export default function AdminReleaseDetailPage() {
                         variant="outlined"
                       />
                     )}
+                    {track.dspLifecycleStatus && track.dspLifecycleStatus !== 'none' && (
+                      <Chip
+                        size="small"
+                        label={`DSP: ${String(track.dspLifecycleStatus).replace(/_/g, ' ')}`}
+                        color={track.dspLifecycleStatus === 'taken_down' ? 'error' : 'info'}
+                        variant="outlined"
+                      />
+                    )}
+                    {(() => {
+                      const next = getNextLifecycleStatus(track.dspLifecycleStatus);
+                      const key = `track:${index}`;
+                      return (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color={next.status === 'takedown_requested' || next.status === 'taken_down' ? 'error' : 'success'}
+                          startIcon={next.status === 'redelivery_requested' || next.status === 'redelivered' ? <Replay fontSize="small" /> : <PlaylistAddCheck fontSize="small" />}
+                          onClick={() => handleLifecycleAction('track', next.status, index)}
+                          disabled={Boolean(lifecycleSaving)}
+                          sx={{ minHeight: 32, fontWeight: 800 }}
+                        >
+                          {lifecycleSaving === key ? <CircularProgress size={14} /> : next.label}
+                        </Button>
+                      );
+                    })()}
                     {audioUrl && (
                       <IconButton
                         size="small"
@@ -831,6 +910,14 @@ export default function AdminReleaseDetailPage() {
                 size="small" 
                 variant="outlined" 
               />
+              {release.dspLifecycleStatus && release.dspLifecycleStatus !== 'none' && (
+                <Chip
+                  label={`DSP: ${String(release.dspLifecycleStatus).replace(/_/g, ' ')}`}
+                  size="small"
+                  color={release.dspLifecycleStatus === 'taken_down' ? 'error' : 'info'}
+                  variant="outlined"
+                />
+              )}
             </Box>
             
             {release.status === "rejected" && release.rejectReason && (
@@ -879,6 +966,37 @@ export default function AdminReleaseDetailPage() {
                 )}
               </Box>
             )}
+            {release.status === "approved" && (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  color="warning"
+                  startIcon={<Pending />}
+                  onClick={handleMoveToPending}
+                  disabled={saving}
+                  sx={{ minWidth: 170 }}
+                >
+                  Move to Pending
+                </Button>
+              </Box>
+            )}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
+              {(() => {
+                const next = getNextLifecycleStatus(release.dspLifecycleStatus);
+                return (
+                  <Button
+                    variant="outlined"
+                    color={next.status === 'takedown_requested' || next.status === 'taken_down' ? 'error' : 'success'}
+                    startIcon={next.status === 'redelivery_requested' || next.status === 'redelivered' ? <Replay /> : <PlaylistAddCheck />}
+                    onClick={() => handleLifecycleAction('release', next.status)}
+                    disabled={Boolean(lifecycleSaving)}
+                    sx={{ minWidth: 170 }}
+                  >
+                    {lifecycleSaving === 'release' ? <CircularProgress size={20} /> : next.label}
+                  </Button>
+                );
+              })()}
+            </Box>
           </Box>
         </Box>
       </Paper>

@@ -64,7 +64,7 @@ export default function AdminSettingsPage() {
     allowRegistrations: true,
     enableEmailNotifications: true,
     currency: 'USD',
-    paymentGateway: 'stripe',
+    paymentGateway: 'paypal',
     minPayoutAmount: 100,
     maxUploadSize: 50, // MB
     allowedFileTypes: ['mp3', 'wav', 'aac', 'flac'],
@@ -99,8 +99,12 @@ export default function AdminSettingsPage() {
         enableEmailNotifications: byKey.has('enableEmailNotifications')
           ? byKey.get('enableEmailNotifications') === true
           : prev.enableEmailNotifications,
-        currency: String(byKey.get('currency') || prev.currency),
-        paymentGateway: String(byKey.get('paymentGateway') || prev.paymentGateway),
+        currency: ['USD', 'INR'].includes(String(byKey.get('currency') || '').toUpperCase())
+          ? String(byKey.get('currency')).toUpperCase()
+          : prev.currency,
+        paymentGateway: ['paypal', 'bank_transfer'].includes(String(byKey.get('paymentGateway') || '').toLowerCase())
+          ? String(byKey.get('paymentGateway')).toLowerCase()
+          : prev.paymentGateway,
         minPayoutAmount: Number(byKey.get('minPayoutAmount') || 100),
         maxUploadSize: Number(byKey.get('maxUploadSize') || prev.maxUploadSize),
       }));
@@ -147,7 +151,7 @@ export default function AdminSettingsPage() {
         ['currency', settings.currency],
         ['paymentGateway', settings.paymentGateway],
         ['minPayoutAmount', settings.minPayoutAmount],
-        ['maxUploadSize', settings.maxUploadSize],
+        ['maxUploadSize', Math.min(200, Math.max(1, Number(settings.maxUploadSize) || 1))],
       ] as const;
       const responses = await Promise.all(writes.map(([key, value]) => adminAPI.updateSetting(key, value)));
 
@@ -308,7 +312,8 @@ export default function AdminSettingsPage() {
                 value={settings.maxUploadSize}
                 onChange={handleNumberInputChange}
                 margin="normal"
-                inputProps={{ min: 1, max: 100 }}
+                inputProps={{ min: 1, max: 200 }}
+                helperText="Admins can set audio upload limits up to 200 MB."
               />
               <TextField
                 fullWidth
@@ -365,8 +370,8 @@ export default function AdminSettingsPage() {
                   native: true,
                 }}
               >
-                <option value="stripe">Stripe</option>
                 <option value="paypal">PayPal</option>
+                <option value="bank_transfer">Bank Transfer</option>
               </TextField>
               <TextField
                 fullWidth
@@ -394,9 +399,7 @@ export default function AdminSettingsPage() {
                 }}
               >
                 <option value="USD">US Dollar (USD)</option>
-                <option value="EUR">Euro (EUR)</option>
-                <option value="GBP">British Pound (GBP)</option>
-                <option value="JPY">Japanese Yen (JPY)</option>
+                <option value="INR">Indian Rupee (INR)</option>
               </TextField>
             </Box>
           </TabPanel>

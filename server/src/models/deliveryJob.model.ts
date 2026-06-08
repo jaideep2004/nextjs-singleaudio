@@ -31,6 +31,10 @@ export interface IDeliveryJob extends Document {
   externalId?: string;
   idempotencyKey: string;
   nextRetryAt?: Date;
+  lockedAt?: Date;
+  lockedBy?: string;
+  lockExpiresAt?: Date;
+  lastAttemptAt?: Date;
   maxRetries: number;
   retryCount: number;
   deadLettered: boolean;
@@ -80,6 +84,10 @@ const DeliveryJobSchema = new Schema<IDeliveryJob>(
     externalId: { type: String },
     idempotencyKey: { type: String, required: true, unique: true, index: true },
     nextRetryAt: { type: Date },
+    lockedAt: { type: Date },
+    lockedBy: { type: String },
+    lockExpiresAt: { type: Date, index: true },
+    lastAttemptAt: { type: Date },
     maxRetries: { type: Number, default: 5 },
     retryCount: { type: Number, default: 0 },
     deadLettered: { type: Boolean, default: false, index: true },
@@ -93,6 +101,8 @@ const DeliveryJobSchema = new Schema<IDeliveryJob>(
 );
 
 DeliveryJobSchema.index({ state: 1, providerKey: 1, createdAt: -1 });
+DeliveryJobSchema.index({ state: 1, nextRetryAt: 1, priority: 1, createdAt: 1 });
+DeliveryJobSchema.index({ lockExpiresAt: 1, state: 1 });
 DeliveryJobSchema.index({ providerKey: 1, trackId: 1, operation: 1 });
 DeliveryJobSchema.index({ providerKey: 1, releaseId: 1, operation: 1 });
 

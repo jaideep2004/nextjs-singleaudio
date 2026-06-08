@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, Stack, Typography, useTheme } from '@mui/material';
@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { PremiumHeader, PremiumPanel, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import AdminKycFileDialog from '../components/AdminKycFileDialog';
 
 export default function UserPreviewPage() {
   const params = useParams<{ id: string }>();
@@ -28,6 +29,9 @@ export default function UserPreviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
+  const [kycOpen, setKycOpen] = useState(false);
+  const releasesRef = useRef<HTMLDivElement | null>(null);
+  const payoutsRef = useRef<HTMLDivElement | null>(null);
 
   const surfaceSx = {
     ...premiumSurfaceSx(theme),
@@ -64,6 +68,10 @@ export default function UserPreviewPage() {
     } finally {
       setStatusSaving(false);
     }
+  };
+
+  const scrollToSection = (target: HTMLDivElement | null) => {
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   useEffect(() => {
@@ -132,7 +140,19 @@ export default function UserPreviewPage() {
           </Stack>
         }
       />
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} sx={{ mb: 2.5 }}>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={1.25}
+        sx={{
+          mb: 2.5,
+          position: 'sticky',
+          top: 76,
+          zIndex: 8,
+          py: 1,
+          bgcolor: isDark ? 'rgba(11,16,32,0.92)' : 'rgba(238,243,248,0.92)',
+          backdropFilter: 'blur(10px)',
+        }}
+      >
         <Button
           variant={user?.isActive ? 'outlined' : 'contained'}
           color={user?.isActive ? 'error' : 'success'}
@@ -143,10 +163,13 @@ export default function UserPreviewPage() {
         >
           {user?.isActive ? 'Deactivate User' : 'Activate User'}
         </Button>
-        <Button component={Link} href={`/admin/releases?status=rejected`} variant="outlined" startIcon={<Album />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+        <Button variant="outlined" startIcon={<Edit />} onClick={() => setKycOpen(true)} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+          Edit User
+        </Button>
+        <Button onClick={() => scrollToSection(releasesRef.current)} variant="outlined" startIcon={<Album />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
           Review Releases
         </Button>
-        <Button component={Link} href={`/admin/payouts`} variant="outlined" startIcon={<Paid />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+        <Button onClick={() => scrollToSection(payoutsRef.current)} variant="outlined" startIcon={<Paid />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
           Payout Tools
         </Button>
       </Stack>
@@ -214,6 +237,7 @@ export default function UserPreviewPage() {
         </Stack>
       </PremiumPanel>
 
+      <Box ref={payoutsRef} sx={{ scrollMarginTop: 150 }}>
       <PremiumPanel sx={{ mt: 2.5, p: { xs: 3, md: 4 }, borderRadius: '16px' }}>
         <Stack spacing={2}>
           <Box>
@@ -249,7 +273,9 @@ export default function UserPreviewPage() {
           </Box>
         </Stack>
       </PremiumPanel>
+      </Box>
 
+      <Box ref={releasesRef} sx={{ scrollMarginTop: 150 }}>
       <PremiumPanel sx={{ mt: 2.5, p: { xs: 3, md: 4 }, borderRadius: '16px' }}>
         <Stack spacing={2}>
           <Box>
@@ -268,12 +294,22 @@ export default function UserPreviewPage() {
             releases.slice(0, 8).map((release) => (
               <Box
                 key={release._id}
+                component={Link}
+                href={`/admin/releases/${release._id}`}
                 sx={{
+                  display: 'block',
+                  textDecoration: 'none',
                   p: 2,
                   borderRadius: '14px',
                   border: '1px solid',
                   borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
                   bgcolor: isDark ? 'rgba(255,255,255,0.025)' : 'rgba(248,250,252,0.72)',
+                  transition: 'border-color 160ms ease, transform 160ms ease, background-color 160ms ease',
+                  '&:hover': {
+                    borderColor: '#5b5ff7',
+                    transform: 'translateY(-1px)',
+                    bgcolor: isDark ? 'rgba(91,95,247,0.10)' : 'rgba(91,95,247,0.06)',
+                  },
                 }}
               >
                 <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" gap={2}>
@@ -295,6 +331,15 @@ export default function UserPreviewPage() {
           )}
         </Stack>
       </PremiumPanel>
+      </Box>
+      <AdminKycFileDialog
+        open={kycOpen}
+        user={user}
+        onClose={() => setKycOpen(false)}
+        onSaved={(updatedUser) => {
+          if (updatedUser) setUser((current: any) => ({ ...current, ...updatedUser }));
+        }}
+      />
     </Box>
   );
 }

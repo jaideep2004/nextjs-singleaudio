@@ -648,6 +648,7 @@ export type KnowledgeBaseArticle = {
   imageRefs?: Array<{ url: string; alt?: string }>;
   seo?: { title?: string; description?: string; keywords?: string[] };
   relatedArticleIds?: KnowledgeBaseArticle[] | string[];
+  createdAt?: string;
   publishedAt?: string;
   updatedAt?: string;
 };
@@ -1087,6 +1088,15 @@ export const adminAPI = {
   retryDspDelivery: async (jobId: string) => {
     try {
       const response = await api.post<ApiResponse<any>>(`/admin/dsp/deliveries/${jobId}/retry`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  processDueDspDeliveries: async (payload: { maxJobs?: number; workerId?: string } = {}) => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/dsp/deliveries/process-due', payload);
       return response.data;
     } catch (error) {
       return handleApiError(error);

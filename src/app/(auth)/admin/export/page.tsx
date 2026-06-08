@@ -8,7 +8,12 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   LinearProgress,
+  MenuItem,
   Paper,
   Stack,
   Tab,
@@ -19,6 +24,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
   useTheme,
@@ -38,6 +44,7 @@ import {
 } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import Link from 'next/link';
+import { releaseAPI } from '@/services/api';
 
 type ExportState = 'queued' | 'running' | 'completed' | 'completed_with_warnings' | 'failed';
 
@@ -52,7 +59,13 @@ type ExportPart = {
 type ExportJob = {
   _id: string;
   state: ExportState;
-  scope: 'approved';
+  scope: 'release' | 'user' | 'status';
+  criteria?: {
+    releaseIds?: string[];
+    userId?: string;
+    statuses?: Array<'approved' | 'pending' | 'rejected'>;
+    zipGrouping?: 'per_release';
+  };
   counts: {
     releases: number;
     tracks: number;
@@ -120,6 +133,12 @@ export default function AdminExportPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<'release' | 'user' | 'status'>('status');
+  const [exportStatus, setExportStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('approved');
+  const [selectedReleaseId, setSelectedReleaseId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [releases, setReleases] = useState<any[]>([]);
 
   const latestJob = jobs[0];
   const active = isActiveJob(latestJob);
@@ -155,16 +174,38 @@ export default function AdminExportPage() {
     return () => window.clearInterval(timer);
   }, [active, loadJobs]);
 
+  const loadReleases = useCallback(async () => {
+    const response = await releaseAPI.getReleases({ summary: '1' });
+    if (response.success) setReleases(Array.isArray(response.data) ? response.data : []);
+  }, []);
+
+  const openCreateExport = () => {
+    setExportOpen(true);
+    if (releases.length === 0) void loadReleases();
+  };
+
   const handleCreateExport = async () => {
     setCreating(true);
     setError('');
 
     try {
-      const response = await fetch('/api/admin/export/catalog', { method: 'POST' });
+      const statuses = exportStatus === 'all' ? ['approved', 'pending', 'rejected'] : [exportStatus];
+      const response = await fetch('/api/admin/export/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: exportScope,
+          releaseIds: exportScope === 'release' ? [selectedReleaseId] : [],
+          userId: exportScope === 'user' ? selectedUserId : undefined,
+          statuses,
+          zipGrouping: 'per_release',
+        }),
+      });
       const payload = await response.json().catch(() => null);
       if (!response.ok || !payload?.success) {
         throw new Error(payload?.error || 'Failed to start export');
       }
+      setExportOpen(false);
       await loadJobs(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start export');
@@ -172,6 +213,27 @@ export default function AdminExportPage() {
       setCreating(false);
     }
   };
+
+  const userOptions = useMemo(() => {
+    const byId = new Map<string, { id: string; label: string; email: string }>();
+    releases.forEach((release) => {
+      const id = String(release.ownerUserId || release.userId || release.artistId || '');
+      if (!id || byId.has(id)) return;
+      byId.set(id, {
+        id,
+        label: release.ownerName || release.ownerArtistName || 'Unknown user',
+        email: release.ownerEmail || '',
+      });
+    });
+    return Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+  }, [releases]);
+
+  const canCreateExport =
+    !creating &&
+    !active &&
+    (exportScope === 'status' ||
+      (exportScope === 'release' && Boolean(selectedReleaseId)) ||
+      (exportScope === 'user' && Boolean(selectedUserId)));
 
   const metrics = useMemo(
     () => [
@@ -212,7 +274,7 @@ export default function AdminExportPage() {
             <Button
               variant="contained"
               startIcon={creating ? <CircularProgress size={18} color="inherit" /> : <PlayArrow />}
-              onClick={handleCreateExport}
+              onClick={openCreateExport}
               disabled={creating || active}
               sx={{ minHeight: 44 }}
             >
@@ -228,6 +290,7 @@ export default function AdminExportPage() {
           aria-label="admin release sections"
           variant="scrollable"
           scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
             px: 1,
             pt: 1,
@@ -248,6 +311,10 @@ export default function AdminExportPage() {
               borderRadius: 999,
               backgroundColor: '#fff',
             },
+            '& .MuiTabs-scrollButtons.Mui-disabled': {
+              opacity: 0,
+              width: 0,
+            },
           }}
         >
           {tabItems.map((item, index) => (
@@ -262,6 +329,7 @@ export default function AdminExportPage() {
               aria-controls={`admin-export-tabpanel-${index}`}
               sx={{
                 minHeight: 46,
+                minWidth: { xs: 124, sm: 132 },
                 mx: 0.5,
                 mb: 0.75,
                 borderRadius: '14px',
@@ -313,6 +381,9 @@ export default function AdminExportPage() {
                   sx={{ fontWeight: 800 }}
                 />
                 <Chip variant="outlined" label={`Scope: ${latestJob.scope}`} />
+                {latestJob.criteria?.statuses?.length ? (
+                  <Chip variant="outlined" label={`Status: ${latestJob.criteria.statuses.join(', ')}`} />
+                ) : null}
                 <Chip variant="outlined" label={`Expires: ${formatDate(latestJob.expiresAt)}`} />
               </Stack>
               <Typography variant="body2" color="text.secondary">
@@ -459,6 +530,87 @@ export default function AdminExportPage() {
           </Table>
         </TableContainer>
       </Paper>
+
+      <Dialog open={exportOpen} onClose={() => setExportOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 950 }}>Create Catalog Export</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <TextField
+              select
+              label="Export scope"
+              value={exportScope}
+              onChange={(event) => setExportScope(event.target.value as 'release' | 'user' | 'status')}
+              fullWidth
+            >
+              <MenuItem value="status">All releases by status</MenuItem>
+              <MenuItem value="user">All releases for a user</MenuItem>
+              <MenuItem value="release">Single release</MenuItem>
+            </TextField>
+
+            {exportScope === 'status' ? (
+              <TextField
+                select
+                label="Status"
+                value={exportStatus}
+                onChange={(event) => setExportStatus(event.target.value as typeof exportStatus)}
+                fullWidth
+              >
+                <MenuItem value="approved">Approved</MenuItem>
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="rejected">Rejected</MenuItem>
+                <MenuItem value="all">All statuses</MenuItem>
+              </TextField>
+            ) : null}
+
+            {exportScope === 'user' ? (
+              <TextField
+                select
+                label="User"
+                value={selectedUserId}
+                onChange={(event) => setSelectedUserId(event.target.value)}
+                fullWidth
+              >
+                {userOptions.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    {[user.label, user.email].filter(Boolean).join(' - ')}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
+
+            {exportScope === 'release' ? (
+              <TextField
+                select
+                label="Release"
+                value={selectedReleaseId}
+                onChange={(event) => setSelectedReleaseId(event.target.value)}
+                fullWidth
+              >
+                {releases.map((release) => (
+                  <MenuItem key={release._id} value={release._id}>
+                    {[release.releaseTitle || release.title || 'Untitled release', release.ownerName || release.ownerArtistName].filter(Boolean).join(' - ')}
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
+
+            <Alert severity="info">
+              Exports are created as release-named ZIP files. Metadata includes user name and email.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setExportOpen(false)} disabled={creating}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateExport}
+            disabled={!canCreateExport}
+            startIcon={creating ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
+          >
+            {creating ? 'Starting' : 'Create Export'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

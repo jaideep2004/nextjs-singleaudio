@@ -99,7 +99,13 @@ function evaluateNativeProviderReadiness(provider: any) {
   }
 
   const config = provider.config || {};
-  const missing = ['baseUrl', 'webhookSecret'].filter((key) => !config[key]);
+  const hasEncryptedCredential = (key: string) =>
+    Boolean(provider.credentials?.__encrypted && provider.credentials?.values?.[key]);
+  const requiredConfig = provider.key === 'mock_dsp' ? ['webhookSecret'] : ['baseUrl', 'webhookSecret'];
+  const missing = requiredConfig.filter((key) => {
+    if (key === 'webhookSecret') return !config[key] && !hasEncryptedCredential('webhookSecret');
+    return !config[key];
+  });
   if (missing.length > 0) {
     return { state: 'missing_credentials', canDispatch: false, missing };
   }
@@ -173,6 +179,7 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
       idempotencyKey,
       maxRetries: 5,
       retryCount: 0,
+      nextRetryAt: now,
       deadLettered: false,
       metadata: {
         releaseTitle: snapshot.payload.releaseTitle,

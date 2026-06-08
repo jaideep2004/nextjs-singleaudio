@@ -37,7 +37,8 @@ type CatalogExportCounts = {
 
 export type CatalogExportJob = {
   _id: ObjectId;
-  scope: 'approved';
+  scope: CatalogExportScope;
+  criteria?: CatalogExportCriteria;
   state: CatalogExportState;
   createdBy: string;
   createdByEmail?: string;
@@ -57,14 +58,21 @@ type ExportUser = {
   email?: string;
 };
 
+export type CatalogExportScope = 'release' | 'user' | 'status';
+export type CatalogExportStatus = 'approved' | 'pending' | 'rejected';
+export type CatalogExportCriteria = {
+  releaseIds?: string[];
+  userId?: string;
+  statuses?: CatalogExportStatus[];
+  zipGrouping?: 'per_release';
+};
+
 type TrackFileResolution =
   | { ok: true; path: string; size: number; extension: string }
   | { ok: false; reason: string; source: string };
 
 const runningJobs = new Set<string>();
 const EXPORT_COLLECTION = 'catalogExportJobs';
-const DEFAULT_PART_TRACK_LIMIT = 1000;
-const DEFAULT_PART_BYTE_LIMIT = 2 * 1024 * 1024 * 1024;
 const DEFAULT_EXPORT_TTL_DAYS = 7;
 const DEFAULT_BATCH_SIZE = 100;
 const ZipArchive = (archiverModule as unknown as {
@@ -79,6 +87,8 @@ const releaseColumns = [
   { header: 'UPC', key: 'upc', width: 20 },
   { header: 'Primary Artist', key: 'primaryArtist', width: 28 },
   { header: 'Label', key: 'label', width: 28 },
+  { header: 'User Name', key: 'userName', width: 24 },
+  { header: 'User Email', key: 'userEmail', width: 30 },
   { header: 'Owner Name', key: 'ownerName', width: 24 },
   { header: 'Owner Email', key: 'ownerEmail', width: 30 },
   { header: 'Release Date', key: 'releaseDate', width: 20 },
@@ -92,6 +102,8 @@ const trackColumns = [
   { header: 'Release ID', key: 'releaseId', width: 28 },
   { header: 'Release Title', key: 'releaseTitle', width: 36 },
   { header: 'Release UPC', key: 'releaseUpc', width: 20 },
+  { header: 'User Name', key: 'userName', width: 24 },
+  { header: 'User Email', key: 'userEmail', width: 30 },
   { header: 'Track Number', key: 'trackNumber', width: 14 },
   { header: 'Disc Number', key: 'discNumber', width: 12 },
   { header: 'Track Title', key: 'title', width: 36 },
@@ -150,14 +162,6 @@ function getTrackSearchRoots() {
   ]
     .filter((value): value is string => Boolean(value))
     .map((value) => path.resolve(value));
-}
-
-function getPartTrackLimit() {
-  return Math.max(1, Number(process.env.CATALOG_EXPORT_PART_TRACK_LIMIT || DEFAULT_PART_TRACK_LIMIT));
-}
-
-function getPartByteLimit() {
-  return Math.max(1, Number(process.env.CATALOG_EXPORT_PART_BYTE_LIMIT || DEFAULT_PART_BYTE_LIMIT));
 }
 
 function getBatchSize() {
@@ -263,6 +267,8 @@ function createWorkbook(filename: string, worksheetName: string, columns: ExcelJ
 
 function releaseRow(release: Record<string, unknown>) {
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
+  const userName = asString(release.ownerName || release.ownerArtistName);
+  const userEmail = asString(release.ownerEmail);
   return {
     releaseId: asString(release._id),
     releaseTitle: asString(release.releaseTitle || release.title),
@@ -271,8 +277,10 @@ function releaseRow(release: Record<string, unknown>) {
     upc: asString(release.upc),
     primaryArtist: asString(release.primaryArtist),
     label: asString(release.label),
-    ownerName: asString(release.ownerName || release.ownerArtistName),
-    ownerEmail: asString(release.ownerEmail),
+    userName,
+    userEmail,
+    ownerName: userName,
+    ownerEmail: userEmail,
     releaseDate: asString(release.releaseDate),
     stores: asString(release.stores),
     trackCount: tracks.length,
@@ -296,10 +304,14 @@ function trackRow(
   index: number,
   archivePath = ''
 ) {
+  const userName = asString(release.ownerName || release.ownerArtistName);
+  const userEmail = asString(release.ownerEmail);
   return {
     releaseId: asString(release._id),
     releaseTitle: asString(release.releaseTitle || release.title),
     releaseUpc: asString(release.upc),
+    userName,
+    userEmail,
     trackNumber: asString(track.trackNumber || index + 1),
     discNumber: asString(track.discNumber || 1),
     title: asString(track.title),
@@ -336,6 +348,43 @@ function createArchivePath(
   return path.posix.join('tracks', releaseDir, `${fileBase}${extension}`);
 }
 
+function createReleaseZipName(release: Record<string, unknown>, index: number) {
+  const releaseId = asString(release._id);
+  const title = sanitizeArchiveSegment(release.releaseTitle || release.title, releaseId || `release-${index + 1}`);
+  const suffix = releaseId ? `-${releaseId.slice(-6)}` : `-${index + 1}`;
+  return `${title}${suffix}.zip`;
+}
+
+function buildReleaseQuery(job: CatalogExportJob) {
+  const criteria = job.criteria || {};
+  const query: Record<string, unknown> = {};
+
+  if (job.scope === 'release') {
+    const ids = (criteria.releaseIds || [])
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    query._id = { $in: ids.length ? ids : [new ObjectId()] };
+    return query;
+  }
+
+  if (job.scope === 'user' && criteria.userId) {
+    query.$or = [
+      { ownerUserId: criteria.userId },
+      { userId: criteria.userId },
+      { artistId: criteria.userId },
+      { ownerId: criteria.userId },
+      { createdBy: criteria.userId },
+    ];
+  }
+
+  const statuses = criteria.statuses?.length ? criteria.statuses : ['approved'];
+  if (statuses.length < 3) {
+    query.status = { $in: statuses };
+  }
+
+  return query;
+}
+
 function writeJsonFile(filename: string, value: unknown) {
   return fs.promises.writeFile(filename, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
@@ -357,86 +406,6 @@ function zipFiles(
     files.forEach((file) => archive.file(file.sourcePath, { name: file.archivePath }));
     archive.finalize().catch(reject);
   });
-}
-
-class TrackPartWriter {
-  private archive: Archiver;
-  private closePromise: Promise<void>;
-  private workbook: ExcelJS.stream.xlsx.WorkbookWriter;
-  private worksheet: ExcelJS.Worksheet;
-  private readonly xlsxPath: string;
-  private trackCount = 0;
-  private bytes = 0;
-
-  constructor(
-    private readonly jobDir: string,
-    private readonly index: number
-  ) {
-    this.xlsxPath = path.join(jobDir, `tracks-part-${String(index).padStart(4, '0')}.xlsx.tmp`);
-    const zipPath = this.zipPath;
-    const output = fs.createWriteStream(zipPath);
-    this.archive = new ZipArchive({ zlib: { level: 6 }, forceZip64: true });
-    this.closePromise = new Promise((resolve, reject) => {
-      output.on('close', resolve);
-      output.on('error', reject);
-      this.archive.on('error', reject);
-      this.archive.on('warning', reject);
-    });
-    this.archive.pipe(output);
-
-    const workbook = createWorkbook(this.xlsxPath, 'Tracks', trackColumns as ExcelJS.Column[]);
-    this.workbook = workbook.workbook;
-    this.worksheet = workbook.worksheet;
-  }
-
-  get name() {
-    return `catalog-tracks-part-${String(this.index).padStart(4, '0')}.zip`;
-  }
-
-  get zipPath() {
-    return path.join(this.jobDir, this.name);
-  }
-
-  get count() {
-    return this.trackCount;
-  }
-
-  get byteCount() {
-    return this.bytes;
-  }
-
-  addTrack(params: {
-    row: Record<string, unknown>;
-    filePath: string;
-    archivePath: string;
-    size: number;
-  }) {
-    this.archive.file(params.filePath, { name: params.archivePath });
-    this.worksheet.addRow(params.row).commit();
-    this.trackCount += 1;
-    this.bytes += params.size;
-  }
-
-  async finalize(): Promise<CatalogExportPart> {
-    await this.workbook.commit();
-    this.archive.file(this.xlsxPath, {
-      name: `metadata/tracks-part-${String(this.index).padStart(4, '0')}.xlsx`,
-    });
-    await this.archive.finalize();
-    await this.closePromise;
-
-    const stats = await fs.promises.stat(this.zipPath);
-    await fs.promises.unlink(this.xlsxPath).catch(() => undefined);
-
-    return {
-      name: this.name,
-      type: 'tracks',
-      path: this.zipPath,
-      size: stats.size,
-      trackCount: this.trackCount,
-      createdAt: new Date(),
-    };
-  }
 }
 
 async function createMetadataZip(params: {
@@ -465,6 +434,49 @@ async function createMetadataZip(params: {
   };
 }
 
+async function createReleasePartZip(params: {
+  jobDir: string;
+  release: Record<string, unknown>;
+  releaseIndex: number;
+  rows: Array<Record<string, unknown>>;
+  files: Array<{ sourcePath: string; archivePath: string }>;
+}) {
+  const safeBase = createReleaseZipName(params.release, params.releaseIndex).replace(/\.zip$/i, '');
+  const tracksPath = path.join(params.jobDir, `${safeBase}-tracks.xlsx.tmp`);
+  const releaseJsonPath = path.join(params.jobDir, `${safeBase}-release.json.tmp`);
+  const zipPath = path.join(params.jobDir, `${safeBase}.zip`);
+
+  const trackBook = createWorkbook(tracksPath, 'Tracks', trackColumns as ExcelJS.Column[]);
+  params.rows.forEach((row) => trackBook.worksheet.addRow(row).commit());
+  await trackBook.workbook.commit();
+
+  await writeJsonFile(releaseJsonPath, {
+    release: releaseRow(params.release),
+    tracks: params.rows,
+  });
+
+  await zipFiles(zipPath, [
+    { sourcePath: releaseJsonPath, archivePath: 'metadata/release.json' },
+    { sourcePath: tracksPath, archivePath: 'metadata/tracks.xlsx' },
+    ...params.files,
+  ]);
+
+  await Promise.all([
+    fs.promises.unlink(tracksPath).catch(() => undefined),
+    fs.promises.unlink(releaseJsonPath).catch(() => undefined),
+  ]);
+
+  const stats = await fs.promises.stat(zipPath);
+  return {
+    name: path.basename(zipPath),
+    type: 'tracks' as const,
+    path: zipPath,
+    size: stats.size,
+    trackCount: params.rows.length,
+    createdAt: new Date(),
+  };
+}
+
 async function updateJobProgress(
   db: Db,
   jobId: ObjectId,
@@ -484,12 +496,23 @@ async function updateJobProgress(
   );
 }
 
-export async function createCatalogExportJob(db: Db, user: ExportUser) {
+export async function createCatalogExportJob(
+  db: Db,
+  user: ExportUser,
+  options: { scope?: CatalogExportScope; criteria?: CatalogExportCriteria } = {}
+) {
   await ensureCatalogExportIndexes(db);
   const now = new Date();
+  const scope = options.scope || 'status';
+  const criteria: CatalogExportCriteria = {
+    zipGrouping: 'per_release',
+    ...(options.criteria || {}),
+    statuses: options.criteria?.statuses?.length ? options.criteria.statuses : ['approved'],
+  };
   const result = await getExportCollection(db).insertOne({
     _id: new ObjectId(),
-    scope: 'approved',
+    scope,
+    criteria,
     state: 'queued',
     createdBy: String(user._id),
     createdByEmail: user.email,
@@ -576,24 +599,10 @@ export async function processCatalogExportJob(jobId: string) {
     const trackBook = createWorkbook(tracksPath, 'Tracks', trackColumns as ExcelJS.Column[]);
     const missingBook = createWorkbook(missingPath, 'Missing Files', missingColumns as ExcelJS.Column[]);
 
-    let currentPart: TrackPartWriter | null = null;
-    let nextPartIndex = 1;
-
-    const finalizeCurrentPart = async () => {
-      if (!currentPart || currentPart.count === 0) return;
-      const part = await currentPart.finalize();
-      parts.push(part);
-      counts.parts = parts.length;
-      currentPart = null;
-      await collection.updateOne(
-        { _id: objectId },
-        { $set: { counts, parts, updatedAt: new Date() } }
-      );
-    };
-
+    const job = lock.value as CatalogExportJob;
     const releases = releasesCollection(db)
       .find(
-        { status: 'approved' },
+        buildReleaseQuery(job),
         {
           projection: {
             releaseTitle: 1,
@@ -607,6 +616,9 @@ export async function processCatalogExportJob(jobId: string) {
             ownerName: 1,
             ownerArtistName: 1,
             ownerEmail: 1,
+            ownerUserId: 1,
+            userId: 1,
+            artistId: 1,
             primaryArtist: 1,
             territories: 1,
             stores: 1,
@@ -621,10 +633,13 @@ export async function processCatalogExportJob(jobId: string) {
 
     for await (const rawRelease of releases) {
       const [release] = await hydrateReleasesWithCanonicalTracks(db, [rawRelease as Record<string, any> & { _id: ObjectId }]);
+      const releaseIndex = counts.releases;
       counts.releases += 1;
       releaseBook.worksheet.addRow(releaseRow(release)).commit();
 
       const tracks = Array.isArray(release.tracks) ? release.tracks : [];
+      const releaseRows: Array<Record<string, unknown>> = [];
+      const releaseFiles: Array<{ sourcePath: string; archivePath: string }> = [];
       for (const rawTrack of tracks) {
         const track = typeof rawTrack === 'object' && rawTrack ? rawTrack as Record<string, unknown> : {};
         const trackIndex = counts.tracks;
@@ -643,7 +658,9 @@ export async function processCatalogExportJob(jobId: string) {
               reason: resolved.reason,
             })
             .commit();
-          trackBook.worksheet.addRow(trackRow(release, track, trackIndex)).commit();
+          const row = trackRow(release, track, trackIndex);
+          trackBook.worksheet.addRow(row).commit();
+          releaseRows.push(row);
           await updateJobProgress(db, objectId, counts, false);
           continue;
         }
@@ -651,35 +668,27 @@ export async function processCatalogExportJob(jobId: string) {
         const archivePath = createArchivePath(release, track, trackIndex, resolved.extension);
         const row = trackRow(release, track, trackIndex, archivePath);
         trackBook.worksheet.addRow(row).commit();
-
-        const trackLimit = getPartTrackLimit();
-        const byteLimit = getPartByteLimit();
-        const shouldRotate =
-          currentPart &&
-          currentPart.count > 0 &&
-          (currentPart.count >= trackLimit || currentPart.byteCount + resolved.size > byteLimit);
-
-        if (shouldRotate) {
-          await finalizeCurrentPart();
-        }
-
-        if (!currentPart) {
-          currentPart = new TrackPartWriter(jobDir, nextPartIndex);
-          nextPartIndex += 1;
-        }
-
-        currentPart.addTrack({
-          row,
-          filePath: resolved.path,
-          archivePath,
-          size: resolved.size,
-        });
+        releaseRows.push(row);
+        releaseFiles.push({ sourcePath: resolved.path, archivePath });
         counts.files += 1;
         await updateJobProgress(db, objectId, counts, false);
       }
+
+      const releasePart = await createReleasePartZip({
+        jobDir,
+        release,
+        releaseIndex,
+        rows: releaseRows,
+        files: releaseFiles,
+      });
+      parts.push(releasePart);
+      counts.parts = parts.length;
+      await collection.updateOne(
+        { _id: objectId },
+        { $set: { counts, parts, updatedAt: new Date() } }
+      );
     }
 
-    await finalizeCurrentPart();
     await Promise.all([
       releaseBook.workbook.commit(),
       trackBook.workbook.commit(),
@@ -688,7 +697,8 @@ export async function processCatalogExportJob(jobId: string) {
 
     const manifest = {
       jobId,
-      scope: 'approved',
+      scope: job.scope,
+      criteria: job.criteria,
       generatedAt: new Date().toISOString(),
       counts,
       parts: parts.map((part) => ({

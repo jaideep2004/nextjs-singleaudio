@@ -76,6 +76,19 @@ export const retryDelivery = async (req: AuthRequest, res: Response): Promise<vo
   }
 };
 
+export const processDueDeliveries = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const maxJobs = req.body?.maxJobs ? Number(req.body.maxJobs) : undefined;
+    const result = await dspDeliveryService.processDueDeliveryJobs({
+      maxJobs,
+      workerId: typeof req.body?.workerId === 'string' ? req.body.workerId : undefined,
+    });
+    successResponse(res, result, 'Due delivery jobs processed');
+  } catch (error) {
+    errorResponse(res, 'Failed to process due delivery jobs', error);
+  }
+};
+
 export const processWebhook = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const event = await dspDeliveryService.processWebhook(

@@ -1,7 +1,6 @@
 import {
   DspCapability,
   DspIntegrationMode,
-  DspPayloadStandard,
   DspProviderRequirement,
   DspReadinessReport,
 } from '../../types/dsp';
@@ -36,6 +35,14 @@ const baseRequirement = (
 });
 
 const REQUIREMENTS: Record<string, DspProviderRequirement> = {
+  mock_dsp: baseRequirement('mock_dsp', 'Mock DSP', {
+    docsStatus: 'official_public',
+    payloadStandard: 'platform_api',
+    requiredCredentialKeys: [],
+    requiredConfigKeys: ['webhookSecret'],
+    readinessChecks: ['webhook_secret'],
+    notes: 'Internal sandbox connector for end-to-end delivery flow verification.',
+  }),
   spotify: baseRequirement('spotify', 'Spotify', {
     docsUrl: 'https://support.spotify.com/st-en/artists/article/getting-music-on-spotify/',
   }),
@@ -151,7 +158,10 @@ export function evaluateDspReadiness(provider: ProviderInput): DspReadinessRepor
   }
 
   const missingCredentials = requirement.requiredCredentialKeys.filter((key) => !hasValue(credentials[key]));
-  const missingConfig = requirement.requiredConfigKeys.filter((key) => !hasValue(config[key]));
+  const missingConfig = requirement.requiredConfigKeys.filter((key) => {
+    if (key === 'webhookSecret') return !hasValue(config[key]) && !hasValue(credentials.webhookSecret);
+    return !hasValue(config[key]);
+  });
   const missing = [...missingCredentials, ...missingConfig];
 
   if (missingCredentials.includes('partnerContractId')) {

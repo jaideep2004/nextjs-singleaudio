@@ -47,6 +47,24 @@ export interface DspTrackPayload {
   metadata: Record<string, unknown>;
 }
 
+export interface DspReleasePayload {
+  releaseId: string;
+  releaseTitle: string;
+  upc?: string;
+  primaryArtist?: string;
+  label?: string;
+  genre?: string;
+  language?: string;
+  releaseDate?: string;
+  stores: string[];
+  tracks: DspTrackPayload[];
+  territories?: string[];
+  assetChecks?: Array<Record<string, unknown>>;
+  metadata: Record<string, unknown>;
+}
+
+export type DspDeliveryPayload = DspTrackPayload | DspReleasePayload;
+
 export interface DspConnectorContext {
   providerKey: string;
   credentials: Record<string, unknown>;
@@ -93,10 +111,10 @@ export interface DspConnector {
   displayName: string;
   capabilities: DspCapability[];
   validateCredentials(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>;
-  validateTrack(payload: DspTrackPayload): Promise<{ valid: boolean; errors: string[] }>;
-  deliver(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
-  update?(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
-  takedown?(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
+  validateTrack(payload: DspDeliveryPayload): Promise<{ valid: boolean; errors: string[] }>;
+  deliver(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
+  update?(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
+  takedown?(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult>;
   getDeliveryStatus?(externalId: string, context: DspConnectorContext): Promise<DspDeliveryResult>;
   validateWebhookSignature?(
     headers: Record<string, string | string[] | undefined>,

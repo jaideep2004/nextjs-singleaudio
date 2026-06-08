@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Alert, Box, Button, Paper, Stack, Typography } from '@mui/material';
@@ -14,13 +14,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const theme = useTheme();
   const pathname = usePathname();
   const { user } = useAuth();
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const needsKycForm = userNeedsKyc(user);
   const underReview = userKycUnderReview(user);
   const reviewAllowed = pathname === '/dashboard' || pathname.startsWith('/dashboard/profile') || pathname.startsWith('/dashboard/support');
+  const maintenanceApplies = maintenanceMode && !!user && !['admin', 'subadmin'].includes(String(user.role || ''));
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMaintenanceMode = async () => {
+      try {
+        const response = await fetch('/api/settings/maintenance-mode', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (mounted) setMaintenanceMode(payload?.enabled === true);
+      } catch {
+        if (mounted) setMaintenanceMode(false);
+      }
+    };
+    void loadMaintenanceMode();
+    return () => {
+      mounted = false;
+    };
+  }, []);
   
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {!needsKycForm && (
+      {!needsKycForm && !maintenanceApplies && (
         <Suspense fallback={null}>
           <UserSidebar />
         </Suspense>
@@ -52,6 +71,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             mx: 'auto',
           }}
         >
+          {maintenanceApplies ? (
+            <Paper
+              variant="outlined"
+              sx={{
+                p: { xs: 3, md: 5 },
+                borderRadius: 3,
+                maxWidth: 760,
+                mx: 'auto',
+                mt: { xs: 4, md: 8 },
+                textAlign: 'center',
+                bgcolor: 'background.paper',
+                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)',
+                boxShadow: theme.palette.mode === 'dark'
+                  ? '0 24px 70px rgba(0,0,0,0.32)'
+                  : '0 24px 70px rgba(15,23,42,0.10)',
+              }}
+            >
+              <Stack spacing={2.25} alignItems="center">
+                <Typography variant="overline" color="primary" fontWeight={900}>
+                  Scheduled Maintenance
+                </Typography>
+                <Typography variant="h4" fontWeight={950}>
+                  We are tuning the dashboard.
+                </Typography>
+                <Typography color="text.secondary" sx={{ maxWidth: 560 }}>
+                  User tools are temporarily paused while the Single Audio team completes maintenance. Your catalog, payouts, and profile data remain safe.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Please check back shortly.
+                </Typography>
+              </Stack>
+            </Paper>
+          ) : (
+          <>
           {!needsKycForm && underReview && (
             <Alert severity="info" sx={{ mt: 2, mb: 2, borderRadius: 2 }}>
               KYC verification under progress. Dashboard actions unlock after admin approval.
@@ -82,6 +135,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Paper>
           ) : (
             <KycGate>{children}</KycGate>
+          )}
+          </>
           )}
         </Box>
       </Box>

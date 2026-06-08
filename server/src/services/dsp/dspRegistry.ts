@@ -1,6 +1,7 @@
 import { DspConnector, DspCapability } from '../../types/dsp';
 import { GenericAudioConnector } from './connectors/genericAudioConnector';
 import { ApiConnector } from './connectors/apiConnector';
+import { MockDspConnector } from './connectors/mockDspConnector';
 
 const createConnector = (key: string, displayName: string, capabilities?: DspCapability[]): DspConnector =>
   new GenericAudioConnector(key, displayName, capabilities);
@@ -21,6 +22,7 @@ const createApiConnector = (
   });
 
 const CONNECTORS: Record<string, DspConnector> = {
+  mock_dsp: new MockDspConnector(),
   spotify: createApiConnector('spotify', 'Spotify', ['audio_delivery', 'reporting'], ['clientId', 'clientSecret'], '/v1/deliveries'),
   apple_music: createApiConnector('apple_music', 'Apple Music', ['audio_delivery', 'reporting'], ['issuerId', 'privateKey'], '/v1/catalog/deliveries'),
   amazon_music: createApiConnector('amazon_music', 'Amazon Music', ['audio_delivery', 'reporting'], ['apiKey', 'apiSecret'], '/v1/releases'),

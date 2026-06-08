@@ -7,6 +7,8 @@ const router = express.Router();
 
 // Public route - no auth required
 router.get('/signupEnabled', settingsController.getSignupEnabled);
+router.get('/maintenanceMode', settingsController.getMaintenanceMode);
+router.get('/uploadLimit', settingsController.getUploadLimit);
 
 // Admin routes - require admin or settings subadmin authentication
 router.use(protect);

@@ -53,7 +53,7 @@ export const UPLOAD_DIR = IS_SERVERLESS_RUNTIME
 export const TRACKS_DIR = path.join(UPLOAD_DIR, 'tracks');
 export const ARTWORK_DIR = path.join(UPLOAD_DIR, 'artwork');
 export const REGISTRATION_DIR = path.join(UPLOAD_DIR, 'registration');
-export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB for audio files
+export const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB ceiling for audio files
 
 // Supported file types
 export const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav'];

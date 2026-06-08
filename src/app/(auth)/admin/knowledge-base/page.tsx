@@ -90,6 +90,11 @@ const slugifyArticleTitle = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+const formatDate = (value?: string) => {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+};
+
 export default function AdminKnowledgeBasePage() {
   const theme = useTheme();
   const searchParams = useSearchParams();
@@ -112,28 +117,46 @@ export default function AdminKnowledgeBasePage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  const activeCategories = useMemo(() => categories.filter(category => category.isActive !== false), [categories]);
+  const archivedCategories = useMemo(() => categories.filter(category => category.isActive === false), [categories]);
+  const activeCategoryIds = useMemo(() => new Set(activeCategories.map(category => category._id)), [activeCategories]);
+  const activeSections = useMemo(
+    () => sections.filter(section => section.isActive !== false && activeCategoryIds.has(String(section.categoryId))),
+    [activeCategoryIds, sections]
+  );
+  const visibleArticles = useMemo(() => articles.filter(article => article.status !== 'archived'), [articles]);
+  const archivedArticles = useMemo(() => articles.filter(article => article.status === 'archived'), [articles]);
   const grouped = useMemo(
-    () => groupKnowledgeBase(categories, sections, articles),
-    [categories, sections, articles]
+    () => groupKnowledgeBase(activeCategories, activeSections, visibleArticles),
+    [activeCategories, activeSections, visibleArticles]
   );
   const availableSections = useMemo(
-    () => sections.filter(section => String(section.categoryId) === form.categoryId),
-    [sections, form.categoryId]
+    () => activeSections.filter(section => String(section.categoryId) === form.categoryId),
+    [activeSections, form.categoryId]
   );
   const filteredArticles = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return articles;
-    return articles.filter(article =>
+    if (!query) return visibleArticles;
+    return visibleArticles.filter(article =>
       `${article.title} ${article.slug} ${article.excerpt || ''}`.toLowerCase().includes(query)
     );
-  }, [articles, search]);
+  }, [search, visibleArticles]);
+  const filteredArchivedArticles = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return archivedArticles;
+    return archivedArticles.filter(article =>
+      `${article.title} ${article.slug} ${article.excerpt || ''}`.toLowerCase().includes(query)
+    );
+  }, [archivedArticles, search]);
   const viewParam = searchParams.get('view');
   const kbView: 'articles' | 'categories' | 'new' =
     viewParam === 'categories' || viewParam === 'structure'
       ? 'categories'
       : viewParam === 'new'
         ? 'new'
-        : 'articles';
+        : viewParam === 'articles'
+          ? 'articles'
+          : 'categories';
   const showEditor = kbView === 'new' || (kbView === 'articles' && Boolean(form._id));
   const isEditingArticle = kbView === 'articles' && Boolean(form._id);
   const showArticleList = kbView === 'articles' && (!isEditingArticle || articleListOpen);
@@ -161,9 +184,10 @@ export default function AdminKnowledgeBasePage() {
       setSections(tree?.sections || []);
       setArticles(articleResponse?.data?.articles || tree?.articles || []);
 
-      if (!form.categoryId && tree?.categories?.[0]) {
-        setForm(current => ({ ...current, categoryId: tree.categories[0]._id }));
-        setSectionDraft(current => ({ ...current, categoryId: tree.categories[0]._id }));
+      const firstActiveCategory = tree?.categories?.find((category: KnowledgeBaseCategory) => category.isActive !== false);
+      if (!form.categoryId && firstActiveCategory) {
+        setForm(current => ({ ...current, categoryId: firstActiveCategory._id }));
+        setSectionDraft(current => ({ ...current, categoryId: firstActiveCategory._id }));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load knowledge base');
@@ -204,7 +228,7 @@ export default function AdminKnowledgeBasePage() {
   };
 
   const resetForm = () => {
-    setForm(createBlankArticle(categories[0]?._id || '', ''));
+    setForm(createBlankArticle(activeCategories[0]?._id || '', ''));
     setArticleListOpen(false);
     setSlugTouched(false);
     setNotice('');
@@ -346,6 +370,47 @@ export default function AdminKnowledgeBasePage() {
       setNotice('Category image updated');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update category image');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateCategoryDetails = async (category: KnowledgeBaseCategory) => {
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await adminKnowledgeBaseAPI.updateCategory(category._id, {
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        iconUrl: category.iconUrl,
+        isActive: category.isActive !== false,
+      });
+      await load();
+      setNotice('Category updated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setCategoryArchived = async (category: KnowledgeBaseCategory, archived: boolean) => {
+    const confirmed = archived
+      ? window.confirm(`Archive category "${category.name}"? It will be hidden from default CMS lists.`)
+      : true;
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+    try {
+      await adminKnowledgeBaseAPI.updateCategory(category._id, { isActive: !archived });
+      await load();
+      setNotice(archived ? 'Category archived' : 'Category restored');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update category archive state');
     } finally {
       setSaving(false);
     }
@@ -579,14 +644,14 @@ export default function AdminKnowledgeBasePage() {
                 ? 'minmax(0, 1fr)'
                 : showEditor
                   ? '320px minmax(0, 1fr)'
-                  : 'minmax(0, 520px)',
+                  : 'minmax(0, 1fr)',
             xl: showCategories
               ? 'minmax(0, 1fr)'
               : showEditor && ((isEditingArticle && !articleListOpen) || kbView === 'new')
                 ? 'minmax(0, 1fr) 360px'
                 : showEditor
                   ? '360px minmax(0, 1fr) 360px'
-                  : 'minmax(0, 560px)',
+                  : 'minmax(0, 1fr)',
           },
           alignItems: 'start',
           gap: 2.5,
@@ -692,7 +757,7 @@ export default function AdminKnowledgeBasePage() {
                         />
                       </Stack>
                       <Typography variant="caption" color="text.secondary">
-                        /{articleItem.slug}
+                        /{articleItem.slug} · Created {formatDate(articleItem.createdAt)}
                       </Typography>
                     </Box>
                   ))}
@@ -702,6 +767,41 @@ export default function AdminKnowledgeBasePage() {
                     </Typography>
                   )}
                 </Stack>
+                {filteredArchivedArticles.length > 0 && (
+                  <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <Archive fontSize="small" />
+                      <Typography fontWeight={900}>Archived Articles</Typography>
+                      <Chip size="small" label={filteredArchivedArticles.length} />
+                    </Stack>
+                    <Stack spacing={1}>
+                      {filteredArchivedArticles.map(articleItem => (
+                        <Box
+                          key={articleItem._id}
+                          onClick={() => selectArticle(articleItem)}
+                          sx={{
+                            p: 1.4,
+                            borderRadius: 1,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            cursor: 'pointer',
+                            bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.035) : alpha(theme.palette.text.primary, 0.025),
+                          }}
+                        >
+                          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                            <Typography fontWeight={850} noWrap color="text.primary">
+                              {articleItem.title || 'Untitled'}
+                            </Typography>
+                            <Chip size="small" label="archived" />
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary">
+                            /{articleItem.slug} · Created {formatDate(articleItem.createdAt)}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
               </Paper>
             )}
 
@@ -842,7 +942,7 @@ export default function AdminKnowledgeBasePage() {
                             }))
                           }
                         >
-                          {categories.map(categoryItem => (
+                          {activeCategories.map(categoryItem => (
                             <MenuItem key={categoryItem._id} value={categoryItem._id}>
                               {categoryItem.name}
                             </MenuItem>
@@ -946,6 +1046,48 @@ export default function AdminKnowledgeBasePage() {
                         <Stack spacing={1} sx={{ mt: 1 }}>
                           <TextField
                             size="small"
+                            label="Name"
+                            value={categoryItem.name || ''}
+                            onChange={event =>
+                              setCategories(current =>
+                                current.map(item =>
+                                  item._id === categoryItem._id
+                                    ? { ...item, name: event.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                          <TextField
+                            size="small"
+                            label="Slug"
+                            value={categoryItem.slug || ''}
+                            onChange={event =>
+                              setCategories(current =>
+                                current.map(item =>
+                                  item._id === categoryItem._id
+                                    ? { ...item, slug: event.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                          <TextField
+                            size="small"
+                            label="Description"
+                            value={categoryItem.description || ''}
+                            onChange={event =>
+                              setCategories(current =>
+                                current.map(item =>
+                                  item._id === categoryItem._id
+                                    ? { ...item, description: event.target.value }
+                                    : item
+                                )
+                              )
+                            }
+                          />
+                          <TextField
+                            size="small"
                             label="Category image URL"
                             value={categoryItem.iconUrl || ''}
                             onChange={event =>
@@ -984,17 +1126,62 @@ export default function AdminKnowledgeBasePage() {
                             </Button>
                             <Button
                               size="small"
-                              onClick={() =>
-                                updateCategoryIcon(categoryItem._id, categoryItem.iconUrl || '')
-                              }
+                              onClick={() => updateCategoryDetails(categoryItem)}
                               disabled={saving}
                             >
                               Save
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="outlined"
+                              onClick={() => setCategoryArchived(categoryItem, true)}
+                              disabled={saving}
+                            >
+                              Archive
                             </Button>
                           </Stack>
                         </Stack>
                       </Box>
                     ))}
+                    {archivedCategories.length > 0 && (
+                      <Box sx={{ pt: 1.5, mt: 0.5, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <Archive fontSize="small" />
+                          <Typography fontWeight={900}>Archived Categories</Typography>
+                          <Chip size="small" label={archivedCategories.length} />
+                        </Stack>
+                        <Stack spacing={1}>
+                          {archivedCategories.map(categoryItem => (
+                            <Box
+                              key={categoryItem._id}
+                              sx={{
+                                p: 1.25,
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                bgcolor: theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.035) : alpha(theme.palette.text.primary, 0.025),
+                              }}
+                            >
+                              <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                                <Box sx={{ minWidth: 0 }}>
+                                  <Typography fontWeight={850} noWrap>{categoryItem.name}</Typography>
+                                  <Typography variant="caption" color="text.secondary">/{categoryItem.slug}</Typography>
+                                </Box>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  onClick={() => setCategoryArchived(categoryItem, false)}
+                                  disabled={saving}
+                                >
+                                  Restore
+                                </Button>
+                              </Stack>
+                            </Box>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
                   </Stack>
                 </Box>
               </Paper>
@@ -1082,7 +1269,7 @@ export default function AdminKnowledgeBasePage() {
                     }))
                   }
                 >
-                  {categories.map(categoryItem => (
+                  {activeCategories.map(categoryItem => (
                     <MenuItem key={categoryItem._id} value={categoryItem._id}>
                       {categoryItem.name}
                     </MenuItem>

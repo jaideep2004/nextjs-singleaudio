@@ -16,6 +16,11 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 @Service()
+/**
+ * Legacy store delivery service.
+ * New DSP delivery work must use DspDeliveryService so delivery jobs, retries,
+ * credentials, and webhooks have one authoritative backend path.
+ */
 export class StoreService {
   constructor(
     private readonly storeRepository: StoreRepository,

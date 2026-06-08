@@ -386,6 +386,9 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                 fontSize: '0.8rem',
                 fontWeight: 700,
                 color: isDarkMode ? '#94a3b8' : '#475569',
+                '& img': {
+                  objectFit: 'contain',
+                },
               }}
             >
               {user?.name?.[0]?.toUpperCase() || 'U'}
@@ -436,6 +439,9 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                     fontWeight: 800,
                     color: isDarkMode ? '#94a3b8' : '#475569',
                     flex: '0 0 auto',
+                    '& img': {
+                      objectFit: 'contain',
+                    },
                   }}
                 >
                   {user?.name?.[0]?.toUpperCase() || 'U'}

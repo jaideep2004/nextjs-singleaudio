@@ -1,17 +1,34 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import DspProvider from '../../models/dspProvider.model';
 import DeliveryJob, { IDeliveryJob } from '../../models/deliveryJob.model';
 import DspWebhookEvent from '../../models/dspWebhookEvent.model';
 import RightsClaim from '../../models/rightsClaim.model';
 import FingerprintMatch from '../../models/fingerprintMatch.model';
-import { DspDeliveryOperation, DspDeliveryState, DspIntegrationMode, DspTrackPayload } from '../../types/dsp';
+import {
+  DspDeliveryOperation,
+  DspDeliveryPayload,
+  DspDeliveryState,
+  DspIntegrationMode,
+  DspReleasePayload,
+  DspTrackPayload,
+} from '../../types/dsp';
 import { dspRegistry } from './dspRegistry';
 import { applyMetadataRules } from './rules/metadataRuleEngine';
 import { releaseVersionService } from './releaseVersion.service';
 import { evaluateDspReadiness, getDspRequirement } from './dspProviderRequirements';
 import { findTrackById } from '../../repositories/track.repository';
+import {
+  decryptCredentialMap,
+  encryptCredentialMap,
+  getConfiguredCredentialKeys,
+  isPlainCredentialMap,
+} from './dspCredentialVault';
 
 const BASE_RETRY_DELAY_MS = 15_000;
+const WORKER_LOCK_MS = 5 * 60_000;
+const DEFAULT_WORKER_BATCH_SIZE = 5;
+const SENSITIVE_CONFIG_KEYS = new Set(['webhookSecret']);
 const ALLOWED_WEBHOOK_STATES: DspDeliveryState[] = [
   'queued',
   'processing',
@@ -24,12 +41,15 @@ const ALLOWED_WEBHOOK_STATES: DspDeliveryState[] = [
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown delivery error';
 
+const hasOwn = (value: Record<string, unknown>, key: string) =>
+  Object.prototype.hasOwnProperty.call(value, key);
+
 const getHeadersRecord = (headers: Record<string, unknown>): Record<string, string | string[] | undefined> => {
   const out: Record<string, string | string[] | undefined> = {};
   for (const [key, value] of Object.entries(headers)) {
-    if (Array.isArray(value)) out[key] = value.map(String);
-    else if (value === undefined || value === null) out[key] = undefined;
-    else out[key] = String(value);
+    if (Array.isArray(value)) out[key.toLowerCase()] = value.map(String);
+    else if (value === undefined || value === null) out[key.toLowerCase()] = undefined;
+    else out[key.toLowerCase()] = String(value);
   }
   return out;
 };
@@ -37,9 +57,37 @@ const getHeadersRecord = (headers: Record<string, unknown>): Record<string, stri
 const toPlainObject = (value: any): Record<string, any> =>
   typeof value?.toObject === 'function' ? value.toObject() : { ...value };
 
+const sanitizeConfig = (config: Record<string, unknown> = {}) => {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (SENSITIVE_CONFIG_KEYS.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
+};
+
+const normalizeConfigAndCredentials = (
+  config: Record<string, unknown> = {},
+  credentials: Record<string, unknown> = {}
+) => {
+  const nextConfig = { ...config };
+  const nextCredentials = { ...credentials };
+  for (const key of SENSITIVE_CONFIG_KEYS) {
+    if (nextConfig[key] !== undefined && nextConfig[key] !== null && nextConfig[key] !== '') {
+      nextCredentials[key] = nextConfig[key];
+      delete nextConfig[key];
+    }
+  }
+  return { config: nextConfig, credentials: nextCredentials };
+};
+
+const hashPayload = (payload: unknown) =>
+  crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+
 class DspDeliveryService {
   private buildProviderView(provider: any) {
     const plain = toPlainObject(provider);
+    const decryptedCredentials = decryptCredentialMap(plain.credentials || {});
     const requirement = getDspRequirement({
       key: plain.key,
       displayName: plain.displayName,
@@ -53,21 +101,30 @@ class DspDeliveryService {
       maintenanceMode: plain.maintenanceMode,
       integrationMode: plain.integrationMode,
       config: plain.config,
-      credentials: plain.credentials,
+      credentials: decryptedCredentials,
     });
+    const configuredCredentialKeys = getConfiguredCredentialKeys(plain.credentials || {});
+    const missingCredentialKeys = requirement.requiredCredentialKeys.filter(
+      (key) => !configuredCredentialKeys.includes(key)
+    );
 
     delete plain.credentials;
+    delete plain.credentialEnvelopeVersion;
     return {
       ...plain,
+      config: sanitizeConfig(plain.config || {}),
       integrationMode: plain.integrationMode || plain.config?.integrationMode || 'shell',
       readiness: readiness.state,
       readinessReport: readiness,
       requirement,
+      configuredCredentialKeys,
+      missingCredentialKeys,
     };
   }
 
   async bootstrapPhase1Providers() {
     const defaults = [
+      { key: 'mock_dsp', displayName: 'Mock DSP', enabled: true, integrationMode: 'sandbox' as DspIntegrationMode },
       { key: 'spotify', displayName: 'Spotify' },
       { key: 'apple_music', displayName: 'Apple Music' },
       { key: 'amazon_music', displayName: 'Amazon Music' },
@@ -86,20 +143,14 @@ class DspDeliveryService {
       const result = await this.registerProvider({
         key: provider.key,
         displayName: provider.displayName,
-        enabled: false,
-        credentials: {},
-        config: { integrationMode: 'shell', ddexProfile: 'ERN-4' },
+        enabled: provider.enabled ?? false,
+        integrationMode: provider.integrationMode || 'shell',
+        credentials: provider.key === 'mock_dsp' ? { webhookSecret: 'mock-dsp-webhook-secret' } : {},
+        config: { integrationMode: provider.integrationMode || 'shell', ddexProfile: 'ERN-4' },
       });
       created.push(result);
     }
     return created;
-  }
-
-  private scheduleRetry(jobId: string, retryCount: number): void {
-    const delay = BASE_RETRY_DELAY_MS * (retryCount + 1);
-    setTimeout(() => {
-      this.processJob(jobId).catch(() => undefined);
-    }, delay);
   }
 
   private buildTrackPayload(trackDoc: any): DspTrackPayload {
@@ -131,6 +182,47 @@ class DspDeliveryService {
     };
   }
 
+  private buildReleasePayload(snapshot: Record<string, any>): DspReleasePayload {
+    const payload = snapshot.payload || {};
+    const tracks = Array.isArray(payload.tracks) ? payload.tracks : [];
+    return {
+      releaseId: String(payload.releaseId || snapshot.releaseId || ''),
+      releaseTitle: String(payload.releaseTitle || 'Untitled release'),
+      upc: payload.upc,
+      primaryArtist: payload.primaryArtist,
+      label: payload.label,
+      genre: payload.genre,
+      language: payload.language,
+      releaseDate: payload.releaseDate,
+      stores: Array.isArray(payload.stores) ? payload.stores : [],
+      territories: Array.isArray(payload.territories) ? payload.territories : ['WORLD'],
+      assetChecks: Array.isArray(payload.assetChecks) ? payload.assetChecks : [],
+      tracks: tracks.map((track: Record<string, any>, index: number) => ({
+        trackId: String(track.id || `${payload.releaseId || snapshot.releaseId || 'release'}:${index + 1}`),
+        title: track.title,
+        artistName: track.artistName || payload.primaryArtist,
+        isrc: track.isrc,
+        upc: track.upc || payload.upc,
+        explicit: track.explicit,
+        audioFile: track.audioFile,
+        artwork: track.artwork,
+        releaseDate: payload.releaseDate,
+        territories: Array.isArray(payload.territories) ? payload.territories : ['WORLD'],
+        contentRating: track.explicit ? 'explicit' : 'clean',
+        ddexProfile: 'ERN-4',
+        metadata: {
+          source: 'releaseDeliverySnapshot',
+          releaseId: String(payload.releaseId || snapshot.releaseId || ''),
+        },
+      })),
+      metadata: {
+        source: 'releaseDeliverySnapshot',
+        payloadHash: snapshot.payloadHash,
+        snapshotId: snapshot._id?.toString?.(),
+      },
+    };
+  }
+
   private generateIdempotencyKey(
     trackId: string,
     providerKey: string,
@@ -138,6 +230,22 @@ class DspDeliveryService {
     versionNumber: number
   ): string {
     return crypto.createHash('sha256').update(`${trackId}:${providerKey}:${operation}:${versionNumber}`).digest('hex');
+  }
+
+  private async getProviderWithDecryptedCredentials(providerKey: string) {
+    const provider = await DspProvider.findOne({ key: providerKey }).select('+credentials +credentialEnvelopeVersion');
+    if (!provider) return null;
+
+    const plain = toPlainObject(provider);
+    const credentials = decryptCredentialMap(plain.credentials || {});
+
+    if (isPlainCredentialMap(plain.credentials || {})) {
+      provider.credentials = encryptCredentialMap(credentials);
+      provider.credentialEnvelopeVersion = 'dsp-v1';
+      await provider.save();
+    }
+
+    return { provider, credentials };
   }
 
   async registerProvider(input: {
@@ -153,10 +261,25 @@ class DspDeliveryService {
   }) {
     const key = input.key.toLowerCase().trim();
     const connector = dspRegistry.get(key);
-    const enabled = input.enabled ?? true;
-    const integrationMode = input.integrationMode || (input.config?.integrationMode as DspIntegrationMode | undefined) || 'shell';
+    const existing = await DspProvider.findOne({ key }).select('+credentials +credentialEnvelopeVersion');
+    const existingPlain = existing ? toPlainObject(existing) : null;
+    const existingCredentials = existingPlain ? decryptCredentialMap(existingPlain.credentials || {}) : {};
+    const rawConfig = { ...(input.config || {}) };
+    const rawCredentials = hasOwn(input as Record<string, unknown>, 'credentials')
+      ? { ...(input.credentials || {}) }
+      : existingCredentials;
+    const normalized = normalizeConfigAndCredentials(rawConfig, rawCredentials);
+    const enabled = input.enabled ?? existing?.enabled ?? true;
+    const integrationMode =
+      input.integrationMode ||
+      (normalized.config.integrationMode as DspIntegrationMode | undefined) ||
+      existing?.integrationMode ||
+      'shell';
+    const config = { ...(existingPlain?.config || {}), ...normalized.config, integrationMode };
+    const credentials = normalized.credentials;
+
     if (enabled && integrationMode !== 'shell') {
-      const validation = await connector.validateCredentials(input.credentials || {});
+      const validation = await connector.validateCredentials(credentials);
       if (!validation.valid) {
         throw new Error(validation.error || 'Invalid provider credentials');
       }
@@ -164,37 +287,38 @@ class DspDeliveryService {
 
     const readiness = evaluateDspReadiness({
       key,
-      displayName: input.displayName || connector.displayName,
-      capabilities: (input.capabilities || connector.capabilities) as any,
+      displayName: input.displayName || existing?.displayName || connector.displayName,
+      capabilities: (input.capabilities || existing?.capabilities || connector.capabilities) as any,
       enabled,
-      maintenanceMode: input.maintenanceMode ?? false,
+      maintenanceMode: input.maintenanceMode ?? existing?.maintenanceMode ?? false,
       integrationMode,
-      config: { ...(input.config || {}), integrationMode },
-      credentials: input.credentials || {},
+      config,
+      credentials,
     });
 
     const provider = await DspProvider.findOneAndUpdate(
       { key },
       {
         key,
-        displayName: input.displayName || connector.displayName,
-        capabilities: input.capabilities || connector.capabilities,
-        region: input.region,
+        displayName: input.displayName || existing?.displayName || connector.displayName,
+        capabilities: input.capabilities || existing?.capabilities || connector.capabilities,
+        region: input.region ?? existing?.region,
         enabled,
-        maintenanceMode: input.maintenanceMode ?? false,
+        maintenanceMode: input.maintenanceMode ?? existing?.maintenanceMode ?? false,
         integrationMode,
         readiness: readiness.state,
-        credentials: input.credentials || {},
-        config: { ...(input.config || {}), integrationMode },
+        credentials: encryptCredentialMap(credentials),
+        credentialEnvelopeVersion: 'dsp-v1',
+        config,
       },
       { upsert: true, new: true }
-    ).select('+credentials');
+    ).select('+credentials +credentialEnvelopeVersion');
 
     return this.buildProviderView(provider);
   }
 
   async listProviders() {
-    const dbProviders = await DspProvider.find().sort({ displayName: 1 }).select('+credentials');
+    const dbProviders = await DspProvider.find().sort({ displayName: 1 }).select('+credentials +credentialEnvelopeVersion');
     if (dbProviders.length > 0) return dbProviders.map((provider) => this.buildProviderView(provider));
 
     return dspRegistry.list().map((connector) => ({
@@ -212,34 +336,37 @@ class DspDeliveryService {
         canDispatch: false,
       },
       requirement: getDspRequirement(connector),
+      configuredCredentialKeys: [],
+      missingCredentialKeys: getDspRequirement(connector).requiredCredentialKeys,
       region: null,
       config: {},
     }));
   }
 
   async dispatchDelivery(trackId: string, providerKey: string, operation: DspDeliveryOperation, createdBy?: string) {
-    const provider = await DspProvider.findOne({ key: providerKey, enabled: true });
-    if (!provider) throw new Error(`Provider ${providerKey} is not active`);
-    if (provider.maintenanceMode) throw new Error(`Provider ${providerKey} is in maintenance mode`);
+    const normalizedProviderKey = providerKey.toLowerCase().trim();
+    const providerRecord = await this.getProviderWithDecryptedCredentials(normalizedProviderKey);
+    if (!providerRecord || !providerRecord.provider.enabled) throw new Error(`Provider ${normalizedProviderKey} is not active`);
+    if (providerRecord.provider.maintenanceMode) throw new Error(`Provider ${normalizedProviderKey} is in maintenance mode`);
 
     const track = await findTrackById(trackId);
     if (!track) throw new Error('Track not found');
 
     const payload = this.buildTrackPayload(track);
-    const connector = dspRegistry.get(providerKey);
-    const ruleResult = applyMetadataRules(providerKey, payload);
+    const connector = dspRegistry.get(normalizedProviderKey);
+    const ruleResult = applyMetadataRules(normalizedProviderKey, payload);
     if (!ruleResult.valid) {
       throw new Error(`Metadata/DDEX validation failed: ${ruleResult.errors.join(', ')}`);
     }
 
     const version = await releaseVersionService.createVersion({
       trackId,
-      providerKey,
+      providerKey: normalizedProviderKey,
       payload: ruleResult.normalized,
       createdBy,
     });
 
-    const idempotencyKey = this.generateIdempotencyKey(trackId, providerKey, operation, version.versionNumber);
+    const idempotencyKey = this.generateIdempotencyKey(trackId, normalizedProviderKey, operation, version.versionNumber);
     const existing = await DeliveryJob.findOne({ idempotencyKey });
     if (existing && ['queued', 'processing', 'delivered'].includes(existing.state)) {
       return existing;
@@ -251,13 +378,15 @@ class DspDeliveryService {
     }
 
     const job = await DeliveryJob.create({
+      targetType: 'track',
       trackId: track._id,
-      providerKey,
+      providerKey: normalizedProviderKey,
       operation,
       state: 'queued',
       idempotencyKey,
       retryCount: 0,
       maxRetries: 5,
+      nextRetryAt: new Date(),
       metadata: {
         deliverySnapshot: {
           title: ruleResult.normalized.title,
@@ -281,8 +410,53 @@ class DspDeliveryService {
       ],
     });
 
-    void this.processJob(job._id.toString());
     return job;
+  }
+
+  private async loadJobPayload(job: IDeliveryJob): Promise<{ payload?: DspDeliveryPayload; errors: string[]; warnings: string[] }> {
+    if (job.targetType === 'release') {
+      if (!job.snapshotId) return { errors: ['Release delivery snapshot missing'], warnings: [] };
+      const snapshot = await mongoose.connection
+        .collection('releaseDeliverySnapshots')
+        .findOne({ _id: job.snapshotId });
+      if (!snapshot) return { errors: ['Release delivery snapshot not found'], warnings: [] };
+      return { payload: this.buildReleasePayload(snapshot), errors: [], warnings: [] };
+    }
+
+    if (!job.trackId) return { errors: ['Track id missing'], warnings: [] };
+    const track = await findTrackById(job.trackId.toString());
+    if (!track) return { errors: ['Track not found'], warnings: [] };
+    const ruleResult = applyMetadataRules(job.providerKey, this.buildTrackPayload(track));
+    return {
+      payload: ruleResult.normalized,
+      errors: ruleResult.errors,
+      warnings: ruleResult.warnings,
+    };
+  }
+
+  private async markJobNeedsAttention(jobId: string, job: IDeliveryJob, message: string, metadata?: Record<string, unknown>) {
+    await DeliveryJob.findByIdAndUpdate(jobId, {
+      state: 'needs_attention',
+      errorMessage: message,
+      metadata: {
+        ...job.metadata,
+        ...(metadata || {}),
+      },
+      $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
+      $push: { events: { state: 'needs_attention', message, source: 'system' } },
+    });
+    return DeliveryJob.findById(jobId);
+  }
+
+  private async failJob(jobId: string, message: string) {
+    await DeliveryJob.findByIdAndUpdate(jobId, {
+      state: 'failed',
+      errorMessage: message,
+      deadLettered: true,
+      $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
+      $push: { events: { state: 'failed', message, source: 'system' } },
+    });
+    return DeliveryJob.findById(jobId);
   }
 
   async processJob(jobId: string): Promise<IDeliveryJob | null> {
@@ -290,31 +464,12 @@ class DspDeliveryService {
     if (!job) return null;
     if (job.deadLettered) return job;
 
-    const provider = await DspProvider.findOne({ key: job.providerKey }).select('+credentials');
-    if (!provider || !provider.enabled || provider.maintenanceMode) {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'needs_attention',
-        errorMessage: 'Provider inactive or in maintenance mode',
-        $push: { events: { state: 'needs_attention', message: 'Provider unavailable', source: 'system' } },
-      });
-      return DeliveryJob.findById(jobId);
+    const providerRecord = await this.getProviderWithDecryptedCredentials(job.providerKey);
+    if (!providerRecord || !providerRecord.provider.enabled || providerRecord.provider.maintenanceMode) {
+      return this.markJobNeedsAttention(jobId, job, 'Provider inactive or in maintenance mode');
     }
 
-    if (job.targetType === 'release') {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'needs_attention',
-        errorMessage: 'Release-level partner adapter is not connected yet',
-        $push: {
-          events: {
-            state: 'needs_attention',
-            message: 'Release package snapshot is ready. Connect live partner adapter before dispatch.',
-            source: 'system',
-          },
-        },
-      });
-      return DeliveryJob.findById(jobId);
-    }
-
+    const { provider, credentials } = providerRecord;
     const readiness = evaluateDspReadiness({
       key: provider.key,
       displayName: provider.displayName,
@@ -323,117 +478,65 @@ class DspDeliveryService {
       maintenanceMode: provider.maintenanceMode,
       integrationMode: provider.integrationMode,
       config: provider.config,
-      credentials: provider.credentials,
+      credentials,
     });
     if (!readiness.canDispatch) {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'needs_attention',
-        errorMessage: `Provider not ready: ${readiness.state}`,
-        metadata: {
-          ...job.metadata,
-          readiness,
-        },
-        $push: {
-          events: {
-            state: 'needs_attention',
-            message: readiness.missing.length
-              ? `Missing provider readiness fields: ${readiness.missing.join(', ')}`
-              : `Provider readiness state: ${readiness.state}`,
-            source: 'system',
-          },
-        },
-      });
-      return DeliveryJob.findById(jobId);
+      return this.markJobNeedsAttention(jobId, job, `Provider not ready: ${readiness.state}`, { readiness });
     }
 
-    if (!job.trackId) {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'failed',
-        errorMessage: 'Track id missing',
-        $push: { events: { state: 'failed', message: 'Track id missing', source: 'system' } },
-      });
-      return DeliveryJob.findById(jobId);
-    }
-
-    const track = await findTrackById(job.trackId.toString());
-    if (!track) {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'failed',
-        errorMessage: 'Track not found',
-        $push: { events: { state: 'failed', message: 'Track missing', source: 'system' } },
-      });
-      return DeliveryJob.findById(jobId);
+    const payloadResult = await this.loadJobPayload(job);
+    if (payloadResult.errors.length > 0 || !payloadResult.payload) {
+      return this.failJob(jobId, `${job.targetType === 'release' ? 'Release package' : 'Metadata/DDEX'} validation failed: ${payloadResult.errors.join(', ')}`);
     }
 
     const connector = dspRegistry.get(job.providerKey);
-    const payload = this.buildTrackPayload(track);
-    const ruleResult = applyMetadataRules(job.providerKey, payload);
-    if (!ruleResult.valid) {
-      await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: 'failed',
-        errorMessage: `Metadata/DDEX validation failed: ${ruleResult.errors.join(', ')}`,
-        $push: {
-          events: {
-            state: 'failed',
-            message: 'Blocked by metadata rule engine',
-            source: 'system',
-          },
-        },
-      });
-      return DeliveryJob.findById(jobId);
+    const validation = await connector.validateTrack(payloadResult.payload);
+    if (!validation.valid) {
+      return this.failJob(jobId, `Connector validation failed: ${validation.errors.join(', ')}`);
     }
 
     await DeliveryJob.findByIdAndUpdate(jobId, {
       state: 'processing',
+      lastAttemptAt: new Date(),
       $push: { events: { state: 'processing', message: 'Connector dispatch started', source: 'system' } },
     });
 
     try {
       let result;
+      const context = {
+        providerKey: provider.key,
+        credentials,
+        region: provider.region,
+        config: provider.config,
+        operation: job.operation,
+      };
       if (job.operation === 'deliver') {
-        result = await connector.deliver(ruleResult.normalized, {
-          providerKey: provider.key,
-          credentials: provider.credentials,
-          region: provider.region,
-          config: provider.config,
-          operation: job.operation,
-        });
+        result = await connector.deliver(payloadResult.payload, context);
       } else if (job.operation === 'update' && connector.update) {
-        result = await connector.update(ruleResult.normalized, {
-          providerKey: provider.key,
-          credentials: provider.credentials,
-          region: provider.region,
-          config: provider.config,
-          operation: job.operation,
-        });
+        result = await connector.update(payloadResult.payload, context);
       } else if (job.operation === 'takedown' && connector.takedown) {
-        result = await connector.takedown(ruleResult.normalized, {
-          providerKey: provider.key,
-          credentials: provider.credentials,
-          region: provider.region,
-          config: provider.config,
-          operation: job.operation,
-        });
+        result = await connector.takedown(payloadResult.payload, context);
       } else {
         throw new Error(`Connector ${job.providerKey} does not support operation ${job.operation}`);
       }
 
       const finalState: DspDeliveryState = result.state;
       const successLike = ['processing', 'delivered'].includes(finalState);
-      await DeliveryJob.findByIdAndUpdate(jobId, {
+      const completionUpdate: Record<string, any> = {
         state: finalState,
         externalId: result.externalId,
-        errorMessage: successLike ? undefined : result.message,
         metadata: {
           ...job.metadata,
           connectorMetadata: result.metadata || {},
+          metadataWarnings: payloadResult.warnings,
         },
+        $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
         $push: {
           attempts: {
             attemptNo: job.retryCount + 1,
             status: successLike ? 'success' : 'failed',
             responseCode: successLike ? 'ACCEPTED' : 'FAILED',
-            requestHash: crypto.createHash('sha256').update(JSON.stringify(ruleResult.normalized)).digest('hex'),
+            requestHash: hashPayload(payloadResult.payload),
             responseBody: result,
             retryable: finalState === 'failed',
           },
@@ -443,7 +546,11 @@ class DspDeliveryService {
             source: 'connector',
           },
         },
-      });
+      };
+      if (successLike) completionUpdate.$unset.errorMessage = '';
+      else completionUpdate.errorMessage = result.message;
+
+      await DeliveryJob.findByIdAndUpdate(jobId, completionUpdate);
       return DeliveryJob.findById(jobId);
     } catch (error) {
       const message = getErrorMessage(error);
@@ -457,6 +564,7 @@ class DspDeliveryService {
         nextRetryAt,
         deadLettered: !shouldRetry,
         errorMessage: message,
+        $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
         $push: {
           attempts: {
             attemptNo: retryCount,
@@ -472,11 +580,85 @@ class DspDeliveryService {
         },
       });
 
-      if (shouldRetry) {
-        this.scheduleRetry(jobId, retryCount);
-      }
       return DeliveryJob.findById(jobId);
     }
+  }
+
+  async claimNextDeliveryJob(workerId: string) {
+    const now = new Date();
+    const lockExpiresAt = new Date(now.getTime() + WORKER_LOCK_MS);
+    return DeliveryJob.findOneAndUpdate(
+      {
+        state: 'queued',
+        deadLettered: false,
+        $and: [
+          {
+            $or: [
+              { nextRetryAt: { $exists: false } },
+              { nextRetryAt: null },
+              { nextRetryAt: { $lte: now } },
+            ],
+          },
+          {
+            $or: [
+              { lockExpiresAt: { $exists: false } },
+              { lockExpiresAt: null },
+              { lockExpiresAt: { $lte: now } },
+            ],
+          },
+        ],
+      },
+      {
+        lockedAt: now,
+        lockedBy: workerId,
+        lockExpiresAt,
+      },
+      { new: true, sort: { priority: 1, createdAt: 1 } }
+    );
+  }
+
+  async releaseExpiredLocks() {
+    const now = new Date();
+    const result = await DeliveryJob.updateMany(
+      {
+        state: 'processing',
+        lockExpiresAt: { $lte: now },
+        deadLettered: false,
+      },
+      {
+        state: 'queued',
+        errorMessage: 'Worker lock expired before completion',
+        $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
+        $push: {
+          events: {
+            state: 'queued',
+            message: 'Worker lock expired; job returned to queue',
+            source: 'system',
+          },
+        },
+      }
+    );
+    return result.modifiedCount;
+  }
+
+  async processDueDeliveryJobs(input: { maxJobs?: number; workerId?: string } = {}) {
+    const workerId = input.workerId || `dsp-worker:${process.pid}:${Date.now()}`;
+    const maxJobs = Math.min(50, Math.max(1, input.maxJobs || DEFAULT_WORKER_BATCH_SIZE));
+    const expiredLocksReleased = await this.releaseExpiredLocks();
+    const processed: Array<{ jobId: string; state: string; error?: string }> = [];
+
+    for (let index = 0; index < maxJobs; index += 1) {
+      const job = await this.claimNextDeliveryJob(workerId);
+      if (!job) break;
+      const result = await this.processJob(job._id.toString());
+      processed.push({
+        jobId: job._id.toString(),
+        state: result?.state || 'missing',
+        error: result?.errorMessage,
+      });
+    }
+
+    return { workerId, expiredLocksReleased, processed };
   }
 
   async retryJob(jobId: string) {
@@ -485,10 +667,10 @@ class DspDeliveryService {
     await DeliveryJob.findByIdAndUpdate(jobId, {
       state: 'queued',
       deadLettered: false,
-      errorMessage: undefined,
+      nextRetryAt: new Date(),
+      $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '', errorMessage: '' },
       $push: { events: { state: 'queued', message: 'Manual retry requested', source: 'user' } },
     });
-    void this.processJob(jobId);
     return DeliveryJob.findById(jobId);
   }
 
@@ -524,16 +706,20 @@ class DspDeliveryService {
   }
 
   async processWebhook(providerKey: string, payload: Record<string, unknown>, headers: Record<string, unknown>) {
-    const provider = await DspProvider.findOne({ key: providerKey });
-    if (!provider) throw new Error('Provider not found');
+    const normalizedProviderKey = providerKey.toLowerCase().trim();
+    const providerRecord = await this.getProviderWithDecryptedCredentials(normalizedProviderKey);
+    if (!providerRecord) throw new Error('Provider not found');
 
-    const connector = dspRegistry.get(providerKey);
+    const { provider, credentials } = providerRecord;
+    const connector = dspRegistry.get(normalizedProviderKey);
+    const webhookSecret = String(credentials.webhookSecret || provider.config?.webhookSecret || '');
+    const requiresSignature = provider.integrationMode !== 'shell';
     const signatureValid = connector.validateWebhookSignature
-      ? connector.validateWebhookSignature(getHeadersRecord(headers), payload, String(provider.config?.webhookSecret || ''))
-      : true;
+      ? connector.validateWebhookSignature(getHeadersRecord(headers), payload, webhookSecret)
+      : !requiresSignature;
 
     const event = await DspWebhookEvent.create({
-      providerKey,
+      providerKey: normalizedProviderKey,
       eventType: typeof payload.eventType === 'string' ? payload.eventType : undefined,
       signatureValid,
       payload,
@@ -541,7 +727,7 @@ class DspDeliveryService {
       processed: false,
     });
 
-    if (!signatureValid) {
+    if (requiresSignature && !signatureValid) {
       event.processingError = 'Invalid webhook signature';
       await event.save();
       throw new Error('Invalid webhook signature');
@@ -554,7 +740,7 @@ class DspDeliveryService {
           ? (payload.state as DspDeliveryState)
           : 'processing';
       await DeliveryJob.findOneAndUpdate(
-        { providerKey, externalId },
+        { providerKey: normalizedProviderKey, externalId },
         {
           state,
           $push: {

@@ -1,0 +1,31 @@
+{
+  "jobId": "6a2689808111a956736995bb",
+  "scope": "release",
+  "criteria": {
+    "zipGrouping": "per_release",
+    "releaseIds": [
+      "6a23d83d33ede1254cbe4a2d"
+    ],
+    "userId": null,
+    "statuses": [
+      "approved"
+    ]
+  },
+  "generatedAt": "2026-06-08T09:21:05.446Z",
+  "counts": {
+    "releases": 1,
+    "tracks": 5,
+    "files": 0,
+    "missing": 5,
+    "parts": 1
+  },
+  "parts": [
+    {
+      "name": "rhdshdsh-be4a2d.zip",
+      "type": "tracks",
+      "size": 8024,
+      "trackCount": 5
+    }
+  ],
+  "warnings": []
+}

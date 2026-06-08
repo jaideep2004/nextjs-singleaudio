@@ -43,6 +43,67 @@ const getSignupEnabled = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMaintenanceMode = catchAsync(async (_req: Request, res: Response) => {
+  const setting = await SettingsModel.findOne({ key: 'maintenanceMode' });
+  const enabled = setting ? setting.value === true : false;
+
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: {
+      key: 'maintenanceMode',
+      value: enabled,
+      description: 'Whether user dashboard maintenance mode is enabled',
+    },
+  });
+});
+
+const getUploadLimit = catchAsync(async (_req: Request, res: Response) => {
+  const setting = await SettingsModel.findOne({ key: 'maxUploadSize' });
+  const value = Number(setting?.value || 100);
+  const maxUploadSize = Math.min(200, Math.max(1, Number.isFinite(value) ? value : 100));
+
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: {
+      key: 'maxUploadSize',
+      value: maxUploadSize,
+      description: 'Maximum user audio upload size in MB',
+    },
+  });
+});
+
+const normalizeSettingValue = (key: string, value: unknown) => {
+  if (['signupEnabled', 'maintenanceMode', 'enableEmailNotifications'].includes(key)) {
+    return value === true;
+  }
+
+  if (key === 'maxUploadSize') {
+    const size = Number(value);
+    if (!Number.isFinite(size) || size < 1 || size > 200) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Maximum upload size must be between 1 and 200 MB');
+    }
+    return size;
+  }
+
+  if (key === 'currency') {
+    const currency = String(value || '').toUpperCase();
+    if (!['USD', 'INR'].includes(currency)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Currency must be USD or INR');
+    }
+    return currency;
+  }
+
+  if (key === 'paymentGateway') {
+    const gateway = String(value || '').toLowerCase();
+    if (!['paypal', 'bank_transfer'].includes(gateway)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Payment gateway must be PayPal or bank transfer');
+    }
+    return gateway;
+  }
+
+  return value;
+};
+
 const updateSetting = catchAsync(async (req: Request, res: Response) => {
   const { key } = req.params;
   const { value, description } = req.body;
@@ -51,9 +112,11 @@ const updateSetting = catchAsync(async (req: Request, res: Response) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Value is required');
   }
   
+  const normalizedValue = normalizeSettingValue(key, value);
+
   const setting = await SettingsModel.findOneAndUpdate(
     { key },
-    { value, description },
+    { value: normalizedValue, description },
     { new: true, upsert: true, setDefaultsOnInsert: true }
   );
   
@@ -71,7 +134,11 @@ const initializeDefaultSettings = async () => {
       value: true, 
       description: 'Whether new user signups are enabled' 
     },
-    // Add more default settings here as needed
+    { key: 'maintenanceMode', value: false, description: 'Whether user dashboard maintenance mode is enabled' },
+    { key: 'maxUploadSize', value: 100, description: 'Maximum user audio upload size in MB' },
+    { key: 'currency', value: 'USD', description: 'Default payout currency' },
+    { key: 'paymentGateway', value: 'paypal', description: 'Default payout method gateway' },
+    { key: 'enableEmailNotifications', value: true, description: 'Whether email notifications are enabled' },
   ];
 
   for (const setting of defaultSettings) {
@@ -87,6 +154,8 @@ export default {
   getSettings,
   getSetting,
   getSignupEnabled,
+  getMaintenanceMode,
+  getUploadLimit,
   updateSetting,
   initializeDefaultSettings,
 };

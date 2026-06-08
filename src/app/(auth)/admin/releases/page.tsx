@@ -83,7 +83,6 @@ export default function AdminReleasesPage() {
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [storeFilter, setStoreFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const { mode } = useColorMode();
@@ -172,18 +171,10 @@ export default function AdminReleasesPage() {
     }
   }, [releases, tabValue]);
 
-  const storeOptions = useMemo(() => {
-    const values = new Set<string>();
-    releases.forEach((release) => {
-      (Array.isArray(release.stores) ? release.stores : []).forEach((store: string) => values.add(store));
-    });
-    return Array.from(values).sort((a, b) => getDspDisplayName(a).localeCompare(getDspDisplayName(b)));
-  }, [releases]);
-
   const releaseTypeOptions = useMemo(() => {
-    const values = new Set<string>();
+    const values = new Set<string>(['single', 'ep', 'album']);
     releases.forEach((release) => {
-      if (release.releaseType || release.type) values.add(String(release.releaseType || release.type));
+      if (release.releaseType || release.type) values.add(String(release.releaseType || release.type).toLowerCase());
     });
     return Array.from(values).sort();
   }, [releases]);
@@ -198,14 +189,15 @@ export default function AdminReleasesPage() {
         release.artist,
         release.label,
         release.upc,
+        release.ownerName,
+        release.ownerArtistName,
+        release.ownerEmail,
       ].filter(Boolean).join(' ').toLowerCase();
       const matchesSearch = !query || haystack.includes(query);
-      const matchesType = typeFilter === 'all' || String(release.releaseType || release.type || '') === typeFilter;
-      const stores = Array.isArray(release.stores) ? release.stores : [];
-      const matchesStore = storeFilter === 'all' || stores.includes(storeFilter);
-      return matchesSearch && matchesType && matchesStore;
+      const matchesType = typeFilter === 'all' || String(release.releaseType || release.type || '').toLowerCase() === typeFilter;
+      return matchesSearch && matchesType;
     });
-  }, [searchTerm, statusFilteredReleases, storeFilter, typeFilter]);
+  }, [searchTerm, statusFilteredReleases, typeFilter]);
 
   const paginatedReleases = useMemo(
     () => filteredReleases.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
@@ -400,22 +392,6 @@ export default function AdminReleasesPage() {
               <MenuItem key={type} value={type}>{type}</MenuItem>
             ))}
           </TextField>
-          <TextField
-            select
-            label="DSP"
-            value={storeFilter}
-            onChange={(event) => {
-              setStoreFilter(event.target.value);
-              resetPage();
-            }}
-            size="small"
-            sx={{ minWidth: { xs: '100%', md: 190 } }}
-          >
-            <MenuItem value="all">All stores</MenuItem>
-            {storeOptions.map((store) => (
-              <MenuItem key={store} value={store}>{getDspDisplayName(store)}</MenuItem>
-            ))}
-          </TextField>
         </Stack>
 
         <TabPanel value={tabValue} index={0}>
@@ -483,10 +459,11 @@ export default function AdminReleasesPage() {
             bgcolor: mode === 'dark' ? 'rgba(11,16,32,0.32)' : 'rgba(255,255,255,0.72)',
           }}
         >
-          <Table size="small" sx={{ minWidth: 960 }}>
+          <Table size="small" sx={{ minWidth: 1060 }}>
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Release</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Artist</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Label</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
@@ -534,6 +511,14 @@ export default function AdminReleasesPage() {
                         </Typography>
                       </Box>
                     </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={700}>
+                      {release.ownerName || release.ownerArtistName || 'Unknown user'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {release.ownerEmail || 'No email'}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">

@@ -39,7 +39,13 @@ export default function AdminHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
-  const { notifications, unreadCount, loading: notificationsLoading, markAsRead, markAllAsRead } = useNotifications();
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
   const { mode, toggleColorMode } = useColorMode();
   const { user } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -79,7 +85,12 @@ export default function AdminHeader() {
     if (!value) return '';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    }).format(date);
   };
 
   const handleNotificationClick = async (id: string) => {
@@ -96,9 +107,9 @@ export default function AdminHeader() {
   const getBreadcrumb = () => {
     const parts = pathname.split('/').filter(Boolean);
     if (parts.length <= 1) return null;
-    const breadcrumb = parts.slice(1).map((part) =>
-      part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, ' ')
-    );
+    const breadcrumb = parts
+      .slice(1)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, ' '));
     return breadcrumb.join(' / ');
   };
 
@@ -114,7 +125,9 @@ export default function AdminHeader() {
         borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
       }}
     >
-      <Toolbar sx={{ justifyContent: 'space-between', px: { xs: 2, sm: 3 }, minHeight: '60px !important' }}>
+      <Toolbar
+        sx={{ justifyContent: 'space-between', px: { xs: 2, sm: 3 }, minHeight: '60px !important' }}
+      >
         {/* Left: Breadcrumb */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           {getBreadcrumb() && (
@@ -205,31 +218,54 @@ export default function AdminHeader() {
                 border: '1px solid',
                 borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
                 bgcolor: isDark ? '#111827' : '#ffffff',
-                boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.4)' : '0 12px 40px rgba(15,23,42,0.1)',
+                boxShadow: isDark
+                  ? '0 12px 40px rgba(0,0,0,0.4)'
+                  : '0 12px 40px rgba(15,23,42,0.1)',
               },
             }}
             transformOrigin={{ horizontal: 'right', vertical: 'top' }}
             anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
           >
-            <Box sx={{ px: 2.5, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
-              <Typography variant="subtitle2" fontWeight={700}>Notifications</Typography>
+            <Box
+              sx={{
+                px: 2.5,
+                py: 1.5,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={700}>
+                Notifications
+              </Typography>
               {unreadCount > 0 && (
-                <Button size="small" onClick={() => markAllAsRead()} sx={{ minWidth: 0, fontSize: '0.72rem', fontWeight: 700 }}>
+                <Button
+                  size="small"
+                  onClick={() => markAllAsRead()}
+                  sx={{ minWidth: 0, fontSize: '0.72rem', fontWeight: 700 }}
+                >
                   Mark All Read
                 </Button>
               )}
             </Box>
-            <Divider sx={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />
+            <Divider
+              sx={{ borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }}
+            />
             {notificationsLoading ? (
               <Box sx={{ px: 2.5, py: 2 }}>
-                <Typography variant="body2" color="text.secondary">Loading notifications…</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Loading notifications…
+                </Typography>
               </Box>
             ) : notifications.length === 0 ? (
               <Box sx={{ px: 2.5, py: 3 }}>
-                <Typography variant="body2" color="text.secondary">No notifications yet.</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No notifications yet.
+                </Typography>
               </Box>
             ) : (
-              notifications.slice(0, 8).map((notification) => {
+              notifications.slice(0, 8).map(notification => {
                 const isUnread = !(notification.read ?? notification.isRead);
                 return (
                   <MenuItem
@@ -239,14 +275,22 @@ export default function AdminHeader() {
                       px: 2.5,
                       py: 1.5,
                       alignItems: 'flex-start',
-                      bgcolor: isUnread ? (isDark ? 'rgba(74,108,247,0.1)' : 'rgba(74,108,247,0.06)') : 'transparent',
+                      bgcolor: isUnread
+                        ? isDark
+                          ? 'rgba(74,108,247,0.1)'
+                          : 'rgba(74,108,247,0.06)'
+                        : 'transparent',
                     }}
                   >
                     <Box sx={{ minWidth: 0 }}>
                       <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
                         {getNotificationTitle(notification.type)}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'normal' }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', whiteSpace: 'normal' }}
+                      >
                         {notification.message}
                       </Typography>
                       <Typography variant="caption" color="text.disabled">
@@ -293,10 +337,13 @@ export default function AdminHeader() {
               sx={{
                 width: 30,
                 height: 30,
-                bgcolor: isDark ? '#7f1d1d' : '#fecaca',
+                bgcolor: isDark ? '#ffffff' : '#ffffff',
                 fontSize: '0.8rem',
                 fontWeight: 700,
-                color: isDark ? '#fca5a5' : '#dc2626',
+                color: isDark ? '#ffffff' : '#ffffff',
+                '& img': {
+                  objectFit: 'contain',
+                },
               }}
             >
               A
@@ -330,9 +377,7 @@ export default function AdminHeader() {
             border: '1px solid',
             borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
             bgcolor: isDark ? '#111827' : '#ffffff',
-            boxShadow: isDark
-              ? '0 8px 24px rgba(0,0,0,0.3)'
-              : '0 8px 24px rgba(15,23,42,0.08)',
+            boxShadow: isDark ? '0 8px 24px rgba(0,0,0,0.3)' : '0 8px 24px rgba(15,23,42,0.08)',
             minWidth: 180,
           },
         }}
@@ -348,12 +393,12 @@ export default function AdminHeader() {
               width: '100%',
               justifyContent: 'flex-start',
               bgcolor: isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.06)',
-              color: isDark ? '#fca5a5' : '#dc2626',
+              color: isDark ? '#ffffff' : '#ffffff',
               border: '1px solid',
               borderColor: isDark ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.14)',
               fontWeight: 700,
               '& .MuiChip-icon': {
-                color: isDark ? '#fca5a5' : '#dc2626',
+                color: isDark ? '#ffffff' : '#ffffff',
               },
             }}
           />

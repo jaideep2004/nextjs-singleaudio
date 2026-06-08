@@ -1,4 +1,4 @@
-import { DspConnector, DspConnectorContext, DspDeliveryResult, DspTrackPayload } from '../../../types/dsp';
+import { DspConnector, DspConnectorContext, DspDeliveryPayload, DspDeliveryResult } from '../../../types/dsp';
 
 export abstract class BaseDspConnector implements DspConnector {
   abstract key: string;
@@ -10,16 +10,22 @@ export abstract class BaseDspConnector implements DspConnector {
     return hasApiKey ? { valid: true } : { valid: false, error: 'Missing apiKey/clientId' };
   }
 
-  async validateTrack(payload: DspTrackPayload): Promise<{ valid: boolean; errors: string[] }> {
+  async validateTrack(payload: DspDeliveryPayload): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
-    if (!payload.title) errors.push('Missing track title');
-    if (!payload.artistName) errors.push('Missing artist name');
-    if (!payload.audioFile) errors.push('Missing audio file');
-    if (!payload.artwork) errors.push('Missing artwork');
+    if ('releaseId' in payload) {
+      if (!payload.releaseTitle) errors.push('Missing release title');
+      if (!Array.isArray(payload.tracks) || payload.tracks.length === 0) errors.push('Missing release tracks');
+      if (!Array.isArray(payload.stores) || payload.stores.length === 0) errors.push('Missing release stores');
+    } else {
+      if (!payload.title) errors.push('Missing track title');
+      if (!payload.artistName) errors.push('Missing artist name');
+      if (!payload.audioFile) errors.push('Missing audio file');
+      if (!payload.artwork) errors.push('Missing artwork');
+    }
     return { valid: errors.length === 0, errors };
   }
 
-  async deliver(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
+  async deliver(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
     const validation = await this.validateTrack(payload);
     if (!validation.valid) {
       return { state: 'failed', message: validation.errors.join(', ') };

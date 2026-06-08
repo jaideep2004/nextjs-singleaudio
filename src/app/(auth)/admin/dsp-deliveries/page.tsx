@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
   Button,
   Chip,
+  Collapse,
   CircularProgress,
+  Divider,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Paper,
@@ -21,11 +24,15 @@ import {
   TextField,
   Typography,
   Link,
+  Tooltip,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ConstructionIcon from '@mui/icons-material/Construction';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
 import { adminAPI } from '@/services/api';
@@ -40,6 +47,8 @@ type Provider = {
   maintenanceMode?: boolean;
   integrationMode?: 'shell' | 'sandbox' | 'live';
   readiness?: string;
+  configuredCredentialKeys?: string[];
+  missingCredentialKeys?: string[];
   readinessReport?: {
     state: string;
     missing: string[];
@@ -65,6 +74,23 @@ type DeliveryJob = {
   deadLettered: boolean;
   errorMessage?: string;
   createdAt: string;
+  externalId?: string;
+  lockedBy?: string;
+  lockExpiresAt?: string;
+  attempts?: Array<{
+    attemptNo: number;
+    status: string;
+    responseCode?: string;
+    errorMessage?: string;
+    retryable: boolean;
+    createdAt: string;
+  }>;
+  events?: Array<{
+    state: string;
+    message: string;
+    source: string;
+    createdAt: string;
+  }>;
   metadata?: {
     releaseTitle?: string;
     payloadHash?: string;
@@ -87,6 +113,8 @@ export default function AdminDspDeliveriesPage() {
   const [providerKey, setProviderKey] = useState('');
   const [dispatching, setDispatching] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
+  const [processingDue, setProcessingDue] = useState(false);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
   const readyProviders = useMemo(
@@ -176,6 +204,20 @@ export default function AdminDspDeliveriesPage() {
     }
   };
 
+  const handleProcessDue = async () => {
+    try {
+      setProcessingDue(true);
+      const response = await adminAPI.processDueDspDeliveries({ maxJobs: 10 });
+      const processed = response?.data?.processed?.length || 0;
+      toast.success(`Processed ${processed} delivery job${processed === 1 ? '' : 's'}`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Worker run failed');
+    } finally {
+      setProcessingDue(false);
+    }
+  };
+
   if (isAdmin === null) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight={420}>
@@ -198,6 +240,9 @@ export default function AdminDspDeliveriesPage() {
           <Stack direction="row" spacing={1}>
             <Button startIcon={<ConstructionIcon />} variant="outlined" onClick={handleBootstrapPhase1} disabled={bootstrapping}>
               {bootstrapping ? 'Bootstrapping…' : 'Bootstrap Phase 1'}
+            </Button>
+            <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={handleProcessDue} disabled={processingDue}>
+              {processingDue ? 'Processing…' : 'Run Worker'}
             </Button>
             <Button startIcon={<RefreshIcon />} variant="outlined" onClick={load}>
               Refresh
@@ -242,6 +287,7 @@ export default function AdminDspDeliveriesPage() {
               <TableCell>Readiness</TableCell>
               <TableCell>Payload</TableCell>
               <TableCell>Docs</TableCell>
+              <TableCell>Credentials</TableCell>
               <TableCell>Missing</TableCell>
             </TableRow>
           </TableHead>
@@ -281,16 +327,25 @@ export default function AdminDspDeliveriesPage() {
                     provider.requirement?.docsStatus || '-'
                   )}
                 </TableCell>
+                <TableCell sx={{ maxWidth: 240 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    {provider.configuredCredentialKeys?.length ? provider.configuredCredentialKeys.join(', ') : '-'}
+                  </Typography>
+                </TableCell>
                 <TableCell sx={{ maxWidth: 360 }}>
                   <Typography variant="caption" color="text.secondary">
-                    {provider.readinessReport?.missing?.length ? provider.readinessReport.missing.join(', ') : '-'}
+                    {provider.missingCredentialKeys?.length
+                      ? provider.missingCredentialKeys.join(', ')
+                      : provider.readinessReport?.missing?.length
+                        ? provider.readinessReport.missing.join(', ')
+                        : '-'}
                   </Typography>
                 </TableCell>
               </TableRow>
             ))}
             {providers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   No providers bootstrapped.
                 </TableCell>
               </TableRow>
@@ -389,6 +444,7 @@ export default function AdminDspDeliveriesPage() {
           <Table size="small">
             <TableHead>
               <TableRow>
+                <TableCell width={44} />
                 <TableCell>Track</TableCell>
                 <TableCell>Provider</TableCell>
                 <TableCell>Operation</TableCell>
@@ -401,60 +457,135 @@ export default function AdminDspDeliveriesPage() {
             </TableHead>
             <TableBody>
               {jobs.map((job) => (
-                <TableRow key={job._id}>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight={600}>
-                      {job.targetType === 'release'
-                        ? job.metadata?.releaseTitle || 'Release delivery'
-                        : job.trackId?.title || 'Unknown track'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {job.targetType === 'release'
-                        ? `${job.metadata?.deliverySnapshot?.trackCount || 0} tracks${job.metadata?.deliverySnapshot?.upc ? ` | UPC ${job.metadata.deliverySnapshot.upc}` : ''}`
-                        : `${job.trackId?.artistName || 'Unknown artist'} ${job.trackId?.isrc ? `| ${job.trackId.isrc}` : ''}`}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <DspLogo
-                        value={job.providerKey}
-                        alt={providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
-                        size={26}
-                        padding={0.25}
-                      />
+                <Fragment key={job._id}>
+                  <TableRow>
+                    <TableCell>
+                      <Tooltip title={expandedJobId === job._id ? 'Collapse job details' : 'Expand job details'}>
+                        <IconButton
+                          size="small"
+                          onClick={() => setExpandedJobId(expandedJobId === job._id ? null : job._id)}
+                          aria-label={`${expandedJobId === job._id ? 'Collapse' : 'Expand'} delivery job ${job._id}`}
+                        >
+                          {expandedJobId === job._id ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="body2" fontWeight={600}>
-                        {providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
+                        {job.targetType === 'release'
+                          ? job.metadata?.releaseTitle || 'Release delivery'
+                          : job.trackId?.title || 'Unknown track'}
                       </Typography>
-                    </Stack>
-                  </TableCell>
-                  <TableCell>{job.operation}</TableCell>
-                  <TableCell>
-                    <Chip label={job.state} color={job.state === 'delivered' ? 'success' : job.state === 'failed' ? 'error' : 'default'} size="small" />
-                  </TableCell>
-                  <TableCell>{job.retryCount}</TableCell>
-                  <TableCell sx={{ maxWidth: 240 }}>
-                    <Typography variant="caption" color={job.errorMessage ? 'error.main' : 'text.secondary'}>
-                      {job.errorMessage || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{new Date(job.createdAt).toLocaleString()}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      disabled={!['failed', 'needs_attention'].includes(job.state)}
-                      onClick={() => handleRetry(job._id)}
-                      startIcon={<ReplayIcon />}
-                      aria-label={`Retry delivery job ${job._id}`}
-                    >
-                      Retry
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                      <Typography variant="caption" color="text.secondary">
+                        {job.targetType === 'release'
+                          ? `${job.metadata?.deliverySnapshot?.trackCount || 0} tracks${job.metadata?.deliverySnapshot?.upc ? ` | UPC ${job.metadata.deliverySnapshot.upc}` : ''}`
+                          : `${job.trackId?.artistName || 'Unknown artist'} ${job.trackId?.isrc ? `| ${job.trackId.isrc}` : ''}`}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <DspLogo
+                          value={job.providerKey}
+                          alt={providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
+                          size={26}
+                          padding={0.25}
+                        />
+                        <Typography variant="body2" fontWeight={600}>
+                          {providerMap.get(job.providerKey) || getDspDisplayName(job.providerKey)}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{job.operation}</TableCell>
+                    <TableCell>
+                      <Chip label={job.state} color={job.state === 'delivered' ? 'success' : job.state === 'failed' ? 'error' : 'default'} size="small" />
+                    </TableCell>
+                    <TableCell>{job.retryCount}</TableCell>
+                    <TableCell sx={{ maxWidth: 240 }}>
+                      <Typography variant="caption" color={job.errorMessage ? 'error.main' : 'text.secondary'}>
+                        {job.errorMessage || '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{new Date(job.createdAt).toLocaleString()}</TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={!['failed', 'needs_attention'].includes(job.state)}
+                        onClick={() => handleRetry(job._id)}
+                        startIcon={<ReplayIcon />}
+                        aria-label={`Retry delivery job ${job._id}`}
+                      >
+                        Retry
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={9} sx={{ p: 0, borderBottom: expandedJobId === job._id ? undefined : 0 }}>
+                      <Collapse in={expandedJobId === job._id} timeout="auto" unmountOnExit>
+                        <Box sx={{ px: 3, py: 2, bgcolor: 'action.hover' }}>
+                          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} mb={2}>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">External ID</Typography>
+                              <Typography variant="body2">{job.externalId || '-'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">Worker</Typography>
+                              <Typography variant="body2">{job.lockedBy || '-'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">Lock Expires</Typography>
+                              <Typography variant="body2">{job.lockExpiresAt ? new Date(job.lockExpiresAt).toLocaleString() : '-'}</Typography>
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography variant="overline" color="text.secondary">Payload Hash</Typography>
+                              <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{job.metadata?.payloadHash || '-'}</Typography>
+                            </Box>
+                          </Stack>
+                          <Divider sx={{ mb: 2 }} />
+                          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+                            <Box flex={1} minWidth={0}>
+                              <Typography variant="subtitle2" fontWeight={800} mb={1}>Attempts</Typography>
+                              <Stack spacing={1}>
+                                {(job.attempts || []).slice(-4).map((attempt) => (
+                                  <Stack key={`${job._id}-attempt-${attempt.attemptNo}`} direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                    <Chip size="small" label={`#${attempt.attemptNo}`} variant="outlined" />
+                                    <Chip size="small" label={attempt.status} color={attempt.status === 'success' ? 'success' : 'error'} />
+                                    <Typography variant="caption" color="text.secondary">
+                                      {attempt.responseCode || attempt.errorMessage || '-'}
+                                    </Typography>
+                                  </Stack>
+                                ))}
+                                {(!job.attempts || job.attempts.length === 0) && (
+                                  <Typography variant="caption" color="text.secondary">No attempts yet.</Typography>
+                                )}
+                              </Stack>
+                            </Box>
+                            <Box flex={1.4} minWidth={0}>
+                              <Typography variant="subtitle2" fontWeight={800} mb={1}>Events</Typography>
+                              <Stack spacing={1}>
+                                {(job.events || []).slice(-5).map((event, index) => (
+                                  <Box key={`${job._id}-event-${index}`}>
+                                    <Typography variant="caption" color="text.secondary">
+                                      {new Date(event.createdAt).toLocaleString()} | {event.source} | {event.state}
+                                    </Typography>
+                                    <Typography variant="body2">{event.message}</Typography>
+                                  </Box>
+                                ))}
+                                {(!job.events || job.events.length === 0) && (
+                                  <Typography variant="caption" color="text.secondary">No events yet.</Typography>
+                                )}
+                              </Stack>
+                            </Box>
+                          </Stack>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </Fragment>
               ))}
               {jobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={9} align="center">
                     No delivery jobs yet.
                   </TableCell>
                 </TableRow>

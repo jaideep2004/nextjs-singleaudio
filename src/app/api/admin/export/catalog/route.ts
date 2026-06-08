@@ -3,6 +3,8 @@ import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { enforceMongoRateLimit, RateLimitError } from '@/lib/mongoRateLimit';
 import {
+  type CatalogExportScope,
+  type CatalogExportStatus,
   createCatalogExportJob,
   listCatalogExportJobs,
 } from '@/lib/adminCatalogExport';
@@ -34,6 +36,7 @@ function serializeJob(job: unknown) {
   return {
     _id: String(row._id || ''),
     scope: row.scope,
+    criteria: row.criteria,
     state: row.state,
     counts: row.counts,
     parts,
@@ -82,6 +85,23 @@ export async function POST(req: NextRequest) {
     if (response) return response;
 
     const { db } = await connectToDatabase();
+    const body = await req.json().catch(() => ({}));
+    const scope = ['release', 'user', 'status'].includes(body?.scope) ? body.scope as CatalogExportScope : 'status';
+    const statuses = Array.isArray(body?.statuses)
+      ? body.statuses.filter((status: string): status is CatalogExportStatus => ['approved', 'pending', 'rejected'].includes(status))
+      : ['approved'];
+    const releaseIds = Array.isArray(body?.releaseIds)
+      ? body.releaseIds.map((id: unknown) => String(id)).filter(Boolean)
+      : [];
+    const userId = body?.userId ? String(body.userId) : undefined;
+
+    if (scope === 'release' && releaseIds.length === 0) {
+      return NextResponse.json({ success: false, error: 'At least one release is required' }, { status: 400 });
+    }
+    if (scope === 'user' && !userId) {
+      return NextResponse.json({ success: false, error: 'User is required for user-wise export' }, { status: 400 });
+    }
+
     await enforceMongoRateLimit(db, {
       key: `POST:/api/admin/export/catalog:${user._id || getClientKey(req)}`,
       limit: 5,
@@ -91,6 +111,14 @@ export async function POST(req: NextRequest) {
     const job = await createCatalogExportJob(db, {
       _id: String(user._id),
       email: user.email,
+    }, {
+      scope,
+      criteria: {
+        releaseIds,
+        userId,
+        statuses,
+        zipGrouping: 'per_release',
+      },
     });
 
     return NextResponse.json(

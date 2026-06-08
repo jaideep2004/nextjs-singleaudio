@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
 import { BaseDspConnector } from './baseConnector';
-import { DspCapability, DspConnectorContext, DspDeliveryResult, DspTrackPayload } from '../../../types/dsp';
+import { DspCapability, DspConnectorContext, DspDeliveryPayload, DspDeliveryResult } from '../../../types/dsp';
 
 type ApiConnectorConfig = {
   key: string;
@@ -35,7 +35,7 @@ export class ApiConnector extends BaseDspConnector {
     return { valid: true };
   }
 
-  async deliver(payload: DspTrackPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
+  async deliver(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
     const validated = await this.validateTrack(payload);
     if (!validated.valid) {
       return { state: 'failed', message: validated.errors.join(', ') };
@@ -43,16 +43,16 @@ export class ApiConnector extends BaseDspConnector {
 
     const integrationMode = String(context.config?.integrationMode || 'shell');
     const baseUrl = typeof context.config?.baseUrl === 'string' ? context.config.baseUrl.trim() : '';
-    if (integrationMode !== 'live' || !baseUrl) {
+    if (integrationMode === 'shell' || !baseUrl) {
       return {
         state: 'needs_attention',
-        message: `${this.displayName} connector is ready for partner API details. Set config.integrationMode=live and config.baseUrl after access is approved.`,
+        message: `${this.displayName} connector is ready for partner API details. Set config.integrationMode=sandbox/live and config.baseUrl after access is approved.`,
         metadata: {
           adapter: 'apiConnector',
-          mode: 'shell',
+          mode: integrationMode,
           deliveryPath: this.deliveryPath,
           requiredCredentialKeys: this.requiredCredentialKeys,
-          ddexProfile: payload.ddexProfile || 'ERN-4',
+          ddexProfile: 'ddexProfile' in payload ? payload.ddexProfile || 'ERN-4' : 'ERN-4',
         },
       };
     }
@@ -81,7 +81,7 @@ export class ApiConnector extends BaseDspConnector {
       metadata: {
         endpoint: `${baseUrl}${this.deliveryPath}`,
         adapter: 'apiConnector',
-        ddexProfile: payload.ddexProfile || 'ERN-4',
+        ddexProfile: 'ddexProfile' in payload ? payload.ddexProfile || 'ERN-4' : 'ERN-4',
         httpStatus: response.status,
         responseBody,
       },

@@ -12,6 +12,7 @@ export interface IDspProvider extends Document {
   integrationMode: DspIntegrationMode;
   readiness: DspReadinessState;
   credentials: Record<string, unknown>;
+  credentialEnvelopeVersion?: string;
   config: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -68,6 +69,10 @@ const DspProviderSchema = new Schema<IDspProvider>(
     credentials: {
       type: Schema.Types.Mixed,
       default: {},
+      select: false,
+    },
+    credentialEnvelopeVersion: {
+      type: String,
       select: false,
     },
     config: {
