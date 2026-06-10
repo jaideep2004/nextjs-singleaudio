@@ -1184,13 +1184,43 @@ export default function UploadPage() {
   const { user } = auth || { user: null };
 
   // File validation for tracks
+  const formatFileSizeMb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+
   const validateTrackFile = (file: File | null) => {
     if (!file) return 'No file selected';
     if (!['audio/mpeg', 'audio/wav', 'audio/flac'].includes(file.type))
       return 'Invalid audio format (mp3, wav, flac only)';
     if (file.size > maxUploadSizeMb * 1024 * 1024)
-      return `File size must be <= ${maxUploadSizeMb}MB`;
+      return `${file.name} is ${formatFileSizeMb(file.size)}. Admin upload limit is ${maxUploadSizeMb}MB.`;
     return '';
+  };
+
+  const getValidTrackFiles = (fileList: FileList, maxCount: number) => {
+    const accepted: File[] = [];
+    const rejectedMessages: string[] = [];
+
+    Array.from(fileList).forEach(file => {
+      const error = validateTrackFile(file);
+      if (error) {
+        rejectedMessages.push(error);
+        return;
+      }
+      accepted.push(file);
+    });
+
+    if (rejectedMessages.length) {
+      toast.error(
+        rejectedMessages.length === 1
+          ? rejectedMessages[0]
+          : `${rejectedMessages.length} tracks skipped. ${rejectedMessages[0]}`
+      );
+    }
+
+    if (accepted.length > maxCount) {
+      toast.info(`Only ${maxCount} track${maxCount === 1 ? '' : 's'} allowed for this release type.`);
+    }
+
+    return accepted.slice(0, maxCount);
   };
 
   const handleAppendTracksClick = () => {
@@ -1315,9 +1345,7 @@ export default function UploadPage() {
     const room = max - tracks.length;
     if (room <= 0) return;
 
-    const incoming = Array.from(fileList)
-      .filter(f => validateTrackFile(f) === '')
-      .slice(0, room);
+    const incoming = getValidTrackFiles(fileList, room);
 
     if (!incoming.length) return;
 
@@ -1523,9 +1551,7 @@ export default function UploadPage() {
   const handleMultiTrackFiles = async (fileList: FileList) => {
     const selectedType = releaseTypes.find(t => t.value === releaseType);
     const max = selectedType?.maxTracks ?? 50;
-    const files = Array.from(fileList)
-      .filter(f => validateTrackFile(f) === '')
-      .slice(0, max);
+    const files = getValidTrackFiles(fileList, max);
 
     if (!files.length) return;
 

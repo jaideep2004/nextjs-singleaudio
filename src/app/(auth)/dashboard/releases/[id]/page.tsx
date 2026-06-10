@@ -595,7 +595,7 @@ function ReleaseDetail() {
               borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.07)',
             }}
           >
-            {['Track', 'Genre', 'Release', 'ACR status', 'State'].map((heading) => (
+            {['Track', 'Genre', 'Release', 'ACR status', 'Status'].map((heading) => (
               <Typography key={heading} sx={{ fontSize: '0.68rem', fontWeight: 900, color: isDark ? 'rgba(255,255,255,0.36)' : 'rgba(15,23,42,0.4)', textTransform: 'uppercase' }}>
                 {heading}
               </Typography>
