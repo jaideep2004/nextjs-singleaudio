@@ -4,6 +4,7 @@ import {
   Avatar,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Container,
@@ -22,6 +23,7 @@ import {
   CardContent,
   IconButton,
   Tooltip,
+  FormControlLabel,
 } from "@mui/material";
 import {
   Album,
@@ -97,6 +99,15 @@ export default function AdminReleaseDetailPage() {
   const [trackDeleteReason, setTrackDeleteReason] = useState("");
   const [deletingTrack, setDeletingTrack] = useState(false);
   const [showAllTerritories, setShowAllTerritories] = useState(false);
+  const [takedownTarget, setTakedownTarget] = useState<{
+    target: 'release' | 'track';
+    nextStatus: string;
+    trackIndex?: number;
+    title: string;
+    providers: string[];
+  } | null>(null);
+  const [selectedTakedownProviders, setSelectedTakedownProviders] = useState<string[]>([]);
+  const [takedownNote, setTakedownNote] = useState('');
 
   const mergeTrackAcrCloudStatus = (tracks: any[], fileId: string, acrCloud: any) =>
     tracks.map((track: any) =>
@@ -238,7 +249,24 @@ export default function AdminReleaseDetailPage() {
     return { status: 'takedown_requested', label: 'Takedown' };
   };
 
-  const handleLifecycleAction = async (target: 'release' | 'track', nextStatus: string, trackIndex?: number) => {
+  const getTakedownProviders = (track?: any) => {
+    const raw = Array.isArray(track?.stores) && track.stores.length ? track.stores : release?.stores;
+    return Array.from(new Set((Array.isArray(raw) ? raw : []).map((item: unknown) => String(item)).filter(Boolean)));
+  };
+
+  const openTakedownDialog = (target: 'release' | 'track', nextStatus: string, title: string, trackIndex?: number, track?: any) => {
+    const providers = getTakedownProviders(track);
+    setTakedownTarget({ target, nextStatus, trackIndex, title, providers });
+    setSelectedTakedownProviders(providers);
+    setTakedownNote('');
+  };
+
+  const handleLifecycleAction = async (
+    target: 'release' | 'track',
+    nextStatus: string,
+    trackIndex?: number,
+    options: { dspProviders?: string[]; note?: string } = {}
+  ) => {
     const savingKey = target === 'release' ? 'release' : `track:${trackIndex}`;
     try {
       setLifecycleSaving(savingKey);
@@ -249,6 +277,8 @@ export default function AdminReleaseDetailPage() {
         body: JSON.stringify({
           status: nextStatus,
           trackIndex: target === 'track' ? trackIndex : undefined,
+          dspProviders: options.dspProviders || [],
+          note: options.note || '',
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -260,6 +290,7 @@ export default function AdminReleaseDetailPage() {
       setError(e?.message || 'Failed to update DSP lifecycle status');
     } finally {
       setLifecycleSaving('');
+      setTakedownTarget(null);
     }
   };
 
@@ -333,6 +364,19 @@ export default function AdminReleaseDetailPage() {
         setCurrentlyPlaying(null);
       };
     }
+  };
+
+  const handleConfirmTakedown = () => {
+    if (!takedownTarget) return;
+    void handleLifecycleAction(
+      takedownTarget.target,
+      takedownTarget.nextStatus,
+      takedownTarget.trackIndex,
+      {
+        dspProviders: selectedTakedownProviders,
+        note: takedownNote,
+      }
+    );
   };
 
   const InfoRow = ({ label, value }: { label: string; value: any }) => (
@@ -722,7 +766,11 @@ export default function AdminReleaseDetailPage() {
                           variant="outlined"
                           color={next.status === 'takedown_requested' || next.status === 'taken_down' ? 'error' : 'success'}
                           startIcon={next.status === 'redelivery_requested' || next.status === 'redelivered' ? <Replay fontSize="small" /> : <PlaylistAddCheck fontSize="small" />}
-                          onClick={() => handleLifecycleAction('track', next.status, index)}
+                          onClick={() =>
+                            next.status === 'takedown_requested'
+                              ? openTakedownDialog('track', next.status, title, index, track)
+                              : handleLifecycleAction('track', next.status, index)
+                          }
                           disabled={Boolean(lifecycleSaving)}
                           sx={{ minHeight: 32, fontWeight: 800 }}
                         >
@@ -988,7 +1036,11 @@ export default function AdminReleaseDetailPage() {
                     variant="outlined"
                     color={next.status === 'takedown_requested' || next.status === 'taken_down' ? 'error' : 'success'}
                     startIcon={next.status === 'redelivery_requested' || next.status === 'redelivered' ? <Replay /> : <PlaylistAddCheck />}
-                    onClick={() => handleLifecycleAction('release', next.status)}
+                    onClick={() =>
+                      next.status === 'takedown_requested'
+                        ? openTakedownDialog('release', next.status, release.releaseTitle || 'this release')
+                        : handleLifecycleAction('release', next.status)
+                    }
                     disabled={Boolean(lifecycleSaving)}
                     sx={{ minWidth: 170 }}
                   >
@@ -1147,6 +1199,85 @@ export default function AdminReleaseDetailPage() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Takedown Dialog */}
+      <Dialog open={!!takedownTarget} onClose={() => !lifecycleSaving && setTakedownTarget(null)} maxWidth="sm" fullWidth>
+        <DialogTitle>Confirm DSP Takedown</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            This will request takedown for {takedownTarget?.title || 'this item'} from the selected DSP providers. This is a destructive distribution action and should be used only when rights or delivery review requires it.
+          </DialogContentText>
+          {takedownTarget?.providers.length ? (
+            <Stack spacing={1.25}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={selectedTakedownProviders.length === takedownTarget.providers.length}
+                    indeterminate={selectedTakedownProviders.length > 0 && selectedTakedownProviders.length < takedownTarget.providers.length}
+                    onChange={(event) => {
+                      setSelectedTakedownProviders(event.target.checked ? takedownTarget.providers : []);
+                    }}
+                  />
+                }
+                label="Select all providers"
+              />
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 0.75 }}>
+                {takedownTarget.providers.map((provider) => (
+                  <FormControlLabel
+                    key={provider}
+                    control={
+                      <Checkbox
+                        checked={selectedTakedownProviders.includes(provider)}
+                        onChange={(event) => {
+                          setSelectedTakedownProviders((current) =>
+                            event.target.checked
+                              ? Array.from(new Set([...current, provider]))
+                              : current.filter((item) => item !== provider)
+                          );
+                        }}
+                      />
+                    }
+                    label={
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <DspLogo value={provider} alt={getDspDisplayName(provider)} size={22} padding={0.2} />
+                        <Typography variant="body2" fontWeight={750}>{getDspDisplayName(provider)}</Typography>
+                      </Stack>
+                    }
+                  />
+                ))}
+              </Box>
+            </Stack>
+          ) : (
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              No DSP providers are stored on this release.
+            </Typography>
+          )}
+          <TextField
+            margin="dense"
+            label="Admin note"
+            fullWidth
+            multiline
+            rows={3}
+            value={takedownNote}
+            onChange={(event) => setTakedownNote(event.target.value)}
+            helperText="Stored with the DSP lifecycle update."
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTakedownTarget(null)} disabled={Boolean(lifecycleSaving)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmTakedown}
+            color="error"
+            variant="contained"
+            disabled={Boolean(lifecycleSaving) || !selectedTakedownProviders.length}
+          >
+            {lifecycleSaving ? <CircularProgress size={20} /> : 'Request Takedown'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Track Dialog */}
       <Dialog open={!!trackDeleteTarget} onClose={() => !deletingTrack && setTrackDeleteTarget(null)} maxWidth="sm" fullWidth>

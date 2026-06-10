@@ -260,6 +260,10 @@ export async function assignReleaseUpcWithGs1(
   let providerConfirmedAssignment: Gs1ValidationResult | undefined;
   let lockId: string | null = null;
   const gs1Input = buildGs1CreateInput(release, releaseId);
+  const trustedExistingAssignment =
+    Boolean(existingUpc) &&
+    cleanString(release.upcProvider) === GS1_DATAKART_PROVIDER &&
+    Boolean(release.upcAssignedAt);
 
   if (!releaseUpc) {
     const shouldRecoverFromReviewHold = hasReviewHeldUpcAssignment(release);
@@ -326,7 +330,18 @@ export async function assignReleaseUpcWithGs1(
 
   let validation: Gs1ValidationResult;
   try {
-    validation = providerConfirmedAssignment || (await validateGs1Gtin(releaseUpc));
+    if (providerConfirmedAssignment) {
+      validation = providerConfirmedAssignment;
+    } else if (trustedExistingAssignment) {
+      validation = {
+        gtin: releaseUpc,
+        recordStatus: cleanString(release.upcAssignment?.recordStatus) || 'validated',
+        isComplete: typeof release.upcAssignment?.isComplete === 'boolean' ? release.upcAssignment.isComplete : true,
+        message: cleanString(release.upcAssignment?.message) || 'Previously assigned GS1 UPC trusted for re-approval.',
+      };
+    } else {
+      validation = await validateGs1Gtin(releaseUpc);
+    }
   } catch (error) {
     if (lockId) {
       await markUpcAssignmentNeedsReview(db, releaseId, lockId, error);

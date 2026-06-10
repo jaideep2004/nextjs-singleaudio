@@ -30,6 +30,9 @@ export default function UserPreviewPage() {
   const [error, setError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
   const [kycOpen, setKycOpen] = useState(false);
+  const [actionRailPinned, setActionRailPinned] = useState(false);
+  const [actionRailFrame, setActionRailFrame] = useState({ left: 0, width: 0, height: 0 });
+  const actionRailRef = useRef<HTMLDivElement | null>(null);
   const releasesRef = useRef<HTMLDivElement | null>(null);
   const payoutsRef = useRef<HTMLDivElement | null>(null);
 
@@ -73,6 +76,28 @@ export default function UserPreviewPage() {
   const scrollToSection = (target: HTMLDivElement | null) => {
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  useEffect(() => {
+    const syncActionRail = () => {
+      const element = actionRailRef.current;
+      if (!element) return;
+      const rect = element.getBoundingClientRect();
+      setActionRailFrame({
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      });
+      setActionRailPinned(rect.top <= 0);
+    };
+
+    syncActionRail();
+    window.addEventListener('scroll', syncActionRail, { passive: true });
+    window.addEventListener('resize', syncActionRail);
+    return () => {
+      window.removeEventListener('scroll', syncActionRail);
+      window.removeEventListener('resize', syncActionRail);
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -131,7 +156,7 @@ export default function UserPreviewPage() {
         description={`Inspecting ${user?.email || 'user'} profile, catalog, payouts, and account state.`}
         action={
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <Button component={Link} href={`/admin/users/${params.id}`} variant="contained" startIcon={<Edit />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+            <Button onClick={() => setKycOpen(true)} variant="contained" startIcon={<Edit />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
               Edit User
             </Button>
             <Button component={Link} href={`/admin/users/${params.id}`} variant="outlined" startIcon={<ArrowBack />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
@@ -140,39 +165,55 @@ export default function UserPreviewPage() {
           </Stack>
         }
       />
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={1.25}
+      <Box
+        ref={actionRailRef}
         sx={{
           mb: 2.5,
-          position: 'sticky',
-          top: 76,
-          zIndex: 8,
-          py: 1,
-          bgcolor: isDark ? 'rgba(11,16,32,0.92)' : 'rgba(238,243,248,0.92)',
-          backdropFilter: 'blur(10px)',
+          minHeight: actionRailPinned ? `${actionRailFrame.height}px` : undefined,
         }}
       >
-        <Button
-          variant={user?.isActive ? 'outlined' : 'contained'}
-          color={user?.isActive ? 'error' : 'success'}
-          onClick={handleStatusToggle}
-          disabled={statusSaving}
-          startIcon={statusSaving ? <CircularProgress size={16} /> : <Security />}
-          sx={{ borderRadius: '12px', fontWeight: 900 }}
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={1.25}
+          sx={{
+            position: actionRailPinned ? 'fixed' : 'relative',
+            top: actionRailPinned ? 0 : 'auto',
+            left: actionRailPinned ? actionRailFrame.left : 'auto',
+            width: actionRailPinned ? actionRailFrame.width : 'auto',
+            zIndex: (theme) => theme.zIndex.appBar + 5,
+            py: 1,
+            px: 0.75,
+            borderRadius: actionRailPinned ? '0 0 18px 18px' : '18px',
+            bgcolor: isDark ? 'rgba(11,16,32,0.94)' : 'rgba(238,243,248,0.96)',
+            backdropFilter: 'blur(14px)',
+            border: '1px solid',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+            boxShadow: actionRailPinned
+              ? isDark ? '0 18px 44px rgba(0,0,0,0.28)' : '0 18px 44px rgba(15,23,42,0.14)'
+              : 'none',
+          }}
         >
-          {user?.isActive ? 'Deactivate User' : 'Activate User'}
-        </Button>
-        <Button variant="outlined" startIcon={<Edit />} onClick={() => setKycOpen(true)} sx={{ borderRadius: '12px', fontWeight: 900 }}>
-          Edit User
-        </Button>
-        <Button onClick={() => scrollToSection(releasesRef.current)} variant="outlined" startIcon={<Album />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
-          Review Releases
-        </Button>
-        <Button onClick={() => scrollToSection(payoutsRef.current)} variant="outlined" startIcon={<Paid />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
-          Payout Tools
-        </Button>
-      </Stack>
+          <Button
+            variant={user?.isActive ? 'outlined' : 'contained'}
+            color={user?.isActive ? 'error' : 'success'}
+            onClick={handleStatusToggle}
+            disabled={statusSaving}
+            startIcon={statusSaving ? <CircularProgress size={16} /> : <Security />}
+            sx={{ borderRadius: '12px', fontWeight: 900 }}
+          >
+            {user?.isActive ? 'Deactivate User' : 'Activate User'}
+          </Button>
+          <Button variant="outlined" startIcon={<Edit />} onClick={() => setKycOpen(true)} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+            Edit User
+          </Button>
+          <Button onClick={() => scrollToSection(releasesRef.current)} variant="outlined" startIcon={<Album />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+            Review Releases
+          </Button>
+          <Button onClick={() => scrollToSection(payoutsRef.current)} variant="outlined" startIcon={<Paid />} sx={{ borderRadius: '12px', fontWeight: 900 }}>
+            Payout Tools
+          </Button>
+        </Stack>
+      </Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr 1fr' }, gap: 2.5 }}>
         {[
           { icon: <Person />, title: 'Profile', text: `${user?.role || 'artist'} account`, meta: `${user?.verification?.status || 'pending'} KYC · ${user?.accountType || 'artist'}`, color: '#5b5ff7' },

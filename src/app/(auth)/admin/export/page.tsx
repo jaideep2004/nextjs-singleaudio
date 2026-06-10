@@ -6,6 +6,7 @@ import {
   alpha,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -13,6 +14,7 @@ import {
   DialogContent,
   DialogTitle,
   LinearProgress,
+  ListItemText,
   MenuItem,
   Paper,
   Stack,
@@ -44,7 +46,7 @@ import {
 } from '@mui/icons-material';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import Link from 'next/link';
-import { releaseAPI } from '@/services/api';
+import { adminAPI, releaseAPI } from '@/services/api';
 
 type ExportState = 'queued' | 'running' | 'completed' | 'completed_with_warnings' | 'failed';
 
@@ -59,12 +61,13 @@ type ExportPart = {
 type ExportJob = {
   _id: string;
   state: ExportState;
-  scope: 'release' | 'user' | 'status';
+  scope: 'release' | 'user' | 'users' | 'status';
   criteria?: {
     releaseIds?: string[];
     userId?: string;
+    userIds?: string[];
     statuses?: Array<'approved' | 'pending' | 'rejected'>;
-    zipGrouping?: 'per_release';
+    zipGrouping?: 'per_release' | 'per_user';
   };
   counts: {
     releases: number;
@@ -134,11 +137,13 @@ export default function AdminExportPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportScope, setExportScope] = useState<'release' | 'user' | 'status'>('status');
+  const [exportScope, setExportScope] = useState<'release' | 'user' | 'users' | 'status'>('status');
   const [exportStatus, setExportStatus] = useState<'all' | 'approved' | 'pending' | 'rejected'>('approved');
   const [selectedReleaseId, setSelectedReleaseId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [releases, setReleases] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
 
   const latestJob = jobs[0];
   const active = isActiveJob(latestJob);
@@ -179,9 +184,18 @@ export default function AdminExportPage() {
     if (response.success) setReleases(Array.isArray(response.data) ? response.data : []);
   }, []);
 
+  const loadUsers = useCallback(async () => {
+    const response = await adminAPI.getUsers({ limit: 500, sort: 'name' });
+    if (response.success) {
+      const rows = Array.isArray(response.data?.users) ? response.data.users : [];
+      setUsers(rows);
+    }
+  }, []);
+
   const openCreateExport = () => {
     setExportOpen(true);
     if (releases.length === 0) void loadReleases();
+    if (users.length === 0) void loadUsers();
   };
 
   const handleCreateExport = async () => {
@@ -197,8 +211,9 @@ export default function AdminExportPage() {
           scope: exportScope,
           releaseIds: exportScope === 'release' ? [selectedReleaseId] : [],
           userId: exportScope === 'user' ? selectedUserId : undefined,
+          userIds: exportScope === 'users' ? selectedUserIds : [],
           statuses,
-          zipGrouping: 'per_release',
+          zipGrouping: exportScope === 'users' ? 'per_user' : 'per_release',
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -216,6 +231,15 @@ export default function AdminExportPage() {
 
   const userOptions = useMemo(() => {
     const byId = new Map<string, { id: string; label: string; email: string }>();
+    users.forEach((user) => {
+      const id = String(user._id || user.id || '');
+      if (!id) return;
+      byId.set(id, {
+        id,
+        label: user.artistName || user.name || user.email || 'Unknown user',
+        email: user.email || '',
+      });
+    });
     releases.forEach((release) => {
       const id = String(release.ownerUserId || release.userId || release.artistId || '');
       if (!id || byId.has(id)) return;
@@ -226,14 +250,15 @@ export default function AdminExportPage() {
       });
     });
     return Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [releases]);
+  }, [releases, users]);
 
   const canCreateExport =
     !creating &&
     !active &&
     (exportScope === 'status' ||
       (exportScope === 'release' && Boolean(selectedReleaseId)) ||
-      (exportScope === 'user' && Boolean(selectedUserId)));
+      (exportScope === 'user' && Boolean(selectedUserId)) ||
+      (exportScope === 'users' && selectedUserIds.length > 0));
 
   const metrics = useMemo(
     () => [
@@ -539,11 +564,12 @@ export default function AdminExportPage() {
               select
               label="Export scope"
               value={exportScope}
-              onChange={(event) => setExportScope(event.target.value as 'release' | 'user' | 'status')}
+              onChange={(event) => setExportScope(event.target.value as 'release' | 'user' | 'users' | 'status')}
               fullWidth
             >
               <MenuItem value="status">All releases by status</MenuItem>
               <MenuItem value="user">All releases for a user</MenuItem>
+              <MenuItem value="users">Selected users</MenuItem>
               <MenuItem value="release">Single release</MenuItem>
             </TextField>
 
@@ -578,6 +604,39 @@ export default function AdminExportPage() {
               </TextField>
             ) : null}
 
+            {exportScope === 'users' ? (
+              <TextField
+                select
+                label="Users"
+                value={selectedUserIds}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSelectedUserIds(typeof value === 'string' ? value.split(',') : value as string[]);
+                }}
+                SelectProps={{
+                  multiple: true,
+                  renderValue: (selected) => {
+                    const ids = selected as string[];
+                    return ids
+                      .map((id) => userOptions.find((user) => user.id === id)?.label || id)
+                      .join(', ');
+                  },
+                }}
+                helperText="Creates one parent ZIP containing user-named ZIP files."
+                fullWidth
+              >
+                {userOptions.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    <Checkbox checked={selectedUserIds.includes(user.id)} />
+                    <ListItemText
+                      primary={user.label}
+                      secondary={user.email}
+                    />
+                  </MenuItem>
+                ))}
+              </TextField>
+            ) : null}
+
             {exportScope === 'release' ? (
               <TextField
                 select
@@ -595,7 +654,9 @@ export default function AdminExportPage() {
             ) : null}
 
             <Alert severity="info">
-              Exports are created as release-named ZIP files. Metadata includes user name and email.
+              {exportScope === 'users'
+                ? 'Selected user exports create a parent ZIP with one ZIP per user plus metadata.'
+                : 'Exports are created as release-named ZIP files. Metadata includes user name and email.'}
             </Alert>
           </Stack>
         </DialogContent>

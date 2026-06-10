@@ -1,0 +1,47 @@
+{
+  "jobId": "6a2918dd387fddba45b6dde7",
+  "scope": "user",
+  "criteria": {
+    "zipGrouping": "per_release",
+    "releaseIds": [],
+    "userId": "6a0edb9365eafed006ae0f62",
+    "statuses": [
+      "approved"
+    ]
+  },
+  "generatedAt": "2026-06-10T07:57:19.497Z",
+  "counts": {
+    "releases": 4,
+    "tracks": 13,
+    "files": 0,
+    "missing": 13,
+    "parts": 4
+  },
+  "parts": [
+    {
+      "name": "hfhxgxzggdhfd dgdsgs-365863.zip",
+      "type": "tracks",
+      "size": 7042,
+      "trackCount": 1
+    },
+    {
+      "name": "fdcj hrf hdfhd hsd-9afc49.zip",
+      "type": "tracks",
+      "size": 7753,
+      "trackCount": 4
+    },
+    {
+      "name": "ew wge geg-85325d.zip",
+      "type": "tracks",
+      "size": 7493,
+      "trackCount": 3
+    },
+    {
+      "name": "rhdshdsh-be4a2d.zip",
+      "type": "tracks",
+      "size": 8024,
+      "trackCount": 5
+    }
+  ],
+  "warnings": []
+}

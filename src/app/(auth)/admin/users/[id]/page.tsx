@@ -127,9 +127,9 @@ export default function EditUserPage() {
     void loadPlatforms();
   }, [isAdmin, userId]);
 
-  const fetchUser = async () => {
+  const fetchUser = async (options: { silent?: boolean } = {}) => {
     try {
-      setFetching(true);
+      if (!options.silent) setFetching(true);
       const response = await adminAPI.getUserById(userId);
 
       if (response.success && response.data) {
@@ -161,7 +161,7 @@ export default function EditUserPage() {
       console.error('Error fetching user:', err);
       setError(err.message || 'Failed to fetch user');
     } finally {
-      setFetching(false);
+      if (!options.silent) setFetching(false);
     }
   };
 
@@ -241,7 +241,7 @@ export default function EditUserPage() {
   };
 
   const handleUserUpdate = () => {
-    fetchUser();
+    fetchUser({ silent: true });
   };
 
   if (isAdmin === null || fetching) {

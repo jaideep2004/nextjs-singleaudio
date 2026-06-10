@@ -58,13 +58,14 @@ type ExportUser = {
   email?: string;
 };
 
-export type CatalogExportScope = 'release' | 'user' | 'status';
+export type CatalogExportScope = 'release' | 'user' | 'users' | 'status';
 export type CatalogExportStatus = 'approved' | 'pending' | 'rejected';
 export type CatalogExportCriteria = {
   releaseIds?: string[];
   userId?: string;
+  userIds?: string[];
   statuses?: CatalogExportStatus[];
-  zipGrouping?: 'per_release';
+  zipGrouping?: 'per_release' | 'per_user';
 };
 
 type TrackFileResolution =
@@ -355,6 +356,26 @@ function createReleaseZipName(release: Record<string, unknown>, index: number) {
   return `${title}${suffix}.zip`;
 }
 
+function getReleaseUserId(release: Record<string, unknown>) {
+  return asString(release.ownerUserId || release.userId || release.artistId || release.ownerId || release.createdBy);
+}
+
+function getReleaseUserInfo(release: Record<string, unknown>) {
+  const id = getReleaseUserId(release);
+  const name = asString(release.ownerName || release.ownerArtistName) || id || 'unknown-user';
+  const email = asString(release.ownerEmail);
+  return { id, name, email };
+}
+
+function createUserZipName(user: { id: string; name: string; email: string }, index: number) {
+  const base = sanitizeArchiveSegment(
+    [user.name, user.email].filter(Boolean).join(' - '),
+    user.id || `user-${index + 1}`
+  );
+  const suffix = user.id ? `-${user.id.slice(-6)}` : `-${index + 1}`;
+  return `${base}${suffix}.zip`;
+}
+
 function buildReleaseQuery(job: CatalogExportJob) {
   const criteria = job.criteria || {};
   const query: Record<string, unknown> = {};
@@ -367,13 +388,16 @@ function buildReleaseQuery(job: CatalogExportJob) {
     return query;
   }
 
-  if (job.scope === 'user' && criteria.userId) {
+  if ((job.scope === 'user' && criteria.userId) || (job.scope === 'users' && criteria.userIds?.length)) {
+    const userIds = job.scope === 'users'
+      ? (criteria.userIds || []).filter(Boolean)
+      : [criteria.userId as string];
     query.$or = [
-      { ownerUserId: criteria.userId },
-      { userId: criteria.userId },
-      { artistId: criteria.userId },
-      { ownerId: criteria.userId },
-      { createdBy: criteria.userId },
+      { ownerUserId: { $in: userIds } },
+      { userId: { $in: userIds } },
+      { artistId: { $in: userIds } },
+      { ownerId: { $in: userIds } },
+      { createdBy: { $in: userIds } },
     ];
   }
 
@@ -477,6 +501,98 @@ async function createReleasePartZip(params: {
   };
 }
 
+type UserExportGroup = {
+  user: { id: string; name: string; email: string };
+  releaseRows: Array<Record<string, unknown>>;
+  trackRows: Array<Record<string, unknown>>;
+  missingRows: Array<Record<string, unknown>>;
+  files: Array<{ sourcePath: string; archivePath: string }>;
+};
+
+async function createUserZip(params: {
+  jobDir: string;
+  group: UserExportGroup;
+  userIndex: number;
+}) {
+  const safeBase = createUserZipName(params.group.user, params.userIndex).replace(/\.zip$/i, '');
+  const releasesPath = path.join(params.jobDir, `${safeBase}-releases.xlsx.tmp`);
+  const tracksPath = path.join(params.jobDir, `${safeBase}-tracks.xlsx.tmp`);
+  const missingPath = path.join(params.jobDir, `${safeBase}-missing.xlsx.tmp`);
+  const userJsonPath = path.join(params.jobDir, `${safeBase}-user.json.tmp`);
+  const zipPath = path.join(params.jobDir, `${safeBase}.zip`);
+
+  const releaseBook = createWorkbook(releasesPath, 'Releases', releaseColumns as ExcelJS.Column[]);
+  params.group.releaseRows.forEach((row) => releaseBook.worksheet.addRow(row).commit());
+  await releaseBook.workbook.commit();
+
+  const trackBook = createWorkbook(tracksPath, 'Tracks', trackColumns as ExcelJS.Column[]);
+  params.group.trackRows.forEach((row) => trackBook.worksheet.addRow(row).commit());
+  await trackBook.workbook.commit();
+
+  const missingBook = createWorkbook(missingPath, 'Missing Files', missingColumns as ExcelJS.Column[]);
+  params.group.missingRows.forEach((row) => missingBook.worksheet.addRow(row).commit());
+  await missingBook.workbook.commit();
+
+  await writeJsonFile(userJsonPath, {
+    user: params.group.user,
+    counts: {
+      releases: params.group.releaseRows.length,
+      tracks: params.group.trackRows.length,
+      files: params.group.files.length,
+      missing: params.group.missingRows.length,
+    },
+  });
+
+  await zipFiles(zipPath, [
+    { sourcePath: userJsonPath, archivePath: 'metadata/user.json' },
+    { sourcePath: releasesPath, archivePath: 'metadata/releases.xlsx' },
+    { sourcePath: tracksPath, archivePath: 'metadata/tracks.xlsx' },
+    { sourcePath: missingPath, archivePath: 'metadata/missing-files.xlsx' },
+    ...params.group.files,
+  ]);
+
+  await Promise.all([
+    fs.promises.unlink(releasesPath).catch(() => undefined),
+    fs.promises.unlink(tracksPath).catch(() => undefined),
+    fs.promises.unlink(missingPath).catch(() => undefined),
+    fs.promises.unlink(userJsonPath).catch(() => undefined),
+  ]);
+
+  return {
+    name: path.basename(zipPath),
+    path: zipPath,
+    trackCount: params.group.trackRows.length,
+  };
+}
+
+async function createUsersParentZip(params: {
+  jobDir: string;
+  userZips: Array<{ name: string; path: string; trackCount: number }>;
+  metadataPart: CatalogExportPart;
+  manifestPath: string;
+}) {
+  const zipPath = path.join(params.jobDir, 'selected-users-catalog.zip');
+  const files = [
+    { sourcePath: params.manifestPath, archivePath: 'manifest.json' },
+    { sourcePath: params.metadataPart.path, archivePath: 'metadata/catalog-metadata.zip' },
+    ...params.userZips.map((zip) => ({
+      sourcePath: zip.path,
+      archivePath: path.posix.join('users', zip.name),
+    })),
+  ];
+
+  await zipFiles(zipPath, files);
+  const stats = await fs.promises.stat(zipPath);
+  return {
+    name: 'selected-users-catalog.zip',
+    type: 'tracks' as const,
+    path: zipPath,
+    size: stats.size,
+    trackCount: params.userZips.reduce((sum, zip) => sum + zip.trackCount, 0),
+    createdAt: new Date(),
+  };
+}
+
 async function updateJobProgress(
   db: Db,
   jobId: ObjectId,
@@ -570,6 +686,7 @@ export async function processCatalogExportJob(jobId: string) {
   const counts: CatalogExportCounts = { releases: 0, tracks: 0, files: 0, missing: 0, parts: 0 };
   const warnings: string[] = [];
   const parts: CatalogExportPart[] = [];
+  const userGroups = new Map<string, UserExportGroup>();
 
   try {
     const lock = await collection.findOneAndUpdate(
@@ -619,6 +736,8 @@ export async function processCatalogExportJob(jobId: string) {
             ownerUserId: 1,
             userId: 1,
             artistId: 1,
+            ownerId: 1,
+            createdBy: 1,
             primaryArtist: 1,
             territories: 1,
             stores: 1,
@@ -633,9 +752,28 @@ export async function processCatalogExportJob(jobId: string) {
 
     for await (const rawRelease of releases) {
       const [release] = await hydrateReleasesWithCanonicalTracks(db, [rawRelease as Record<string, any> & { _id: ObjectId }]);
+      const groupByUser = job.scope === 'users' && job.criteria?.zipGrouping === 'per_user';
+      let userGroup: UserExportGroup | undefined;
+      if (groupByUser) {
+        const userInfo = getReleaseUserInfo(release);
+        const userKey = userInfo.id || `unknown:${userInfo.email || userInfo.name}`;
+        userGroup = userGroups.get(userKey);
+        if (!userGroup) {
+          userGroup = {
+            user: userInfo,
+            releaseRows: [],
+            trackRows: [],
+            missingRows: [],
+            files: [],
+          };
+          userGroups.set(userKey, userGroup);
+        }
+      }
       const releaseIndex = counts.releases;
       counts.releases += 1;
-      releaseBook.worksheet.addRow(releaseRow(release)).commit();
+      const currentReleaseRow = releaseRow(release);
+      releaseBook.worksheet.addRow(currentReleaseRow).commit();
+      userGroup?.releaseRows.push(currentReleaseRow);
 
       const tracks = Array.isArray(release.tracks) ? release.tracks : [];
       const releaseRows: Array<Record<string, unknown>> = [];
@@ -648,19 +786,20 @@ export async function processCatalogExportJob(jobId: string) {
 
         if (!resolved.ok) {
           counts.missing += 1;
-          missingBook.worksheet
-            .addRow({
-              releaseId: asString(release._id),
-              releaseTitle: asString(release.releaseTitle || release.title),
-              trackTitle: asString(track.title),
-              isrc: asString(track.isrc),
-              source: resolved.source,
-              reason: resolved.reason,
-            })
-            .commit();
+          const missingRow = {
+            releaseId: asString(release._id),
+            releaseTitle: asString(release.releaseTitle || release.title),
+            trackTitle: asString(track.title),
+            isrc: asString(track.isrc),
+            source: resolved.source,
+            reason: resolved.reason,
+          };
+          missingBook.worksheet.addRow(missingRow).commit();
+          userGroup?.missingRows.push(missingRow);
           const row = trackRow(release, track, trackIndex);
           trackBook.worksheet.addRow(row).commit();
           releaseRows.push(row);
+          userGroup?.trackRows.push(row);
           await updateJobProgress(db, objectId, counts, false);
           continue;
         }
@@ -669,24 +808,30 @@ export async function processCatalogExportJob(jobId: string) {
         const row = trackRow(release, track, trackIndex, archivePath);
         trackBook.worksheet.addRow(row).commit();
         releaseRows.push(row);
+        userGroup?.trackRows.push(row);
         releaseFiles.push({ sourcePath: resolved.path, archivePath });
+        userGroup?.files.push({ sourcePath: resolved.path, archivePath });
         counts.files += 1;
         await updateJobProgress(db, objectId, counts, false);
       }
 
-      const releasePart = await createReleasePartZip({
-        jobDir,
-        release,
-        releaseIndex,
-        rows: releaseRows,
-        files: releaseFiles,
-      });
-      parts.push(releasePart);
-      counts.parts = parts.length;
-      await collection.updateOne(
-        { _id: objectId },
-        { $set: { counts, parts, updatedAt: new Date() } }
-      );
+      if (!groupByUser) {
+        const releasePart = await createReleasePartZip({
+          jobDir,
+          release,
+          releaseIndex,
+          rows: releaseRows,
+          files: releaseFiles,
+        });
+        parts.push(releasePart);
+        counts.parts = parts.length;
+        await collection.updateOne(
+          { _id: objectId },
+          { $set: { counts, parts, updatedAt: new Date() } }
+        );
+      } else {
+        await updateJobProgress(db, objectId, counts, true);
+      }
     }
 
     await Promise.all([
@@ -720,6 +865,23 @@ export async function processCatalogExportJob(jobId: string) {
     });
     parts.unshift(metadataPart);
     counts.parts = parts.length;
+
+    if (job.scope === 'users' && job.criteria?.zipGrouping === 'per_user') {
+      const userZips: Array<{ name: string; path: string; trackCount: number }> = [];
+      let userIndex = 0;
+      for (const group of userGroups.values()) {
+        userZips.push(await createUserZip({ jobDir, group, userIndex }));
+        userIndex += 1;
+      }
+      const parentPart = await createUsersParentZip({
+        jobDir,
+        userZips,
+        metadataPart,
+        manifestPath,
+      });
+      parts.push(parentPart);
+      counts.parts = parts.length;
+    }
 
     const state: CatalogExportState = counts.missing > 0 || warnings.length > 0
       ? 'completed_with_warnings'

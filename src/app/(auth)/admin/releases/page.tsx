@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Typography,
   Paper,
+  Alert,
   Table,
   TableBody,
   TableCell,
@@ -85,6 +86,8 @@ export default function AdminReleasesPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [pendingExporting, setPendingExporting] = useState(false);
+  const [pendingExportMessage, setPendingExportMessage] = useState('');
   const { mode } = useColorMode();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -205,6 +208,31 @@ export default function AdminReleasesPage() {
   );
 
   const resetPage = () => setPage(0);
+  const handlePendingExport = async () => {
+    try {
+      setPendingExporting(true);
+      setPendingExportMessage('');
+      const response = await fetch('/api/admin/export/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: 'status',
+          statuses: ['pending'],
+          zipGrouping: 'per_release',
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to start pending export');
+      }
+      setPendingExportMessage('Pending catalog export started. Downloads will appear in Export.');
+    } catch (err) {
+      setPendingExportMessage(err instanceof Error ? err.message : 'Failed to start pending export');
+    } finally {
+      setPendingExporting(false);
+    }
+  };
+
   const tabItems = [
     { label: 'All', count: releases.length, icon: <Album fontSize="small" />, color: '#5b5ff7' },
     { label: 'Pending', count: pendingCount, icon: <Pending fontSize="small" />, color: '#f59e0b' },
@@ -392,7 +420,35 @@ export default function AdminReleasesPage() {
               <MenuItem key={type} value={type}>{type}</MenuItem>
             ))}
           </TextField>
+          {tabValue === 1 ? (
+            <Button
+              variant="contained"
+              startIcon={pendingExporting ? <CircularProgress size={16} color="inherit" /> : <UploadFile />}
+              onClick={handlePendingExport}
+              disabled={pendingExporting}
+              sx={{
+                minHeight: 40,
+                whiteSpace: 'nowrap',
+                px: 2,
+                bgcolor: '#0ea5e9',
+                '&:hover': { bgcolor: '#0284c7' },
+              }}
+              style={{padding:"10px 20px"}}
+            >
+              {pendingExporting ? 'Starting' : 'Export Pending'}
+            </Button>
+          ) : null}
         </Stack>
+
+        {pendingExportMessage ? (
+          <Alert
+            severity={pendingExportMessage.toLowerCase().includes('started') ? 'success' : 'error'}
+            sx={{ mx: 1.5, mb: 1.5 }}
+            onClose={() => setPendingExportMessage('')}
+          >
+            {pendingExportMessage}
+          </Alert>
+        ) : null}
 
         <TabPanel value={tabValue} index={0}>
           {renderReleasesTable()}

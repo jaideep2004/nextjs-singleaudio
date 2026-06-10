@@ -44,6 +44,12 @@ export async function PATCH(
     const status = body?.status as DspLifecycleStatus | undefined;
     const trackIndex = body?.trackIndex;
     const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : '';
+    const dspProviders = Array.isArray(body?.dspProviders)
+      ? body.dspProviders
+          .map((provider: unknown) => String(provider).trim())
+          .filter(Boolean)
+          .slice(0, 100)
+      : [];
 
     if (!status || !lifecycleStatuses.has(status)) {
       return NextResponse.json({ success: false, error: 'Invalid lifecycle status' }, { status: 400 });
@@ -58,6 +64,7 @@ export async function PATCH(
       dspLifecycleUpdatedBy: String(user._id),
       dspLifecycleUpdatedByEmail: user.email,
       dspLifecycleNote: note,
+      dspLifecycleProviders: dspProviders,
     };
 
     if (Number.isInteger(trackIndex) && trackIndex >= 0) {
@@ -72,6 +79,7 @@ export async function PATCH(
               [`tracks.${index}.dspLifecycleUpdatedBy`]: String(user._id),
               [`tracks.${index}.dspLifecycleUpdatedByEmail`]: user.email,
               [`tracks.${index}.dspLifecycleNote`]: note,
+              [`tracks.${index}.dspLifecycleProviders`]: dspProviders,
               updatedAt: now,
             },
           }
@@ -85,6 +93,7 @@ export async function PATCH(
               'legacyMetadata.dspLifecycleUpdatedBy': String(user._id),
               'legacyMetadata.dspLifecycleUpdatedByEmail': user.email,
               'legacyMetadata.dspLifecycleNote': note,
+              'legacyMetadata.dspLifecycleProviders': dspProviders,
               updatedAt: now,
             },
           }

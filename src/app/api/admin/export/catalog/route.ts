@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     const { db } = await connectToDatabase();
     const body = await req.json().catch(() => ({}));
-    const scope = ['release', 'user', 'status'].includes(body?.scope) ? body.scope as CatalogExportScope : 'status';
+    const scope = ['release', 'user', 'users', 'status'].includes(body?.scope) ? body.scope as CatalogExportScope : 'status';
     const statuses = Array.isArray(body?.statuses)
       ? body.statuses.filter((status: string): status is CatalogExportStatus => ['approved', 'pending', 'rejected'].includes(status))
       : ['approved'];
@@ -94,12 +94,18 @@ export async function POST(req: NextRequest) {
       ? body.releaseIds.map((id: unknown) => String(id)).filter(Boolean)
       : [];
     const userId = body?.userId ? String(body.userId) : undefined;
+    const userIds = Array.isArray(body?.userIds)
+      ? body.userIds.map((id: unknown) => String(id)).filter(Boolean)
+      : [];
 
     if (scope === 'release' && releaseIds.length === 0) {
       return NextResponse.json({ success: false, error: 'At least one release is required' }, { status: 400 });
     }
     if (scope === 'user' && !userId) {
       return NextResponse.json({ success: false, error: 'User is required for user-wise export' }, { status: 400 });
+    }
+    if (scope === 'users' && userIds.length === 0) {
+      return NextResponse.json({ success: false, error: 'At least one user is required for selected-users export' }, { status: 400 });
     }
 
     await enforceMongoRateLimit(db, {
@@ -116,8 +122,9 @@ export async function POST(req: NextRequest) {
       criteria: {
         releaseIds,
         userId,
+        userIds,
         statuses,
-        zipGrouping: 'per_release',
+        zipGrouping: scope === 'users' ? 'per_user' : 'per_release',
       },
     });
 
