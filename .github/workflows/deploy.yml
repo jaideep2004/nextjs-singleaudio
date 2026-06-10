@@ -11,6 +11,18 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Verify root lockfile
+        run: npm ci --dry-run --ignore-scripts --no-audit --no-fund
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
 
