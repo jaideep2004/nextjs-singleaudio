@@ -26,6 +26,7 @@ import {
   HelpOutline,
   LightMode,
   Logout,
+  MarkEmailRead,
   Person as PersonIcon,
   Search as SearchIcon,
   Settings as SettingsIcon,
@@ -34,6 +35,7 @@ import {
 import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { getNotificationTitle } from '@/lib/notificationTitles';
 
 interface TopNavigationProps {
   title?: string;
@@ -88,16 +90,6 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
 
   const handleNotificationsClose = () => {
     setNotificationsAnchor(null);
-  };
-
-  const getNotificationTitle = (type?: string) => {
-    const normalized = (type || 'system').replace(/_/g, ' ').toLowerCase();
-    if (normalized.includes('approved')) return 'Approved';
-    if (normalized.includes('rejected')) return 'Rejected';
-    if (normalized.includes('payout')) return 'Payout Update';
-    if (normalized.includes('email')) return 'Email Update';
-    if (normalized.includes('release')) return 'Release Update';
-    return 'Notification';
   };
 
   const formatNotificationDate = (value?: string) => {
@@ -323,12 +315,16 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                       px: 2.5,
                       py: 1.5,
                       alignItems: 'flex-start',
+                      gap: 1,
                       bgcolor: isUnread ? (isDarkMode ? 'rgba(74,108,247,0.1)' : 'rgba(74,108,247,0.06)') : 'transparent',
                     }}
                   >
-                    <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
                       <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
-                        {getNotificationTitle(notification.type)}
+                        {getNotificationTitle({
+                          type: notification.type,
+                          message: notification.message,
+                        })}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', whiteSpace: 'normal' }}>
                         {notification.message}
@@ -337,6 +333,28 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                         {formatNotificationDate(notification.createdAt)}
                       </Typography>
                     </Box>
+                    <Tooltip title="Mark as read">
+                      <IconButton
+                        aria-label="Mark notification as read"
+                        size="small"
+                        onClick={event => {
+                          event.stopPropagation();
+                          void markAsRead(notification._id);
+                        }}
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          mt: -0.25,
+                          color: isDarkMode ? 'rgba(255,255,255,0.55)' : 'rgba(15,23,42,0.52)',
+                          '&:hover': {
+                            bgcolor: isDarkMode ? 'rgba(34,197,94,0.14)' : 'rgba(34,197,94,0.1)',
+                            color: '#16a34a',
+                          },
+                        }}
+                      >
+                        <MarkEmailRead sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
                   </MenuItem>
                 );
               })

@@ -38,6 +38,9 @@ const canFetchNotifications = () => {
   return !isPublicAuthPath(window.location.pathname) && hasAuthToken();
 };
 
+const isUnreadNotification = (notification: Notification) =>
+  !(notification.read ?? notification.isRead);
+
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -72,7 +75,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           ? response.data.map((notification) => ({
               ...notification,
               read: notification.read ?? notification.isRead ?? false,
-            }))
+            })).filter(isUnreadNotification)
           : [];
         setNotifications(normalized);
       } else {
@@ -92,10 +95,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     
     try {
       await notificationAPI.markAsRead(id);
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => n._id === id ? { ...n, read: true, isRead: true } : n)
-      );
+      setNotifications(prev => prev.filter(n => n._id !== id));
     } catch (error) {
       console.error('Failed to mark notification as read:', error);
     }
@@ -107,10 +107,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     
     try {
       await notificationAPI.markAllAsRead();
-      // Update local state
-      setNotifications(prev => 
-        prev.map(n => ({ ...n, read: true, isRead: true }))
-      );
+      setNotifications([]);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
     }
