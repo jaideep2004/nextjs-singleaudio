@@ -435,7 +435,7 @@ export default function AdminReleasesPage() {
               }}
               style={{padding:"10px 20px"}}
             >
-              {pendingExporting ? 'Starting' : 'Export Pending'}
+              {pendingExporting ? 'Starting' : 'Export Pendings'}
             </Button>
           ) : null}
         </Stack>
