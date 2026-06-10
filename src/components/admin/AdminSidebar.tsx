@@ -114,8 +114,13 @@ const menuSections = [
     ],
   },
   {
-    label: 'Finance',
+    label: 'Profile & Finance',
     items: [
+      {
+        text: 'Profile',
+        icon: <PersonIcon />,
+        path: '/admin/profile',
+      },
       {
         text: 'Payouts',
         icon: <PaymentIcon />,
@@ -133,11 +138,6 @@ const menuSections = [
   {
     label: 'System',
     items: [
-      {
-        text: 'Profile',
-        icon: <PersonIcon />,
-        path: '/admin/profile',
-      },
       {
         text: 'Settings',
         icon: <SettingsIcon />,

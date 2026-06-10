@@ -611,9 +611,12 @@ export default function UploadPage() {
   const [originalReleaseDate, setOriginalReleaseDate] = useState<string>('');
   const [artworkValidating, setArtworkValidating] = useState<boolean>(false);
   const [artworkUploading, setArtworkUploading] = useState<boolean>(false);
+  const [artworkDragActive, setArtworkDragActive] = useState(false);
+  const [audioDragActive, setAudioDragActive] = useState(false);
   // Local audio preview URLs for each selected track
   const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
+  const [distributionTermsAccepted, setDistributionTermsAccepted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
   const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
   const [editReleaseLoading, setEditReleaseLoading] = useState(false);
@@ -827,7 +830,8 @@ export default function UploadPage() {
     }
   };
 
-  const isDistributionValid = selectedDSPs.length > 0;
+  const hasSelectedDistributionProviders = selectedDSPs.length > 0;
+  const isDistributionValid = hasSelectedDistributionProviders && distributionTermsAccepted;
 
   // Event handlers
   const handleDSPToggle = (key: DspKey) => {
@@ -1223,6 +1227,30 @@ export default function UploadPage() {
     return accepted.slice(0, maxCount);
   };
 
+  const handleArtworkDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setArtworkDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    if (event.dataTransfer.files.length > 1) {
+      toast.info('Only one artwork file can be uploaded.');
+    }
+    setArtworkFile(file);
+  };
+
+  const handleArtworkDragOver = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setArtworkDragActive(true);
+  };
+
+  const handleArtworkDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setArtworkDragActive(false);
+  };
+
   const handleAppendTracksClick = () => {
     appendTracksInputRef.current?.click();
   };
@@ -1564,6 +1592,35 @@ export default function UploadPage() {
     }
   };
 
+  const handleAudioDrop = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setAudioDragActive(false);
+    const files = event.dataTransfer.files;
+    if (!files?.length) return;
+
+    const selectedType = releaseTypes.find(t => t.value === releaseType);
+    const max = selectedType?.maxTracks ?? 50;
+    if (tracks.length > 0 && tracks.length < max) {
+      void handleAppendTracksSelected(files);
+      return;
+    }
+
+    void handleMultiTrackFiles(files);
+  };
+
+  const handleAudioDragOver = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setAudioDragActive(true);
+  };
+
+  const handleAudioDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setAudioDragActive(false);
+  };
+
   const renderStepContent = () => {
     switch (activeStep) {
       case 0:
@@ -1786,9 +1843,13 @@ export default function UploadPage() {
                 >
                   <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
                     <Box
+                      onDrop={handleArtworkDrop}
+                      onDragOver={handleArtworkDragOver}
+                      onDragEnter={handleArtworkDragOver}
+                      onDragLeave={handleArtworkDragLeave}
                       sx={{
                         border: '2px dashed',
-                        borderColor: artworkPreview ? 'primary.main' : 'divider',
+                        borderColor: artworkDragActive || artworkPreview ? 'primary.main' : 'divider',
                         borderRadius: '22px',
                         p: { xs: 1.5, sm: 2 },
                         display: 'grid',
@@ -1797,9 +1858,14 @@ export default function UploadPage() {
                         gap: { xs: 2, md: 2.5 },
                         minHeight: 360,
                         bgcolor: theme =>
-                          theme.palette.mode === 'dark'
-                            ? 'rgba(255,255,255,0.025)'
-                            : 'rgba(248,250,252,0.74)',
+                          artworkDragActive
+                            ? theme.palette.mode === 'dark'
+                              ? 'rgba(74,108,247,0.14)'
+                              : 'rgba(74,108,247,0.08)'
+                            : theme.palette.mode === 'dark'
+                              ? 'rgba(255,255,255,0.025)'
+                              : 'rgba(248,250,252,0.74)',
+                        transition: 'border-color 160ms ease, background-color 160ms ease',
                       }}
                     >
                       <Box
@@ -1863,7 +1929,8 @@ export default function UploadPage() {
                           color="text.secondary"
                           sx={{ maxWidth: 240, textAlign: { xs: 'center', md: 'left' } }}
                         >
-                          Preview uses the same square crop stores will receive.
+                          Drop artwork here, or choose a file. Preview uses the same square crop
+                          stores will receive.
                         </Typography>
                         <input
                           id="artwork-upload"
@@ -2087,11 +2154,26 @@ export default function UploadPage() {
               }}
             >
               <Box
+                onDrop={handleAudioDrop}
+                onDragOver={handleAudioDragOver}
+                onDragEnter={handleAudioDragOver}
+                onDragLeave={handleAudioDragLeave}
                 sx={{
                   flex: { md: '0 1 42%' },
                   minWidth: { md: 0 },
                   width: { xs: '100%', md: 'auto' },
                   maxWidth: { md: 520 },
+                  p: { xs: 1.25, sm: 1.5 },
+                  border: '2px dashed',
+                  borderColor: audioDragActive ? 'primary.main' : 'divider',
+                  borderRadius: 2,
+                  bgcolor: theme =>
+                    audioDragActive
+                      ? theme.palette.mode === 'dark'
+                        ? 'rgba(74,108,247,0.14)'
+                        : 'rgba(74,108,247,0.08)'
+                      : 'transparent',
+                  transition: 'border-color 160ms ease, background-color 160ms ease',
                 }}
               >
                 <Box
@@ -2153,8 +2235,8 @@ export default function UploadPage() {
                     }}
                   >
                     <Typography color="text.secondary" align="center">
-                      No audio yet. Use <strong>Select audio files</strong> — track cards appear
-                      here automatically.
+                      Drop audio files here, or use <strong>Select audio files</strong>. Track cards
+                      appear here automatically.
                     </Typography>
                   </Paper>
                 ) : (
@@ -3329,6 +3411,32 @@ export default function UploadPage() {
                 })}
               </Box>
             )}
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 2.5,
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 2,
+                borderColor: distributionTermsAccepted ? 'success.main' : 'divider',
+                bgcolor: theme =>
+                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)',
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={distributionTermsAccepted}
+                    onChange={event => setDistributionTermsAccepted(event.target.checked)}
+                    inputProps={{ 'aria-label': 'Agree to terms and conditions' }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" fontWeight={800}>
+                    I agree to terms & conditions
+                  </Typography>
+                }
+              />
+            </Paper>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack}>Back</Button>
               <Button

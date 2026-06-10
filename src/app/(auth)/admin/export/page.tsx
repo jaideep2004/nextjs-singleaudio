@@ -130,6 +130,17 @@ function isActiveJob(job?: ExportJob) {
   return !!job && ['queued', 'running'].includes(job.state);
 }
 
+function getReleaseUserId(release: any) {
+  return String(
+    release.ownerUserId ||
+      release.userId ||
+      release.artistId ||
+      release.ownerId ||
+      release.createdBy ||
+      ''
+  );
+}
+
 export default function AdminExportPage() {
   const theme = useTheme();
   const [jobs, setJobs] = useState<ExportJob[]>([]);
@@ -142,6 +153,7 @@ export default function AdminExportPage() {
   const [selectedReleaseId, setSelectedReleaseId] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedUserReleaseIds, setSelectedUserReleaseIds] = useState<string[]>([]);
   const [releases, setReleases] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
 
@@ -203,17 +215,29 @@ export default function AdminExportPage() {
     setError('');
 
     try {
-      const statuses = exportStatus === 'all' ? ['approved', 'pending', 'rejected'] : [exportStatus];
+      const createScope =
+        exportScope === 'user' && selectedUserReleaseIds.length > 0 ? 'release' : exportScope;
+      const statuses =
+        exportScope === 'user'
+          ? ['pending']
+          : exportStatus === 'all'
+            ? ['approved', 'pending', 'rejected']
+            : [exportStatus];
       const response = await fetch('/api/admin/export/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scope: exportScope,
-          releaseIds: exportScope === 'release' ? [selectedReleaseId] : [],
+          scope: createScope,
+          releaseIds:
+            exportScope === 'user'
+              ? selectedUserReleaseIds
+              : exportScope === 'release'
+                ? [selectedReleaseId]
+                : [],
           userId: exportScope === 'user' ? selectedUserId : undefined,
-          userIds: exportScope === 'users' ? selectedUserIds : [],
+          userIds: createScope === 'users' ? selectedUserIds : [],
           statuses,
-          zipGrouping: exportScope === 'users' ? 'per_user' : 'per_release',
+          zipGrouping: createScope === 'users' ? 'per_user' : 'per_release',
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -252,12 +276,34 @@ export default function AdminExportPage() {
     return Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
   }, [releases, users]);
 
+  const exportedReleaseIds = useMemo(() => {
+    const ids = new Set<string>();
+    jobs.forEach((job) => {
+      if (!['completed', 'completed_with_warnings'].includes(job.state)) return;
+      (job.criteria?.releaseIds || []).forEach((id) => {
+        if (id) ids.add(String(id));
+      });
+    });
+    return ids;
+  }, [jobs]);
+
+  const pendingUserReleases = useMemo(
+    () =>
+      selectedUserId
+        ? releases.filter(
+            (release) =>
+              getReleaseUserId(release) === selectedUserId && String(release.status) === 'pending'
+          )
+        : [],
+    [releases, selectedUserId]
+  );
+
   const canCreateExport =
     !creating &&
     !active &&
     (exportScope === 'status' ||
       (exportScope === 'release' && Boolean(selectedReleaseId)) ||
-      (exportScope === 'user' && Boolean(selectedUserId)) ||
+      (exportScope === 'user' && Boolean(selectedUserId) && selectedUserReleaseIds.length > 0) ||
       (exportScope === 'users' && selectedUserIds.length > 0));
 
   const metrics = useMemo(
@@ -564,11 +610,17 @@ export default function AdminExportPage() {
               select
               label="Export scope"
               value={exportScope}
-              onChange={(event) => setExportScope(event.target.value as 'release' | 'user' | 'users' | 'status')}
+              onChange={(event) => {
+                setExportScope(event.target.value as 'release' | 'user' | 'users' | 'status');
+                setSelectedReleaseId('');
+                setSelectedUserId('');
+                setSelectedUserIds([]);
+                setSelectedUserReleaseIds([]);
+              }}
               fullWidth
             >
               <MenuItem value="status">All releases by status</MenuItem>
-              <MenuItem value="user">All releases for a user</MenuItem>
+              <MenuItem value="user">Pending releases for a user</MenuItem>
               <MenuItem value="users">Selected users</MenuItem>
               <MenuItem value="release">Single release</MenuItem>
             </TextField>
@@ -589,19 +641,86 @@ export default function AdminExportPage() {
             ) : null}
 
             {exportScope === 'user' ? (
-              <TextField
-                select
-                label="User"
-                value={selectedUserId}
-                onChange={(event) => setSelectedUserId(event.target.value)}
-                fullWidth
-              >
-                {userOptions.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {[user.label, user.email].filter(Boolean).join(' - ')}
-                  </MenuItem>
-                ))}
-              </TextField>
+              <>
+                <TextField
+                  select
+                  label="User"
+                  value={selectedUserId}
+                  onChange={(event) => {
+                    setSelectedUserId(event.target.value);
+                    setSelectedUserReleaseIds([]);
+                  }}
+                  fullWidth
+                >
+                  {userOptions.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {[user.label, user.email].filter(Boolean).join(' - ')}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  label="Pending releases"
+                  value={selectedUserReleaseIds}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSelectedUserReleaseIds(
+                      typeof value === 'string' ? value.split(',') : value as string[]
+                    );
+                  }}
+                  disabled={!selectedUserId || pendingUserReleases.length === 0}
+                  SelectProps={{
+                    multiple: true,
+                    renderValue: (selected) => {
+                      const ids = selected as string[];
+                      return ids
+                        .map((id) => {
+                          const release = pendingUserReleases.find((item) => String(item._id) === id);
+                          return release?.releaseTitle || release?.title || id;
+                        })
+                        .join(', ');
+                    },
+                  }}
+                  helperText={
+                    !selectedUserId
+                      ? 'Select a user to load pending releases.'
+                      : pendingUserReleases.length === 0
+                        ? 'No pending releases found for this user.'
+                        : 'Select one or more pending releases to export.'
+                  }
+                  fullWidth
+                >
+                  {pendingUserReleases.map((release) => {
+                    const releaseId = String(release._id);
+                    const title = release.releaseTitle || release.title || 'Untitled release';
+                    const trackCount = Array.isArray(release.tracks) ? release.tracks.length : 0;
+                    const exported = exportedReleaseIds.has(releaseId);
+                    return (
+                      <MenuItem key={releaseId} value={releaseId}>
+                        <Checkbox checked={selectedUserReleaseIds.includes(releaseId)} />
+                        <ListItemText
+                          primary={title}
+                          secondary={[
+                            release.primaryArtist || release.artist,
+                            `${trackCount} track${trackCount === 1 ? '' : 's'}`,
+                          ].filter(Boolean).join(' - ')}
+                        />
+                        {exported ? (
+                          <Chip
+                            size="small"
+                            icon={<CheckCircle />}
+                            label="Exported"
+                            color="success"
+                            variant="outlined"
+                            sx={{ ml: 1 }}
+                          />
+                        ) : null}
+                      </MenuItem>
+                    );
+                  })}
+                </TextField>
+              </>
             ) : null}
 
             {exportScope === 'users' ? (
@@ -656,6 +775,8 @@ export default function AdminExportPage() {
             <Alert severity="info">
               {exportScope === 'users'
                 ? 'Selected user exports create a parent ZIP with one ZIP per user plus metadata.'
+                : exportScope === 'user'
+                  ? 'Only the selected pending releases for this user will be exported. Releases already exported once are marked.'
                 : 'Exports are created as release-named ZIP files. Metadata includes user name and email.'}
             </Alert>
           </Stack>

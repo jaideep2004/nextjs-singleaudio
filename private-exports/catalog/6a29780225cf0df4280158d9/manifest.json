@@ -1,0 +1,32 @@
+{
+  "jobId": "6a29780225cf0df4280158d9",
+  "scope": "release",
+  "criteria": {
+    "zipGrouping": "per_release",
+    "releaseIds": [
+      "6a2937cbfa06af58779103d2"
+    ],
+    "userId": "6a0edb9365eafed006ae0f62",
+    "userIds": [],
+    "statuses": [
+      "pending"
+    ]
+  },
+  "generatedAt": "2026-06-10T14:43:15.362Z",
+  "counts": {
+    "releases": 1,
+    "tracks": 1,
+    "files": 0,
+    "missing": 1,
+    "parts": 1
+  },
+  "parts": [
+    {
+      "name": "release 10 june-9103d2.zip",
+      "type": "tracks",
+      "size": 7134,
+      "trackCount": 1
+    }
+  ],
+  "warnings": []
+}
