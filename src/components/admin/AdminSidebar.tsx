@@ -133,11 +133,6 @@ const menuSections = [
         path: '/admin/royalties',
         permission: 'payouts' as AdminPermission,
       },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
       {
         text: 'Settings',
         icon: <SettingsIcon />,
