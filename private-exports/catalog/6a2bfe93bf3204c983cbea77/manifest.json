@@ -1,0 +1,25 @@
+{
+  "jobId": "6a2bfe93bf3204c983cbea77",
+  "scope": "user",
+  "criteria": {
+    "zipGrouping": "per_user",
+    "releaseIds": [
+      "6a2937cbfa06af58779103d2"
+    ],
+    "userId": "6a0edb9365eafed006ae0f62",
+    "userIds": [],
+    "statuses": [
+      "pending"
+    ]
+  },
+  "generatedAt": "2026-06-12T12:41:56.157Z",
+  "counts": {
+    "releases": 1,
+    "tracks": 1,
+    "files": 0,
+    "missing": 1,
+    "parts": 0
+  },
+  "parts": [],
+  "warnings": []
+}

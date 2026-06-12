@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/utils/mongodb';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import {
@@ -23,6 +24,12 @@ function canReadRelease(release: any, user: any) {
   });
 }
 
+function getReleaseOwnerId(release: any) {
+  return [release.ownerUserId, release.userId, release.artistId, release.ownerId, release.createdBy]
+    .map((value) => String(value || '').trim())
+    .find(Boolean);
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -38,7 +45,24 @@ export async function GET(
     if (!canReadRelease(release, user)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
     }
-    return NextResponse.json({ success: true, release });
+
+    const ownerId = getReleaseOwnerId(release);
+    const ownerUser = ownerId && ObjectId.isValid(ownerId)
+      ? await db.collection('users').findOne(
+          { _id: new ObjectId(ownerId) },
+          { projection: { name: 1, email: 1, artistName: 1, role: 1, accountType: 1 } }
+        )
+      : null;
+    const enrichedRelease = ownerUser
+      ? {
+          ...release,
+          ownerUser,
+          userName: ownerUser.name || ownerUser.artistName || ownerUser.email,
+          userEmail: ownerUser.email,
+        }
+      : release;
+
+    return NextResponse.json({ success: true, release: enrichedRelease });
   } catch (e: any) {
     const message = e?.message || 'Failed to fetch release';
     return NextResponse.json({ success: false, error: message }, { status: message === 'Authentication required' ? 401 : 500 });

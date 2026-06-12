@@ -219,9 +219,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Single Audio Account Created',
+        subject: 'SingleAudio Distribution Account Created',
         title: 'Account Created',
-        intro: `${user.name} now has a Single Audio account.`,
+        intro: `${user.name} now has a SingleAudio Distribution account.`,
         details: {
           User: user.name,
           Email: user.email,
@@ -385,7 +385,7 @@ export const verifySignup = async (req: Request, res: Response): Promise<void> =
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Welcome to Single Audio',
+        subject: 'Welcome to SingleAudio Distribution',
         title: 'Account Created',
         intro: `${user.name} completed signup and can now submit KYC.`,
         details: {
@@ -463,8 +463,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       const resetUrl = `${origin.replace(/\/$/, '')}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
       await sendEmailMessage(
         email,
-        'Reset Your Single Audio Password',
-        `Use this secure link to reset your Single Audio password: ${resetUrl}\n\nThis link expires in 30 minutes.`
+        'Reset Your SingleAudio Distribution Password',
+        `Use this secure link to reset your SingleAudio Distribution password: ${resetUrl}\n\nThis link expires in 30 minutes.`
       );
     }
 
@@ -807,7 +807,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Single Audio Profile Updated',
+        subject: 'SingleAudio Distribution Profile Updated',
         title: 'Profile Updated',
         intro: `${user.name} updated profile details.`,
         details: {

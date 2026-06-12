@@ -54,10 +54,11 @@ export const TRACKS_DIR = path.join(UPLOAD_DIR, 'tracks');
 export const ARTWORK_DIR = path.join(UPLOAD_DIR, 'artwork');
 export const REGISTRATION_DIR = path.join(UPLOAD_DIR, 'registration');
 export const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200MB ceiling for audio files
+export const PROFILE_IMAGE_MAX_FILE_SIZE = 15 * 1024 * 1024;
 
 // Supported file types
 export const ALLOWED_AUDIO_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav'];
-export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Release statuses
 export enum ReleaseStatus {

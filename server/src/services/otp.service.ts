@@ -61,6 +61,55 @@ async function smtpCommand(socket: tls.TLSSocket, command: string) {
   }
 }
 
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const getFrontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+function renderBasicEmail(subject: string, text: string) {
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p style="margin:0 0 14px;color:#475569;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(part).replace(/\n/g, '<br />')}</p>`)
+    .join('');
+
+  return `
+    <!doctype html>
+    <html>
+      <body style="margin:0;padding:0;background:#05050a;color:#0f172a">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05050a">
+          <tr>
+            <td>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
+                <tr>
+                  <td style="padding:32px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.28) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.18) 0%, transparent 60%),#05050a;color:#ffffff">
+                    <img src="${escapeHtml(`${getFrontendUrl()}/images/singleaudio-b1.png`)}" alt="SingleAudio Distribution" width="220" style="display:block;max-width:220px;height:auto;margin:0 0 18px 0" />
+                    <div style="color:#ffffff;font:900 22px Arial,sans-serif;letter-spacing:.02em">SingleAudio Distribution</div>
+                    <div style="margin-top:6px;color:#cbd5e1;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.16em">Secure account notification</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:36px 40px">
+                    <h1 style="margin:0 0 12px;color:#0f172a;font:900 30px/1.15 Arial,sans-serif">${escapeHtml(subject)}</h1>
+                    ${paragraphs}
+                    <p style="margin:30px 0 0;color:#94a3b8;font:500 12px/1.5 Arial,sans-serif">This is an automated SingleAudio Distribution notification.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
 export async function sendEmailMessage(email: string, subject: string, text: string, html?: string): Promise<void> {
   const user = process.env.SMTP_GMAIL_USER;
   const pass = process.env.SMTP_GMAIL_APP_PASSWORD;
@@ -84,14 +133,15 @@ export async function sendEmailMessage(email: string, subject: string, text: str
   await smtpCommand(socket, `RCPT TO:<${email}>`);
   await smtpCommand(socket, 'DATA');
 
+  const bodyHtml = html || renderBasicEmail(subject, text);
   const message = [
-    `From: Single Audio <${user}>`,
+    `From: SingleAudio Distribution <${user}>`,
     `To: ${email}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
-    html ? 'Content-Type: text/html; charset=utf-8' : 'Content-Type: text/plain; charset=utf-8',
+    'Content-Type: text/html; charset=utf-8',
     '',
-    html || text,
+    bodyHtml,
     '.',
   ].join('\r\n');
   socket.write(`${message}\r\n`);
@@ -103,7 +153,7 @@ export async function sendEmailMessage(email: string, subject: string, text: str
 export async function sendEmailOtp(email: string, otp: string): Promise<void> {
   return sendEmailMessage(
     email,
-    'Your Single Audio OTP',
-    `Your OTP for Single Audio is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`
+    'Your SingleAudio Distribution OTP',
+    `Your OTP for SingleAudio Distribution is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`
   );
 }

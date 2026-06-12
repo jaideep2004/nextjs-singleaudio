@@ -210,13 +210,22 @@ export default function AdminExportPage() {
     if (users.length === 0) void loadUsers();
   };
 
+  const resetExportDialog = () => {
+    setExportScope('status');
+    setExportStatus('approved');
+    setSelectedReleaseId('');
+    setSelectedUserId('');
+    setSelectedUserIds([]);
+    setSelectedUserReleaseIds([]);
+  };
+
   const handleCreateExport = async () => {
     setCreating(true);
     setError('');
 
     try {
       const createScope =
-        exportScope === 'user' && selectedUserReleaseIds.length > 0 ? 'release' : exportScope;
+        exportScope === 'user' && selectedUserReleaseIds.length > 0 ? 'user' : exportScope;
       const statuses =
         exportScope === 'user'
           ? ['pending']
@@ -237,7 +246,7 @@ export default function AdminExportPage() {
           userId: exportScope === 'user' ? selectedUserId : undefined,
           userIds: createScope === 'users' ? selectedUserIds : [],
           statuses,
-          zipGrouping: createScope === 'users' ? 'per_user' : 'per_release',
+          zipGrouping: createScope === 'users' || exportScope === 'user' ? 'per_user' : 'per_release',
         }),
       });
       const payload = await response.json().catch(() => null);
@@ -245,6 +254,7 @@ export default function AdminExportPage() {
         throw new Error(payload?.error || 'Failed to start export');
       }
       setExportOpen(false);
+      resetExportDialog();
       await loadJobs(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start export');
@@ -602,7 +612,15 @@ export default function AdminExportPage() {
         </TableContainer>
       </Paper>
 
-      <Dialog open={exportOpen} onClose={() => setExportOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={exportOpen}
+        onClose={() => {
+          setExportOpen(false);
+          resetExportDialog();
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 950 }}>Create Catalog Export</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2} sx={{ pt: 0.5 }}>
@@ -782,7 +800,15 @@ export default function AdminExportPage() {
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setExportOpen(false)} disabled={creating}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setExportOpen(false);
+              resetExportDialog();
+            }}
+            disabled={creating}
+          >
+            Cancel
+          </Button>
           <Button
             variant="contained"
             onClick={handleCreateExport}

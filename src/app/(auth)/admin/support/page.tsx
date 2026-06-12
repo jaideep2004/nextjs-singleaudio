@@ -117,7 +117,7 @@ export default function AdminSupportPage() {
       const response = await adminSupportAPI.getTickets(params);
       const nextTickets = response?.data?.tickets || [];
       setTickets(nextTickets);
-      setSelectedId(current => current || nextTickets[0]?._id || '');
+      setSelectedId(current => (current && nextTickets.some((ticket: any) => ticket._id === current) ? current : ''));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load support queue');
     } finally {
@@ -146,7 +146,7 @@ export default function AdminSupportPage() {
     setTickets(current =>
       current.map(ticket => (ticket._id === id ? { ...ticket, unreadMessageCount: 0 } : ticket))
     );
-    setDetail(current =>
+    setDetail((current: any | null) =>
       current?.ticket?._id === id
         ? { ...current, ticket: { ...current.ticket, unreadMessageCount: 0 } }
         : current
@@ -431,7 +431,11 @@ export default function AdminSupportPage() {
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            xl: queueHidden ? 'minmax(0, 1fr) 340px' : '390px minmax(0, 1fr) 340px',
+            xl: !selectedTicket
+              ? '1fr'
+              : queueHidden
+                ? 'minmax(0, 1fr) 340px'
+                : '390px minmax(0, 1fr) 340px',
           },
           gap: 2,
         }}
@@ -559,7 +563,16 @@ export default function AdminSupportPage() {
           )}
         </Paper>
 
-        <Paper sx={{ borderRadius: 2, minHeight: 620, display: 'flex', flexDirection: 'column' }}>
+        <Paper
+          sx={{
+            borderRadius: 2,
+            height: selectedTicket ? '90vh' : 'auto',
+            minHeight: selectedTicket ? 0 : 360,
+            display: selectedTicket ? 'flex' : 'none',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           {!selectedTicket ? (
             <Box sx={{ m: 'auto', p: 4, textAlign: 'center' }}>
               <Typography color="text.secondary">Select ticket.</Typography>
@@ -640,7 +653,18 @@ export default function AdminSupportPage() {
                 </Stack>
               </Box>
 
-              <Stack spacing={1.5} sx={{ p: 2, flex: 1, overflow: 'auto' }}>
+              <Stack
+                spacing={1.5}
+                sx={{
+                  p: 2,
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  scrollbarWidth: 'thin',
+                  '&::-webkit-scrollbar': { width: 4 },
+                  '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 999 },
+                }}
+              >
                 {detailLoading ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}>
                     <CircularProgress size={24} />
@@ -721,14 +745,14 @@ export default function AdminSupportPage() {
                   <Button
                     type="submit"
                     variant="contained"
-                    endIcon={<SendIcon />}
+                    endIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon />}
                     disabled={
                       submitting ||
                       selectedTicket.status === 'closed' ||
                       (!reply.trim() && !replyAttachment)
                     }
                   >
-                    Reply
+                    {submitting ? 'Sending' : 'Reply'}
                   </Button>
                 </Stack>
                 {replyAttachment && (
@@ -752,7 +776,7 @@ export default function AdminSupportPage() {
           )}
         </Paper>
 
-        <Stack spacing={2}>
+        <Stack spacing={2} sx={{ display: selectedTicket ? 'flex' : 'none' }}>
           <Paper sx={{ p: 2, borderRadius: 2 }}>
             <Stack spacing={1.5}>
               <Typography fontWeight={900}>Actions</Typography>

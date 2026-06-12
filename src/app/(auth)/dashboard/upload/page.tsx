@@ -624,6 +624,9 @@ export default function UploadPage() {
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
+  const releaseDraftKey = `singleaudio.releaseDraft.v1.${auth.user?.id || 'anonymous'}`;
+  const releaseDraftRestoredRef = useRef(false);
+  const [releaseDraftReady, setReleaseDraftReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -816,6 +819,7 @@ export default function UploadPage() {
       const data = await res.json();
       if (data.success) {
         setSubmitState('success');
+        if (typeof window !== 'undefined') localStorage.removeItem(releaseDraftKey);
         toast.success(
           isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.'
         );
@@ -1051,6 +1055,146 @@ export default function UploadPage() {
       acrCloudPollRef.current = {};
     };
   }, []);
+
+  useEffect(() => {
+    if (!mounted || releaseDraftRestoredRef.current || typeof window === 'undefined') return;
+    if (editReleaseId) {
+      releaseDraftRestoredRef.current = true;
+      setReleaseDraftReady(true);
+      return;
+    }
+    releaseDraftRestoredRef.current = true;
+
+    const raw = localStorage.getItem(releaseDraftKey);
+    if (!raw) {
+      setReleaseDraftReady(true);
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(raw);
+      if (draft?.status !== 'draft') {
+        setReleaseDraftReady(true);
+        return;
+      }
+
+      setActiveStep(Number(draft.activeStep || 0));
+      setReleaseType((draft.releaseType || 'single') as ReleaseType);
+      setReleaseTitle(draft.releaseTitle || '');
+      setLabel(draft.label || '');
+      setUpc(draft.upc || '');
+      setAutoGenerateCodes(draft.autoGenerateCodes !== false);
+      setAutoGenerateIsrcs(draft.autoGenerateIsrcs !== false);
+      setReleaseDate(draft.releaseDate || '');
+      setOriginalReleaseDate(draft.originalReleaseDate || '');
+      setArtworkUploadedUrl(draft.artworkUploadedUrl || null);
+      setArtworkUploadedFilename(draft.artworkUploadedFilename || null);
+      setArtworkPreview(draft.artworkUploadedUrl || null);
+      setTerritoryCountries(Array.isArray(draft.territoryCountries) ? draft.territoryCountries : []);
+      setTerritoryMode(draft.territoryMode || 'allowed');
+      setRightsType(draft.rightsType || 'exclusive');
+      setRightsDescription(draft.rightsDescription || '');
+      setSelectedDSPs(Array.isArray(draft.selectedDSPs) ? draft.selectedDSPs : []);
+      setReleaseWorldwide(Boolean(draft.releaseWorldwide));
+      setDistributionTermsAccepted(Boolean(draft.distributionTermsAccepted));
+
+      const nextTrackInfos = Array.isArray(draft.trackInfos) ? draft.trackInfos : [];
+      const nextAudioUrls = Array.isArray(draft.audioUploadedUrls) ? draft.audioUploadedUrls : [];
+      const nextAudioFiles = Array.isArray(draft.audioUploadedFilenames) ? draft.audioUploadedFilenames : [];
+      const trackCount = Math.max(nextTrackInfos.length, nextAudioUrls.length, nextAudioFiles.length);
+      setTrackInfos(nextTrackInfos.length ? nextTrackInfos : []);
+      setTracks(Array.from({ length: trackCount }, (_, index) => new File([], nextAudioFiles[index] || nextTrackInfos[index]?.title || `track-${index + 1}.mp3`, { type: 'audio/mpeg' })));
+      setAudioUploadedUrls(resizeList(nextAudioUrls, trackCount, null));
+      setAudioUploadedFilenames(resizeList(nextAudioFiles, trackCount, null));
+      setAudioAcrCloudStatuses(resizeList(Array.isArray(draft.audioAcrCloudStatuses) ? draft.audioAcrCloudStatuses : [], trackCount, null));
+      setAudioUploadPct(Array.from({ length: trackCount }, (_, index) => (nextAudioUrls[index] ? 100 : 0)));
+      setTrackPreviewUrls(resizeList(nextAudioUrls, trackCount, null));
+      setTrackUploading(Array.from({ length: trackCount }, () => false));
+      setAnalysisLoading(Array.from({ length: trackCount }, () => false));
+      toast.info('Recovered your draft release.');
+    } catch {
+      localStorage.removeItem(releaseDraftKey);
+    } finally {
+      setReleaseDraftReady(true);
+    }
+  }, [editReleaseId, mounted, releaseDraftKey]);
+
+  useEffect(() => {
+    if (!mounted || !releaseDraftReady || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+
+    const hasDraftData =
+      releaseTitle.trim() ||
+      label.trim() ||
+      upc.trim() ||
+      releaseDate ||
+      originalReleaseDate ||
+      artworkUploadedUrl ||
+      trackInfos.some((track) => Object.values(track).some((value) => {
+        if (Array.isArray(value)) return value.some((item) => Object.values(item).some(Boolean));
+        return Boolean(value);
+      })) ||
+      audioUploadedUrls.some(Boolean);
+
+    if (!hasDraftData) return;
+
+    localStorage.setItem(
+      releaseDraftKey,
+      JSON.stringify({
+        status: 'draft',
+        updatedAt: new Date().toISOString(),
+        activeStep,
+        releaseType,
+        releaseTitle,
+        label,
+        upc,
+        autoGenerateCodes,
+        autoGenerateIsrcs,
+        releaseDate,
+        originalReleaseDate,
+        artworkUploadedUrl,
+        artworkUploadedFilename,
+        territoryCountries,
+        territoryMode,
+        rightsType,
+        rightsDescription,
+        selectedDSPs,
+        releaseWorldwide,
+        distributionTermsAccepted,
+        trackInfos,
+        audioUploadedUrls,
+        audioUploadedFilenames,
+        audioAcrCloudStatuses,
+      })
+    );
+  }, [
+    activeStep,
+    artworkUploadedFilename,
+    artworkUploadedUrl,
+    audioAcrCloudStatuses,
+    audioUploadedFilenames,
+    audioUploadedUrls,
+    autoGenerateCodes,
+    autoGenerateIsrcs,
+    distributionTermsAccepted,
+    editReleaseId,
+    label,
+    mounted,
+    originalReleaseDate,
+    releaseDate,
+    releaseDraftKey,
+    releaseDraftReady,
+    releaseTitle,
+    releaseType,
+    releaseWorldwide,
+    rightsDescription,
+    rightsType,
+    selectedDSPs,
+    submitState,
+    territoryCountries,
+    territoryMode,
+    trackInfos,
+    upc,
+  ]);
 
   useEffect(() => {
     const loadAllowed = async () => {

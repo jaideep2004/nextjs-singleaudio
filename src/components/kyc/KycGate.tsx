@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -231,6 +231,9 @@ export default function KycGate({ children }: { children: ReactNode }) {
   const status = user?.verification?.status || 'pending';
   const needsKyc = userNeedsKyc(user);
   const isIndia = form.region === 'india';
+  const kycDraftKey = `singleaudio.kycDraft.v1.${user?.id || 'anonymous'}`;
+  const kycDraftRestoredRef = useRef(false);
+  const [kycDraftReady, setKycDraftReady] = useState(false);
 
   const statusMeta = useMemo(() => {
     if (status === 'submitted') return { label: 'Submitted for review', color: 'warning' as const };
@@ -255,6 +258,47 @@ export default function KycGate({ children }: { children: ReactNode }) {
     setCities([]);
     void readLookup<CityOption[]>(`/api/geo/cities/${form.countryIso}/${form.stateIso}`, []).then(setCities);
   }, [form.countryIso, form.region, form.stateIso]);
+
+  useEffect(() => {
+    if (!needsKyc || kycDraftRestoredRef.current || typeof window === 'undefined') return;
+    kycDraftRestoredRef.current = true;
+
+    const raw = localStorage.getItem(kycDraftKey);
+    if (!raw) {
+      setKycDraftReady(true);
+      return;
+    }
+
+    try {
+      const draft = JSON.parse(raw);
+      if (draft?.status !== 'draft' || !draft.form) {
+        setKycDraftReady(true);
+        return;
+      }
+      setActiveStep(Math.min(steps.length - 1, Math.max(0, Number(draft.activeStep || 0))));
+      setForm((prev) => ({ ...prev, ...draft.form }));
+    } catch {
+      localStorage.removeItem(kycDraftKey);
+    } finally {
+      setKycDraftReady(true);
+    }
+  }, [kycDraftKey, needsKyc]);
+
+  useEffect(() => {
+    if (!needsKyc || !kycDraftReady || typeof window === 'undefined') return;
+    localStorage.setItem(
+      kycDraftKey,
+      JSON.stringify({
+        status: 'draft',
+        updatedAt: new Date().toISOString(),
+        activeStep,
+        form,
+        fileNames: Object.fromEntries(
+          Object.entries(files).map(([key, file]) => [key, file?.name || ''])
+        ),
+      })
+    );
+  }, [activeStep, files, form, kycDraftKey, kycDraftReady, needsKyc]);
 
   if (!needsKyc) return <>{children}</>;
 
@@ -438,6 +482,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/me/kyc', { method: 'PUT', body: payload });
       const json = await response.json().catch(() => null);
       if (!response.ok || !json?.success) throw new Error(json?.message || json?.error || 'KYC submission failed');
+      if (typeof window !== 'undefined') localStorage.removeItem(kycDraftKey);
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'KYC submission failed');

@@ -10,6 +10,7 @@ import {
   SUPPORT_ATTACHMENT_DIR,
   KNOWLEDGE_BASE_MEDIA_DIR,
   MAX_FILE_SIZE,
+  PROFILE_IMAGE_MAX_FILE_SIZE,
   ALLOWED_AUDIO_TYPES,
   ALLOWED_IMAGE_TYPES,
   ALLOWED_SUPPORT_ATTACHMENT_TYPES,
@@ -111,7 +112,7 @@ export const uploadAudio = multer({
 export const uploadImage = multer({
   storage: imageStorage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB
+    fileSize: PROFILE_IMAGE_MAX_FILE_SIZE
   },
   fileFilter: imageFileFilter
 });

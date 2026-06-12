@@ -67,7 +67,9 @@ export default function UserSupportPage() {
       const response = await supportAPI.getTickets();
       const nextTickets = response?.data?.tickets || [];
       setTickets(nextTickets);
-      setSelectedId((current) => current || nextTickets[0]?._id || '');
+      setSelectedId((current) =>
+        current && nextTickets.some((ticket: any) => ticket._id === current) ? current : ''
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load support tickets');
     } finally {
@@ -242,7 +244,13 @@ export default function UserSupportPage() {
         </Paper>
       )}
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '360px 1fr' }, gap: 2 }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: selectedTicket ? '360px 1fr' : '1fr' },
+          gap: 2,
+        }}
+      >
         <Paper sx={{ borderRadius: 2, overflow: 'hidden' }}>
           <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Typography fontWeight={900}>Tickets</Typography>
@@ -291,7 +299,16 @@ export default function UserSupportPage() {
           )}
         </Paper>
 
-        <Paper sx={{ borderRadius: 2, minHeight: 520, display: 'flex', flexDirection: 'column' }}>
+        <Paper
+          sx={{
+            borderRadius: 2,
+            height: selectedTicket ? '90vh' : 'auto',
+            minHeight: selectedTicket ? 0 : 360,
+            display: selectedTicket ? 'flex' : 'none',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           {!selectedTicket ? (
             <Box sx={{ p: 4, textAlign: 'center', m: 'auto' }}>
               <Typography color="text.secondary">Select a ticket to view conversation.</Typography>
@@ -314,7 +331,18 @@ export default function UserSupportPage() {
                 </Stack>
               </Box>
 
-              <Stack spacing={1.5} sx={{ p: 2, flex: 1, overflow: 'auto' }}>
+              <Stack
+                spacing={1.5}
+                sx={{
+                  p: 2,
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  scrollbarWidth: 'thin',
+                  '&::-webkit-scrollbar': { width: 4 },
+                  '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 999 },
+                }}
+              >
                 {detailLoading ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress size={24} /></Box>
                 ) : (
@@ -357,7 +385,7 @@ export default function UserSupportPage() {
                     fullWidth
                     disabled={selectedTicket.status === 'closed'}
                   />
-                  <IconButton component="label" disabled={selectedTicket.status === 'closed'}>
+                  <IconButton component="label" disabled={submitting || selectedTicket.status === 'closed'}>
                     <AttachFile />
                     <input hidden type="file" onChange={handleAttachment} />
                   </IconButton>
@@ -365,11 +393,11 @@ export default function UserSupportPage() {
                     type="submit"
                     variant="contained"
                     endIcon={
-                      submitting && attachment ? <CircularProgress size={16} color="inherit" /> : <SendIcon />
+                      submitting ? <CircularProgress size={16} color="inherit" /> : <SendIcon />
                     }
-                    disabled={submitting || selectedTicket.status === 'closed'}
+                    disabled={submitting || selectedTicket.status === 'closed' || (!reply.trim() && !attachment)}
                   >
-                    {submitting && attachment ? 'Sending' : 'Send'}
+                    {submitting ? 'Sending' : 'Send'}
                   </Button>
                 </Stack>
               </Box>

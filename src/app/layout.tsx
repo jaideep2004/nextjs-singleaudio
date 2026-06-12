@@ -7,9 +7,9 @@ export const metadata: Metadata = {
   title: 'Single Audio - Music Distribution Platform',
   description: 'Distribute your music worldwide with Single Audio',
   icons: {
-    icon: '/images/favicon-s2.png',
-    shortcut: '/images/favicon-s2.png',
-    apple: '/images/favicon-s2.png',
+    icon: '/images/favicon-s3.png',
+    shortcut: '/images/favicon-s3.png',
+    apple: '/images/favicon-s3.png',
   },
 };
 

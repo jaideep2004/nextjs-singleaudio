@@ -59,6 +59,11 @@ type Track = {
   isrc?: string;
   duration?: string | number;
   explicit?: boolean;
+  copyrightC?: string;
+  copyrightP?: string;
+  copyrightCYear?: string | number;
+  copyrightPYear?: string | number;
+  label?: string;
   acrCloud?: AcrCloudStatusLike;
 };
 
@@ -80,6 +85,12 @@ type Release = {
   label?: string;
   copyright?: string;
   production?: string;
+  cLine?: string;
+  cline?: string;
+  pLine?: string;
+  pline?: string;
+  copyrightC?: string;
+  copyrightP?: string;
   stores?: string[];
   tracks?: Track[];
   rejectionReason?: string;
@@ -255,6 +266,9 @@ function ReleaseDetail() {
   const readyAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'ready').length;
   const pendingAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'pending').length;
   const rejectedReason = release?.rejectionReason || release?.rejectReason;
+  const firstTrack = tracks[0];
+  const releaseGenre = release?.genre || firstTrack?.genre || '';
+  const releaseSubGenre = release?.subGenre || firstTrack?.subGenre || '';
 
   const handlePlayPause = (trackId: string, audioUrl?: string) => {
     if (!audioUrl) return;
@@ -671,7 +685,7 @@ function ReleaseDetail() {
                   </Stack>
 
                   <Typography sx={{ fontSize: '0.8rem', color: isDark ? 'rgba(255,255,255,0.58)' : 'rgba(15,23,42,0.58)' }}>
-                    {track.genre || release.genre || 'Not set'}
+                    {[track.genre || releaseGenre, track.subGenre || releaseSubGenre].filter(Boolean).join(' / ') || 'Not set'}
                   </Typography>
 
                   <Typography sx={{ fontSize: '0.8rem', color: isDark ? 'rgba(255,255,255,0.58)' : 'rgba(15,23,42,0.58)' }}>
@@ -719,13 +733,15 @@ function ReleaseDetail() {
             </Stack>
             {[
               ['UPC', release.upc],
-              ['Label', release.label],
-              ['Genre', [release.genre, release.subGenre].filter(Boolean).join(' / ')],
+              ['Label', release.label || tracks[0]?.label],
+              ['Release type', release.releaseType],
+              ['Digital release', formatDate(release.releaseDate)],
+              ['Genre', [releaseGenre, releaseSubGenre].filter(Boolean).join(' / ')],
               ['Original release', formatDate(release.originalReleaseDate)],
               ['Created', formatDate(release.createdAt)],
               ['Updated', formatDate(release.updatedAt)],
-              ['C line', release.copyright],
-              ['P line', release.production],
+              ['C line', release.copyright || release.cLine || release.cline || release.copyrightC || [tracks[0]?.copyrightCYear, tracks[0]?.copyrightC].filter(Boolean).join(' ')],
+              ['P line', release.production || release.pLine || release.pline || release.copyrightP || [tracks[0]?.copyrightPYear, tracks[0]?.copyrightP].filter(Boolean).join(' ')],
             ].map(([label, value], index) => (
               <Box key={label}>
                 {index > 0 && <Divider sx={{ my: 1.15, borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)' }} />}

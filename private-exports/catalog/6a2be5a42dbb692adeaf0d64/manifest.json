@@ -1,0 +1,32 @@
+{
+  "jobId": "6a2be5a42dbb692adeaf0d64",
+  "scope": "release",
+  "criteria": {
+    "zipGrouping": "per_release",
+    "releaseIds": [
+      "6a2a84765cf62b3a96c30476"
+    ],
+    "userId": "6a047aebedd8ab2b75609ee6",
+    "userIds": [],
+    "statuses": [
+      "pending"
+    ]
+  },
+  "generatedAt": "2026-06-12T10:55:33.539Z",
+  "counts": {
+    "releases": 1,
+    "tracks": 3,
+    "files": 0,
+    "missing": 3,
+    "parts": 1
+  },
+  "parts": [
+    {
+      "name": "Cold Love Confessions-c30476.zip",
+      "type": "tracks",
+      "size": 7483,
+      "trackCount": 3
+    }
+  ],
+  "warnings": []
+}

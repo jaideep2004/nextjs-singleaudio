@@ -20,7 +20,6 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 
 const navItems = [
-  { label: 'Home', href: '/' },
   { label: 'Login', href: '/login' },
   { label: 'Sign Up', href: '/signup' },
 ];
@@ -36,9 +35,12 @@ export default function PublicNavBar() {
 
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
-      <Typography variant="h6" sx={{ my: 2 }}>
-        Single Audio
-      </Typography>
+      <Box
+        component="img"
+        src={theme.palette.mode === 'dark' ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+        alt="SingleAudio Distribution"
+        sx={{ width: 190, maxWidth: '80%', my: 2 }}
+      />
       <Divider />
       <List>
         {navItems.map((item) => (
@@ -54,7 +56,17 @@ export default function PublicNavBar() {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <AppBar component="nav" position="static">
+      <AppBar
+        component="nav"
+        position="static"
+        elevation={0}
+        sx={{
+          bgcolor: theme.palette.mode === 'dark' ? '#05050a' : '#ffffff',
+          color: theme.palette.mode === 'dark' ? '#ffffff' : '#05050a',
+          borderBottom: '1px solid',
+          borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.10)' : 'rgba(5,5,10,0.10)',
+        }}
+      >
         <Toolbar>
           {isMobile && (
             <IconButton
@@ -67,13 +79,24 @@ export default function PublicNavBar() {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{ flexGrow: 1, textAlign: { xs: 'center', md: 'left' } }}
+          <Box
+            component={Link}
+            href="/login"
+            sx={{
+              flexGrow: 1,
+              display: 'inline-flex',
+              justifyContent: { xs: 'center', md: 'flex-start' },
+              alignItems: 'center',
+              minWidth: 0,
+            }}
           >
-            Single Audio.
-          </Typography>
+            <Box
+              component="img"
+              src={theme.palette.mode === 'dark' ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
+              alt="SingleAudio Distribution"
+              sx={{ width: { xs: 180, sm: 220 }, maxHeight: 44, objectFit: 'contain' }}
+            />
+          </Box>
           {!isMobile && (
             <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
               {navItems.map((item) => (

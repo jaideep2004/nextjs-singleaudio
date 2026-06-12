@@ -379,13 +379,17 @@ function createUserZipName(user: { id: string; name: string; email: string }, in
 function buildReleaseQuery(job: CatalogExportJob) {
   const criteria = job.criteria || {};
   const query: Record<string, unknown> = {};
+  const releaseIds = (criteria.releaseIds || [])
+    .filter((id) => ObjectId.isValid(id))
+    .map((id) => new ObjectId(id));
 
   if (job.scope === 'release') {
-    const ids = (criteria.releaseIds || [])
-      .filter((id) => ObjectId.isValid(id))
-      .map((id) => new ObjectId(id));
-    query._id = { $in: ids.length ? ids : [new ObjectId()] };
+    query._id = { $in: releaseIds.length ? releaseIds : [new ObjectId()] };
     return query;
+  }
+
+  if (releaseIds.length) {
+    query._id = { $in: releaseIds };
   }
 
   if ((job.scope === 'user' && criteria.userId) || (job.scope === 'users' && criteria.userIds?.length)) {
@@ -558,10 +562,14 @@ async function createUserZip(params: {
     fs.promises.unlink(userJsonPath).catch(() => undefined),
   ]);
 
+  const stats = await fs.promises.stat(zipPath);
   return {
     name: path.basename(zipPath),
+    type: 'tracks' as const,
     path: zipPath,
+    size: stats.size,
     trackCount: params.group.trackRows.length,
+    createdAt: new Date(),
   };
 }
 
@@ -752,7 +760,9 @@ export async function processCatalogExportJob(jobId: string) {
 
     for await (const rawRelease of releases) {
       const [release] = await hydrateReleasesWithCanonicalTracks(db, [rawRelease as Record<string, any> & { _id: ObjectId }]);
-      const groupByUser = job.scope === 'users' && job.criteria?.zipGrouping === 'per_user';
+      const groupByUser =
+        (job.scope === 'user' || job.scope === 'users') &&
+        job.criteria?.zipGrouping === 'per_user';
       let userGroup: UserExportGroup | undefined;
       if (groupByUser) {
         const userInfo = getReleaseUserInfo(release);
@@ -866,20 +876,24 @@ export async function processCatalogExportJob(jobId: string) {
     parts.unshift(metadataPart);
     counts.parts = parts.length;
 
-    if (job.scope === 'users' && job.criteria?.zipGrouping === 'per_user') {
-      const userZips: Array<{ name: string; path: string; trackCount: number }> = [];
+    if ((job.scope === 'user' || job.scope === 'users') && job.criteria?.zipGrouping === 'per_user') {
+      const userZips: CatalogExportPart[] = [];
       let userIndex = 0;
       for (const group of userGroups.values()) {
         userZips.push(await createUserZip({ jobDir, group, userIndex }));
         userIndex += 1;
       }
-      const parentPart = await createUsersParentZip({
-        jobDir,
-        userZips,
-        metadataPart,
-        manifestPath,
-      });
-      parts.push(parentPart);
+      if (job.scope === 'user') {
+        parts.push(...userZips);
+      } else {
+        const parentPart = await createUsersParentZip({
+          jobDir,
+          userZips,
+          metadataPart,
+          manifestPath,
+        });
+        parts.push(parentPart);
+      }
       counts.parts = parts.length;
     }
 

@@ -34,6 +34,15 @@ const STEP_FIELDS: Record<number, (keyof SignupFormValues)[]> = {
   2: [],
 };
 
+const authBackground = `
+  radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.18) 0%, transparent 60%),
+  radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.10) 0%, transparent 60%),
+  radial-gradient(ellipse 50% 60% at 50% 50%, rgba(83,12,195,0.07) 0%, transparent 70%),
+  #05050A
+`;
+
+const authButtonGradient = 'linear-gradient(135deg,#ed1e79,#7b1fa2)';
+
 export default function SignupPage() {
   const { startSignup, verifySignup } = useAuth();
 
@@ -131,7 +140,8 @@ export default function SignupPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(180deg, #08111f 0%, #0d1726 45%, #121a2d 100%)',
+          background: authBackground,
+          bgcolor: '#05050a',
         }}
       >
         <CircularProgress sx={{ color: '#4a6cf7' }} />
@@ -148,7 +158,8 @@ export default function SignupPage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(180deg, #08111f 0%, #0d1726 45%, #121a2d 100%)',
+          background: authBackground,
+          bgcolor: '#05050a',
           px: 2,
         }}
       >
@@ -179,7 +190,7 @@ export default function SignupPage() {
             sx={{
               borderRadius: '14px',
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
+              background: authButtonGradient,
               px: 4,
               py: 1.5,
             }}
@@ -202,8 +213,8 @@ export default function SignupPage() {
         overflow: 'hidden',
         px: { xs: 2, sm: 3, md: 5, lg: 6 },
         py: { xs: 3, md: 6 },
-        background:
-          'linear-gradient(180deg, #08111f 0%, #0d1726 45%, #121a2d 100%)',
+        background: authBackground,
+        bgcolor: '#05050a',
       }}
     >
       <Box
@@ -212,7 +223,7 @@ export default function SignupPage() {
           inset: 0,
           pointerEvents: 'none',
           background:
-            'linear-gradient(135deg, rgba(37,99,235,0.12) 0%, transparent 34%, rgba(15,118,110,0.1) 100%)',
+            'transparent',
         }}
       />
 
@@ -503,11 +514,11 @@ export default function SignupPage() {
                       py: 1.5,
                       width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
-                      boxShadow: '0 12px 28px rgba(37,99,235,0.22)',
+                      background: authButtonGradient,
+                      boxShadow: '0 12px 28px rgba(237,30,121,0.22)',
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%)',
-                        boxShadow: '0 16px 32px rgba(37,99,235,0.30)',
+                        background: authButtonGradient,
+                        boxShadow: '0 16px 32px rgba(123,31,162,0.30)',
                       },
                     }}
                   >
@@ -533,11 +544,11 @@ export default function SignupPage() {
                       py: 1.5,
                       width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
-                      boxShadow: '0 12px 28px rgba(37,99,235,0.22)',
+                      background: authButtonGradient,
+                      boxShadow: '0 12px 28px rgba(237,30,121,0.22)',
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%)',
-                        boxShadow: '0 16px 32px rgba(37,99,235,0.30)',
+                        background: authButtonGradient,
+                        boxShadow: '0 16px 32px rgba(123,31,162,0.30)',
                       },
                       '&.Mui-disabled': {
                         background: 'rgba(37,99,235,0.4)',

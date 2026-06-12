@@ -81,7 +81,7 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Single Audio Account Created by Admin',
+        subject: 'SingleAudio Distribution Account Created by Admin',
         title: 'Account Created',
         intro: `${user.name} was created by an admin.`,
         details: {
@@ -303,7 +303,7 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Single Audio User Profile Updated',
+        subject: 'SingleAudio Distribution User Profile Updated',
         title: 'User Profile Updated',
         intro: `${user.name} account details were updated by an admin.`,
         details: {

@@ -51,6 +51,15 @@ const featureCards = [
   },
 ];
 
+const authBackground = `
+  radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.18) 0%, transparent 60%),
+  radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.10) 0%, transparent 60%),
+  radial-gradient(ellipse 50% 60% at 50% 50%, rgba(83,12,195,0.07) 0%, transparent 70%),
+  #05050A
+`;
+
+const authButtonGradient = 'linear-gradient(135deg,#ed1e79,#7b1fa2)';
+
 export default function LoginPage() {
   const { login } = useAuth();
   const theme = useTheme();
@@ -93,10 +102,8 @@ export default function LoginPage() {
         minHeight: 'calc(100vh - 96px)',
         px: { xs: 2, sm: 3, md: 5, lg: 6 },
         py: { xs: 3, md: 6 },
-        background:
-          theme.palette.mode === 'dark'
-            ? 'linear-gradient(180deg, #08111f 0%, #0d1726 45%, #121a2d 100%)'
-            : 'linear-gradient(180deg, #f5f7fb 0%, #edf2f8 48%, #e6edf6 100%)',
+        background: authBackground,
+        bgcolor: '#05050a',
       }}
     >
       <Box
@@ -104,10 +111,7 @@ export default function LoginPage() {
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
-          background:
-            theme.palette.mode === 'dark'
-              ? 'radial-gradient(circle at 12% 18%, rgba(70, 127, 255, 0.26), transparent 24%), radial-gradient(circle at 88% 16%, rgba(255, 140, 82, 0.20), transparent 20%), radial-gradient(circle at 78% 78%, rgba(95, 201, 173, 0.14), transparent 22%)'
-              : 'radial-gradient(circle at 12% 18%, rgba(70, 127, 255, 0.16), transparent 24%), radial-gradient(circle at 88% 16%, rgba(255, 140, 82, 0.14), transparent 20%), radial-gradient(circle at 78% 78%, rgba(16, 140, 120, 0.10), transparent 22%)',
+          background: 'transparent',
         }}
       />
 
@@ -211,7 +215,7 @@ export default function LoginPage() {
                     lineHeight: 1.02,
                     fontWeight: 800,
                     maxWidth: 720,
-                    letterSpacing: '-0.04em',
+                    letterSpacing: 0,
                   }}
                 >
                   Enter your private music operations suite.
@@ -341,7 +345,7 @@ export default function LoginPage() {
                         lineHeight: 1.1,
                         fontWeight: 800,
                         color: theme.palette.mode === 'dark' ? '#f8fafc' : '#0f172a',
-                        letterSpacing: '-0.03em',
+                        letterSpacing: 0,
                       }}
                     >
                       Welcome Back
@@ -475,11 +479,11 @@ export default function LoginPage() {
                       borderRadius: '18px',
                       fontWeight: 700,
                       fontSize: '1rem',
-                      boxShadow: '0 18px 34px rgba(37, 99, 235, 0.24)',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #0f766e 100%)',
+                      boxShadow: '0 18px 34px rgba(237,30,121,0.24)',
+                      background: authButtonGradient,
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #0f766e 100%)',
-                        boxShadow: '0 22px 38px rgba(37, 99, 235, 0.30)',
+                        background: authButtonGradient,
+                        boxShadow: '0 22px 38px rgba(123,31,162,0.32)',
                       },
                     }}
                   >

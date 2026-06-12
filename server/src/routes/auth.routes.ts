@@ -1,6 +1,8 @@
-import { Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
+import multer from 'multer';
 import * as authController from '../controllers/auth.controller';
 import { protect } from '../middleware/auth.middleware';
+import { ApiError } from '../middleware/errorHandler.middleware';
 import { validate } from '../middleware/validator.middleware';
 import {
   registerValidator,
@@ -9,8 +11,28 @@ import {
   changePasswordValidator,
 } from '../validators/auth.validator';
 import { uploadImage, uploadRegistrationFiles } from '../utils/fileUpload';
+import { PROFILE_IMAGE_MAX_FILE_SIZE } from '../config/constants';
 
 const router = Router();
+const profilePictureUpload = (req: Request, res: Response, next: NextFunction): void => {
+  uploadImage.single('profilePicture')(req, res, (error: unknown) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError) {
+      const maxMb = Math.floor(PROFILE_IMAGE_MAX_FILE_SIZE / (1024 * 1024));
+      const message = error.code === 'LIMIT_FILE_SIZE'
+        ? `Profile image must be ${maxMb}MB or smaller`
+        : error.message;
+      next(new ApiError(message, 400));
+      return;
+    }
+
+    next(error);
+  });
+};
 
 /**
  * @route   GET /api/auth/check-artist-name
@@ -63,7 +85,7 @@ router.put('/me/kyc', protect, uploadRegistrationFiles, authController.submitKyc
  * @access  Private
  */
 router.put('/me', protect, validate(updateProfileValidator), authController.updateProfile);
-router.put('/me/profile-picture', protect, uploadImage.single('profilePicture'), authController.updateProfilePicture);
+router.put('/me/profile-picture', protect, profilePictureUpload, authController.updateProfilePicture);
 
 /**
  * @route   PUT /api/auth/change-password

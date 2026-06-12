@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
     const userIds = Array.isArray(body?.userIds)
       ? body.userIds.map((id: unknown) => String(id)).filter(Boolean)
       : [];
+    const zipGrouping = body?.zipGrouping === 'per_user' ? 'per_user' : 'per_release';
 
     if (scope === 'release' && releaseIds.length === 0) {
       return NextResponse.json({ success: false, error: 'At least one release is required' }, { status: 400 });
@@ -124,7 +125,9 @@ export async function POST(req: NextRequest) {
         userId,
         userIds,
         statuses,
-        zipGrouping: scope === 'users' ? 'per_user' : 'per_release',
+        zipGrouping: scope === 'users' || (scope === 'user' && zipGrouping === 'per_user')
+          ? 'per_user'
+          : 'per_release',
       },
     });
 

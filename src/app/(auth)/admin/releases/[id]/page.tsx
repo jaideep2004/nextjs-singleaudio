@@ -379,6 +379,40 @@ export default function AdminReleaseDetailPage() {
     );
   };
 
+  const firstTrack = Array.isArray(release?.tracks) ? release.tracks[0] : null;
+  const releaseGenre = release?.genre || firstTrack?.genre || '';
+  const releaseSubgenre = release?.subGenre || release?.subgenre || firstTrack?.subGenre || firstTrack?.subgenre || '';
+  const releaseCLine = release?.copyright || release?.cLine || release?.cline || release?.copyrightC || [
+    firstTrack?.copyrightCYear,
+    firstTrack?.copyrightC,
+  ].filter(Boolean).join(' ');
+  const releasePLine = release?.production || release?.pLine || release?.pline || release?.copyrightP || [
+    firstTrack?.copyrightPYear,
+    firstTrack?.copyrightP,
+  ].filter(Boolean).join(' ');
+  const releaseUser = release?.userName || release?.ownerName || release?.artistName ||
+    release?.ownerUser?.name || release?.user?.name || release?.owner?.name || release?.userId?.name || release?.ownerId?.name ||
+    release?.createdBy?.name || release?.userEmail || release?.ownerEmail || release?.user?.email ||
+    release?.ownerUser?.email || release?.owner?.email || release?.userId?.email || release?.ownerId?.email || release?.createdBy?.email;
+  const releaseInfoRows = [
+    ['Release Type', release?.releaseType],
+    ['Release Title', release?.releaseTitle || release?.title],
+    ['User', releaseUser],
+    ['Primary Artist', release?.primaryArtist],
+    ['Featuring', release?.featuring],
+    ['Label', release?.label],
+    ['UPC', release?.upc],
+    ['Original Release Date', release?.originalReleaseDate],
+    ['Digital Release Date', release?.releaseDate],
+    ['Genre', releaseGenre],
+    ['Subgenre', releaseSubgenre],
+    ['C line', releaseCLine],
+    ['P line', releasePLine],
+    ['Rights Type', release?.rightsType],
+    ['Created', release?.createdAt ? new Date(release.createdAt).toLocaleString() : ''],
+    ['Updated', release?.updatedAt ? new Date(release.updatedAt).toLocaleString() : ''],
+  ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
+
   const InfoRow = ({ label, value }: { label: string; value: any }) => (
     <Stack direction="row" spacing={1} sx={{ my: 0.5 }}>
       <Typography variant="body2" color="text.secondary" sx={{ minWidth: 160, fontWeight: 500 }}>
@@ -1070,30 +1104,10 @@ export default function AdminReleaseDetailPage() {
               Release Information
             </Typography>
             
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-              <Box sx={{ flex: 1 }}>
-                <InfoRow label="Release Title" value={release.releaseTitle} />
-                <InfoRow label="Primary Artist" value={release.primaryArtist} />
-                <InfoRow label="Featuring" value={release.featuring} />
-                <InfoRow label="Label" value={release.label} />
-                <InfoRow label="UPC" value={release.upc} />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <InfoRow label="Release Date" value={release.releaseDate} />
-                <InfoRow label="Pre-order Date" value={release.preorderDate} />
-                <InfoRow label="Genre" value={release.genre} />
-                <InfoRow label="Sub-genre" value={release.subGenre} />
-                <InfoRow label="Copyright" value={release.copyright} />
-              </Box>
-            </Box>
-            
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                Description
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {release.description || 'No description provided'}
-              </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: { xs: 0.5, sm: 2 } }}>
+              {releaseInfoRows.map(([label, value]) => (
+                <InfoRow key={String(label)} label={String(label)} value={value} />
+              ))}
             </Box>
           </Paper>
           
