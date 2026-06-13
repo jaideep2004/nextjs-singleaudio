@@ -33,11 +33,11 @@ const renderDetails = (details?: ActionEmail['details']) => {
   if (!rows.length) return '';
 
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;border-collapse:collapse;border:1px solid #d9e2ef;border-radius:12px;overflow:hidden">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-collapse:separate;border-spacing:0;border:1px solid #eadde8;border-radius:16px;overflow:hidden;background:#ffffff">
       ${rows.map(([label, value]) => `
         <tr>
-          <td style="padding:12px 14px;background:#f8fafc;color:#64748b;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%">${escapeHtml(label)}</td>
-          <td style="padding:12px 14px;color:#0f172a;font:700 14px Arial,sans-serif">${escapeHtml(value)}</td>
+          <td style="padding:14px 16px;background:#fbf7fb;color:#7d6f7b;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%;border-bottom:1px solid #f0e6ee">${escapeHtml(label)}</td>
+          <td style="padding:14px 16px;color:#171018;font:700 14px Arial,sans-serif;border-bottom:1px solid #f0e6ee">${escapeHtml(value)}</td>
         </tr>
       `).join('')}
     </table>
@@ -47,27 +47,26 @@ const renderDetails = (details?: ActionEmail['details']) => {
 const renderEmail = ({ title, intro, details, actionLabel, actionUrl }: ActionEmail) => `
   <!doctype html>
   <html>
-    <body style="margin:0;padding:0;background:#05050a;color:#0f172a">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05050a">
+    <body style="margin:0;padding:0;background:#05050a;color:#171018">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;padding:28px 12px">
         <tr>
-          <td>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
+          <td align="center">
+            <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #1f1326;box-shadow:0 28px 70px rgba(0,0,0,.32)">
               <tr>
-                <td style="padding:32px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.28) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.18) 0%, transparent 60%),#05050a;color:#ffffff">
-                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="220" style="display:block;max-width:220px;height:auto;margin:0 0 18px 0" />
-                  <div style="color:#ffffff;font:900 22px Arial,sans-serif;letter-spacing:.02em">SingleAudio Distribution</div>
-                  <div style="margin-top:6px;color:#cbd5e1;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.16em">Music distribution operations</div>
+                <td style="padding:34px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.30) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.20) 0%, transparent 60%),#05050a;color:#ffffff;border-bottom:1px solid rgba(255,255,255,.08)">
+                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" style="display:block;max-width:228px;height:auto;margin:0" />
                 </td>
               </tr>
               <tr>
-                <td style="padding:36px 40px">
-                  <h1 style="margin:0 0 12px;color:#0f172a;font:900 30px/1.15 Arial,sans-serif">${escapeHtml(title)}</h1>
-                  <p style="margin:0;color:#475569;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(intro)}</p>
+                <td style="padding:38px 40px 30px">
+                  <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">${escapeHtml(title)}</h1>
+                  <p style="margin:0;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(intro)}</p>
                   ${renderDetails(details)}
                   ${actionLabel && actionUrl ? `
-                    <a href="${escapeHtml(actionUrl)}" style="display:inline-block;margin-top:26px;padding:13px 20px;border-radius:12px;background:linear-gradient(135deg,#ed1e79,#7b1fa2);color:#ffffff;text-decoration:none;font:900 14px Arial,sans-serif">${escapeHtml(actionLabel)}</a>
+                    <a href="${escapeHtml(actionUrl)}" style="display:inline-block;margin-top:28px;padding:14px 22px;border-radius:14px;background:linear-gradient(135deg,#ed1e79,#7b1fa2);color:#ffffff;text-decoration:none;font:900 14px Arial,sans-serif;box-shadow:0 14px 26px rgba(237,30,121,.22)">${escapeHtml(actionLabel)}</a>
                   ` : ''}
-                  <p style="margin:30px 0 0;color:#94a3b8;font:500 12px/1.5 Arial,sans-serif">This is an automated SingleAudio Distribution notification.</p>
+                  <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Automated notification from SingleAudio Distribution.</p>
+                  <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">© ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
                 </td>
               </tr>
             </table>

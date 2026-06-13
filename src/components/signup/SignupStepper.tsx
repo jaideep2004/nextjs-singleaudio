@@ -24,28 +24,28 @@ export default function SignupStepper({ currentStep, steps }: SignupStepperProps
         sx={{
           mb: 2,
           '& .MuiStepLabel-label': {
-            color: 'rgba(255,255,255,0.45)',
+            color: 'var(--auth-muted, rgba(255,255,255,0.45))',
             fontSize: '0.82rem',
             fontWeight: 500,
           },
           '& .MuiStepLabel-label.Mui-active': {
-            color: '#4a6cf7',
+            color: '#ed1e79',
             fontWeight: 700,
           },
           '& .MuiStepLabel-label.Mui-completed': {
-            color: 'rgba(255,255,255,0.7)',
+            color: 'var(--auth-text, rgba(255,255,255,0.7))',
           },
           '& .MuiStepIcon-root': {
-            color: 'rgba(255,255,255,0.15)',
+            color: 'var(--auth-field-border, rgba(255,255,255,0.15))',
           },
           '& .MuiStepIcon-root.Mui-active': {
-            color: '#4a6cf7',
+            color: '#ed1e79',
           },
           '& .MuiStepIcon-root.Mui-completed': {
-            color: '#22c55e',
+            color: '#7b1fa2',
           },
           '& .MuiStepConnector-line': {
-            borderColor: 'rgba(255,255,255,0.12)',
+            borderColor: 'var(--auth-field-border, rgba(255,255,255,0.12))',
           },
         }}
       >
@@ -62,19 +62,19 @@ export default function SignupStepper({ currentStep, steps }: SignupStepperProps
         sx={{
           height: 4,
           borderRadius: 2,
-          backgroundColor: 'rgba(255,255,255,0.08)',
+          backgroundColor: 'var(--auth-field-border, rgba(255,255,255,0.08))',
           '& .MuiLinearProgress-bar': {
             borderRadius: 2,
-            background: 'linear-gradient(90deg, #4a6cf7, #7c3aed)',
+            background: 'linear-gradient(90deg, #ed1e79, #7b1fa2)',
           },
         }}
       />
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+        <Typography variant="caption" sx={{ color: 'var(--auth-muted, rgba(255,255,255,0.4))' }}>
           Step {currentStep} of {steps.length}
         </Typography>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+        <Typography variant="caption" sx={{ color: 'var(--auth-muted, rgba(255,255,255,0.4))' }}>
           {Math.round(progressValue)}% complete
         </Typography>
       </Box>

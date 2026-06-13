@@ -97,11 +97,11 @@ export default function FileDropZone({
             gap: 1.5,
             p: 1.5,
             borderRadius: '14px',
-            border: '1px solid rgba(74, 108, 247, 0.4)',
-            background: 'rgba(74, 108, 247, 0.08)',
+            border: '1px solid rgba(237, 30, 121, 0.4)',
+            background: 'rgba(237, 30, 121, 0.08)',
           }}
         >
-          <InsertDriveFile sx={{ color: '#4a6cf7', flexShrink: 0 }} />
+          <InsertDriveFile sx={{ color: '#ed1e79', flexShrink: 0 }} />
           <Typography
             variant="body2"
             sx={{
@@ -135,7 +135,7 @@ export default function FileDropZone({
               displayError
                 ? '#ef4444'
                 : isDragging
-                ? '#4a6cf7'
+                ? '#ed1e79'
                 : 'rgba(255,255,255,0.15)'
             }`,
             borderRadius: '14px',
@@ -148,7 +148,7 @@ export default function FileDropZone({
             textAlign: 'center',
             cursor: disabled ? 'not-allowed' : 'pointer',
             background: isDragging
-              ? 'rgba(74, 108, 247, 0.08)'
+              ? 'rgba(237, 30, 121, 0.08)'
               : 'rgba(255,255,255,0.02)',
             transition: 'border-color 200ms, background 200ms',
             opacity: disabled ? 0.5 : 1,
@@ -166,7 +166,7 @@ export default function FileDropZone({
           <CloudUpload
             sx={{
               fontSize: 36,
-              color: isDragging ? '#4a6cf7' : 'rgba(255,255,255,0.3)',
+              color: isDragging ? '#ed1e79' : 'rgba(255,255,255,0.3)',
               mb: 1,
             }}
           />
@@ -174,7 +174,7 @@ export default function FileDropZone({
             Drag & drop here, or{' '}
             <Box
               component="span"
-              sx={{ color: '#4a6cf7', fontWeight: 600, cursor: 'pointer' }}
+              sx={{ color: '#ed1e79', fontWeight: 600, cursor: 'pointer' }}
             >
               browse
             </Box>

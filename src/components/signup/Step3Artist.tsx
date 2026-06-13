@@ -43,8 +43,8 @@ export interface Step3ArtistProps {
 }
 
 function ArtistNameAdornment({ status }: { status: ArtistNameStatus }) {
-  if (status === 'checking') return <CircularProgress size={18} sx={{ color: '#4a6cf7' }} />;
-  if (status === 'available') return <CheckCircle sx={{ color: '#22c55e', fontSize: 20 }} />;
+  if (status === 'checking') return <CircularProgress size={18} sx={{ color: '#ed1e79' }} />;
+  if (status === 'available') return <CheckCircle sx={{ color: '#ed1e79', fontSize: 20 }} />;
   if (status === 'taken' || status === 'error')
     return <ErrorIcon sx={{ color: '#ef4444', fontSize: 20 }} />;
   return null;
@@ -94,7 +94,7 @@ export default function Step3Artist({
                 sx: {
                   color:
                     artistNameStatus === 'available'
-                      ? '#22c55e'
+                      ? '#ed1e79'
                       : artistNameStatus === 'taken' || artistNameStatus === 'error'
                       ? '#ef4444'
                       : undefined,

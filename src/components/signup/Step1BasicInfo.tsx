@@ -67,7 +67,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Person sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <Person sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }} />
                 </InputAdornment>
               ),
             }}
@@ -92,6 +92,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             label="Email Address"
             type="email"
             autoComplete="email"
+            spellCheck={false}
             error={!!errors.email}
             helperText={errors.email?.message}
             disabled={isSubmitting}
@@ -99,7 +100,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Email sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <Email sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }} />
                 </InputAdornment>
               ),
             }}
@@ -131,7 +132,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <PhoneIphone sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <PhoneIphone sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }} />
                 </InputAdornment>
               ),
             }}
@@ -160,7 +161,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Lock sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <Lock sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }} />
                 </InputAdornment>
               ),
               endAdornment: (
@@ -170,7 +171,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
                     edge="end"
                     tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    sx={{ color: 'rgba(255,255,255,0.35)' }}
+                    sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }}
                   >
                     {showPassword ? <VisibilityOff /> : <Visibility />}
                   </IconButton>
@@ -203,7 +204,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Lock sx={{ color: 'rgba(255,255,255,0.35)' }} />
+                  <Lock sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }} />
                 </InputAdornment>
               ),
               endAdornment: (
@@ -213,7 +214,7 @@ export default function Step1BasicInfo({ control, errors, isSubmitting }: Step1P
                     edge="end"
                     tabIndex={-1}
                     aria-label={showConfirm ? 'Hide password' : 'Show password'}
-                    sx={{ color: 'rgba(255,255,255,0.35)' }}
+                    sx={{ color: 'var(--auth-icon, rgba(255,255,255,0.35))' }}
                   >
                     {showConfirm ? <VisibilityOff /> : <Visibility />}
                   </IconButton>

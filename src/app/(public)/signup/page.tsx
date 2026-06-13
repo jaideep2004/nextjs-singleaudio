@@ -10,23 +10,34 @@ import {
   Stack,
   Alert,
   CircularProgress,
-  Chip,
   TextField,
+  useTheme,
 } from '@mui/material';
 import {
   ArrowForward,
   ArrowBack,
   Error as ErrorIcon,
   CheckCircle,
+  GraphicEq,
+  Insights,
+  Public,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import SignupStepper from '@/components/signup/SignupStepper';
 import Step1BasicInfo from '@/components/signup/Step1BasicInfo';
+import { fieldSx } from '@/components/signup/styles';
 import {
   SignupFormValues,
   defaultSignupValues,
   SIGNUP_STEPS,
 } from './types';
+import {
+  AUTH_BUTTON_GRADIENT,
+  AuthLogo,
+  AuthCopyrightFooter,
+  authStyleVars,
+  getAuthTokens,
+} from '@/components/auth/authBrand';
 
 // Fields validated per step
 const STEP_FIELDS: Record<number, (keyof SignupFormValues)[]> = {
@@ -34,17 +45,28 @@ const STEP_FIELDS: Record<number, (keyof SignupFormValues)[]> = {
   2: [],
 };
 
-const authBackground = `
-  radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.18) 0%, transparent 60%),
-  radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.10) 0%, transparent 60%),
-  radial-gradient(ellipse 50% 60% at 50% 50%, rgba(83,12,195,0.07) 0%, transparent 70%),
-  #05050A
-`;
-
-const authButtonGradient = 'linear-gradient(135deg,#ed1e79,#7b1fa2)';
+const signupFeatureCards = [
+  {
+    icon: <Public sx={{ fontSize: 20 }} />,
+    title: 'Worldwide Delivery',
+    text: 'Prepare releases for 150+ platforms with clean account setup.',
+  },
+  {
+    icon: <Insights sx={{ fontSize: 20 }} />,
+    title: 'Royalty Ready',
+    text: 'Start with verified contact data for payouts and reporting.',
+  },
+  {
+    icon: <GraphicEq sx={{ fontSize: 20 }} />,
+    title: 'Creator Control',
+    text: 'Keep music, metadata, publishing, and approvals in one workspace.',
+  },
+];
 
 export default function SignupPage() {
   const { startSignup, verifySignup } = useAuth();
+  const theme = useTheme();
+  const authTokens = getAuthTokens(theme.palette.mode);
 
   const [mounted, setMounted] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
@@ -135,16 +157,18 @@ export default function SignupPage() {
   if (isLoading) {
     return (
       <Box
+        style={authStyleVars(theme.palette.mode)}
         sx={{
           minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: authBackground,
-          bgcolor: '#05050a',
+          background: authTokens.pageBackground,
+          bgcolor: authTokens.pageBgColor,
+          color: authTokens.text,
         }}
       >
-        <CircularProgress sx={{ color: '#4a6cf7' }} />
+        <CircularProgress sx={{ color: '#ed1e79' }} />
       </Box>
     );
   }
@@ -153,13 +177,15 @@ export default function SignupPage() {
   if (!isSignupEnabled) {
     return (
       <Box
+        style={authStyleVars(theme.palette.mode)}
         sx={{
           minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: authBackground,
-          bgcolor: '#05050a',
+          background: authTokens.pageBackground,
+          bgcolor: authTokens.pageBgColor,
+          color: authTokens.text,
           px: 2,
         }}
       >
@@ -169,17 +195,17 @@ export default function SignupPage() {
             width: '100%',
             p: { xs: 3, sm: 5 },
             borderRadius: '28px',
-            background: 'linear-gradient(180deg, rgba(17,24,39,0.92), rgba(15,23,42,0.85))',
-            border: '1px solid rgba(255,255,255,0.08)',
+            background: authTokens.surfaceBackground,
+            border: `1px solid ${authTokens.border}`,
             backdropFilter: 'blur(18px)',
             textAlign: 'center',
           }}
         >
           <ErrorIcon sx={{ fontSize: 56, color: '#ef4444', mb: 2 }} />
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#f8fafc', mb: 1.5 }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--auth-text)', mb: 1.5 }}>
             Registrations Currently Disabled
           </Typography>
-          <Typography sx={{ color: 'rgba(226,232,240,0.7)', mb: 3, lineHeight: 1.7 }}>
+          <Typography sx={{ color: 'var(--auth-muted)', mb: 3, lineHeight: 1.7 }}>
             We're not accepting new registrations at this time. Please check back later or
             contact support.
           </Typography>
@@ -190,13 +216,14 @@ export default function SignupPage() {
             sx={{
               borderRadius: '14px',
               fontWeight: 700,
-              background: authButtonGradient,
+              background: AUTH_BUTTON_GRADIENT,
               px: 4,
               py: 1.5,
             }}
           >
             Go to Login
           </Button>
+          <AuthCopyrightFooter />
         </Box>
       </Box>
     );
@@ -204,6 +231,7 @@ export default function SignupPage() {
 
   return (
     <Box
+      style={authStyleVars(theme.palette.mode)}
       sx={{
         width: '100vw',
         ml: 'calc(50% - 50vw)',
@@ -213,8 +241,9 @@ export default function SignupPage() {
         overflow: 'hidden',
         px: { xs: 2, sm: 3, md: 5, lg: 6 },
         py: { xs: 3, md: 6 },
-        background: authBackground,
-        bgcolor: '#05050a',
+        background: authTokens.pageBackground,
+        bgcolor: authTokens.pageBgColor,
+        color: authTokens.text,
       }}
     >
       <Box
@@ -252,12 +281,11 @@ export default function SignupPage() {
               minHeight: { lg: 760 },
               flexDirection: 'column',
               justifyContent: 'space-between',
-              color: '#f8fafc',
+              color: authTokens.panelText,
               position: 'relative',
               overflow: 'hidden',
-              background:
-                'linear-gradient(150deg, rgba(7,19,39,0.92) 0%, rgba(13,28,51,0.88) 54%, rgba(20,48,76,0.92) 100%)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: authTokens.panelBackground,
+              border: `1px solid ${authTokens.border}`,
               boxShadow: '0 28px 80px rgba(3,10,24,0.34)',
               transform: mounted ? 'translateY(0)' : 'translateY(16px)',
               opacity: mounted ? 1 : 0,
@@ -269,23 +297,12 @@ export default function SignupPage() {
                 position: 'absolute',
                 inset: 0,
                 background:
-                  'linear-gradient(135deg, rgba(89,153,255,0.18) 0%, transparent 42%, rgba(124,58,237,0.12) 100%)',
+                  authTokens.panelOverlay,
               }}
             />
 
             <Stack spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
-              <Chip
-                label="Single Audio"
-                sx={{
-                  alignSelf: 'flex-start',
-                  height: 34,
-                  px: 1,
-                  color: '#dbeafe',
-                  bgcolor: 'rgba(148,163,184,0.12)',
-                  border: '1px solid rgba(191,219,254,0.14)',
-                  fontWeight: 700,
-                }}
-              />
+              <AuthLogo width={230} />
 
               <Box>
                 <Typography
@@ -304,7 +321,7 @@ export default function SignupPage() {
                     maxWidth: 560,
                     fontSize: '1.05rem',
                     lineHeight: 1.7,
-                    color: 'rgba(226,232,240,0.72)',
+                    color: 'var(--auth-panel-muted)',
                   }}
                 >
                   Artists and labels get a focused onboarding flow for releases, verification,
@@ -323,8 +340,8 @@ export default function SignupPage() {
                     key={point}
                     sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}
                   >
-                    <CheckCircle sx={{ color: '#22c55e', fontSize: 18, flexShrink: 0 }} />
-                    <Typography sx={{ fontSize: '0.98rem', color: 'rgba(248,250,252,0.88)' }}>
+                    <CheckCircle sx={{ color: '#ed1e79', fontSize: 18, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: '0.98rem', color: 'var(--auth-panel-text)' }}>
                       {point}
                     </Typography>
                   </Box>
@@ -337,25 +354,48 @@ export default function SignupPage() {
                 position: 'relative',
                 zIndex: 1,
                 mt: 6,
-                p: 3,
-                borderRadius: '20px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
               }}
             >
-              <Typography
-                variant="body2"
-                sx={{ color: 'rgba(226,232,240,0.65)', fontStyle: 'italic', lineHeight: 1.7 }}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gap: 2,
+                }}
               >
-                "Single Audio transformed how we manage our catalog. The platform is clean,
-                fast, and built for professionals."
-              </Typography>
-              <Typography
-                variant="caption"
-                sx={{ color: 'rgba(255,255,255,0.45)', mt: 1.5, display: 'block' }}
-              >
-                — Independent Label, Mumbai
-              </Typography>
+                {signupFeatureCards.map((card) => (
+                  <Box
+                    key={card.title}
+                    sx={{
+                      p: 2.5,
+                      minHeight: 170,
+                      borderRadius: '24px',
+                      background: 'var(--auth-card-bg)',
+                      border: '1px solid var(--auth-card-border)',
+                      backdropFilter: 'blur(10px)',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: '14px',
+                        display: 'grid',
+                        placeItems: 'center',
+                        bgcolor: 'rgba(237,30,121,0.14)',
+                        color: '#ff7ab8',
+                        mb: 1.5,
+                      }}
+                    >
+                      {card.icon}
+                    </Box>
+                    <Typography sx={{ fontWeight: 800, mb: 0.75 }}>{card.title}</Typography>
+                    <Typography sx={{ color: 'var(--auth-panel-muted)', lineHeight: 1.6 }}>
+                      {card.text}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
             </Box>
           </Box>
 
@@ -368,10 +408,9 @@ export default function SignupPage() {
               borderRadius: { xs: '28px', md: '32px' },
               p: { xs: 2.5, sm: 4, md: 5 },
               alignSelf: 'stretch',
-              background:
-                'linear-gradient(180deg, rgba(17,24,39,0.92), rgba(15,23,42,0.85))',
-              border: '1px solid rgba(255,255,255,0.08)',
-              boxShadow: '0 24px 60px rgba(2,8,23,0.38)',
+              background: authTokens.surfaceBackground,
+              border: `1px solid ${authTokens.border}`,
+              boxShadow: authTokens.shadow,
               backdropFilter: 'blur(18px)',
               transform: mounted ? 'translateY(0)' : 'translateY(20px)',
               opacity: mounted ? 1 : 0,
@@ -380,23 +419,11 @@ export default function SignupPage() {
           >
             {/* Header */}
             <Box sx={{ mb: 4 }}>
-              <Chip
-                label="Single Audio"
-                size="small"
-                sx={{
-                  mb: 2,
-                  color: '#93c5fd',
-                  bgcolor: 'rgba(147,197,253,0.1)',
-                  border: '1px solid rgba(147,197,253,0.2)',
-                  fontWeight: 700,
-                  display: { xs: 'inline-flex', lg: 'none' },
-                }}
-              />
               <Typography
                 sx={{
                   fontSize: { xs: '1.7rem', sm: '2rem' },
                   fontWeight: 800,
-                  color: '#f8fafc',
+                  color: 'var(--auth-text)',
                   letterSpacing: 0,
                   lineHeight: 1.1,
                 }}
@@ -406,14 +433,14 @@ export default function SignupPage() {
               <Typography
                 sx={{
                   mt: 1,
-                  color: 'rgba(226,232,240,0.65)',
+                  color: 'var(--auth-muted)',
                   lineHeight: 1.7,
                 }}
               >
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  style={{ color: '#4a6cf7', fontWeight: 700, textDecoration: 'none' }}
+                  style={{ color: '#ed1e79', fontWeight: 700, textDecoration: 'none' }}
                 >
                   Sign in
                 </Link>
@@ -451,19 +478,25 @@ export default function SignupPage() {
                   </Alert>
                   <TextField
                     label="Email OTP"
+                    name="emailOtp"
                     value={emailOtp}
                     onChange={(event) => setEmailOtp(event.target.value)}
                     inputProps={{ inputMode: 'numeric', autoComplete: 'one-time-code' }}
                     disabled={isSubmitting}
+                    spellCheck={false}
                     fullWidth
+                    sx={fieldSx}
                   />
                   <TextField
                     label="Mobile OTP"
+                    name="smsOtp"
                     value={smsOtp}
                     onChange={(event) => setSmsOtp(event.target.value)}
                     inputProps={{ inputMode: 'numeric', autoComplete: 'one-time-code' }}
                     disabled={isSubmitting}
+                    spellCheck={false}
                     fullWidth
+                    sx={fieldSx}
                   />
                 </Stack>
               )}
@@ -481,16 +514,16 @@ export default function SignupPage() {
                     startIcon={<ArrowBack />}
                     sx={{
                       borderRadius: '14px',
-                      color: 'rgba(255,255,255,0.6)',
-                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'var(--auth-muted)',
+                      border: '1px solid var(--auth-field-border)',
                       px: 3,
                       py: 1.5,
                       width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
                       fontWeight: 600,
                       '&:hover': {
-                        background: 'rgba(255,255,255,0.05)',
-                        borderColor: 'rgba(255,255,255,0.2)',
+                        background: 'var(--auth-card-bg)',
+                        borderColor: 'var(--auth-card-border)',
                       },
                     }}
                   >
@@ -514,15 +547,15 @@ export default function SignupPage() {
                       py: 1.5,
                       width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
-                      background: authButtonGradient,
+                      background: AUTH_BUTTON_GRADIENT,
                       boxShadow: '0 12px 28px rgba(237,30,121,0.22)',
                       '&:hover': {
-                        background: authButtonGradient,
+                        background: AUTH_BUTTON_GRADIENT,
                         boxShadow: '0 16px 32px rgba(123,31,162,0.30)',
                       },
                     }}
                   >
-                    {isSubmitting ? 'Sending...' : 'Send OTP'}
+                    {isSubmitting ? 'Sending…' : 'Send OTP'}
                   </Button>
                 ) : (
                   <Button
@@ -544,23 +577,24 @@ export default function SignupPage() {
                       py: 1.5,
                       width: { xs: '100%', sm: 'auto' },
                       textTransform: 'none',
-                      background: authButtonGradient,
+                      background: AUTH_BUTTON_GRADIENT,
                       boxShadow: '0 12px 28px rgba(237,30,121,0.22)',
                       '&:hover': {
-                        background: authButtonGradient,
+                        background: AUTH_BUTTON_GRADIENT,
                         boxShadow: '0 16px 32px rgba(123,31,162,0.30)',
                       },
                       '&.Mui-disabled': {
-                        background: 'rgba(37,99,235,0.4)',
-                        color: 'rgba(255,255,255,0.5)',
+                        background: 'rgba(123,31,162,0.34)',
+                        color: 'var(--auth-faint)',
                       },
                     }}
                   >
-                    {isSubmitting ? 'Verifying...' : otpSent ? 'Verify & Create Account' : 'Send OTP'}
+                    {isSubmitting ? 'Verifying…' : otpSent ? 'Verify & Create Account' : 'Send OTP'}
                   </Button>
                 )}
               </Stack>
             </Box>
+            <AuthCopyrightFooter />
           </Box>
         </Box>
       </Box>

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import tls from 'tls';
 
 const OTP_TTL_MINUTES = Number(process.env.OTP_TTL_MINUTES || 10);
+const AMAZE_SMS_TIMEOUT_MS = Number(process.env.AMAZE_SMS_TIMEOUT_MS || 45000);
 
 export const getOtpExpiry = () => new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
@@ -20,7 +21,7 @@ export async function sendAmazeSmsOtp(phoneNumber: string, otp: string): Promise
     return;
   }
 
-  const body = `Your OTP for SIngle Audio Login Is ${otp}. It is valid for 10 minutes. Do not share this OTP.`;
+  const body = `Your OTP for SingleAudio Login is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`;
   const url = new URL(baseUrl);
   url.searchParams.set('key', apiKey);
   url.searchParams.set('from', process.env.AMAZE_SMS_SENDER_ID || 'SNGLAU');
@@ -29,9 +30,21 @@ export async function sendAmazeSmsOtp(phoneNumber: string, otp: string): Promise
   url.searchParams.set('templateid', process.env.AMAZE_SMS_TEMPLATE_ID || '1007380632079936419');
   url.searchParams.set('entityid', process.env.AMAZE_SMS_ENTITY_ID || '1001529360956910382');
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Amaze SMS failed with status ${response.status}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AMAZE_SMS_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Amaze SMS failed with status ${response.status}`);
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Amaze SMS timed out after ${AMAZE_SMS_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -76,29 +89,28 @@ function renderBasicEmail(subject: string, text: string) {
     .split(/\n{2,}/)
     .map((part) => part.trim())
     .filter(Boolean)
-    .map((part) => `<p style="margin:0 0 14px;color:#475569;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(part).replace(/\n/g, '<br />')}</p>`)
+    .map((part) => `<p style="margin:0 0 14px;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(part).replace(/\n/g, '<br />')}</p>`)
     .join('');
 
   return `
     <!doctype html>
     <html>
-      <body style="margin:0;padding:0;background:#05050a;color:#0f172a">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05050a">
+      <body style="margin:0;padding:0;background:#05050a;color:#171018">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05050a;padding:28px 12px">
           <tr>
-            <td>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff">
+            <td align="center">
+              <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;max-width:680px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #1f1326;box-shadow:0 28px 70px rgba(0,0,0,.32)">
                 <tr>
-                  <td style="padding:32px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.28) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.18) 0%, transparent 60%),#05050a;color:#ffffff">
-                    <img src="${escapeHtml(`${getFrontendUrl()}/images/singleaudio-b1.png`)}" alt="SingleAudio Distribution" width="220" style="display:block;max-width:220px;height:auto;margin:0 0 18px 0" />
-                    <div style="color:#ffffff;font:900 22px Arial,sans-serif;letter-spacing:.02em">SingleAudio Distribution</div>
-                    <div style="margin-top:6px;color:#cbd5e1;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.16em">Secure account notification</div>
+                  <td style="padding:34px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.30) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.20) 0%, transparent 60%),#05050a;color:#ffffff;border-bottom:1px solid rgba(255,255,255,.08)">
+                    <img src="${escapeHtml(`${getFrontendUrl()}/images/singleaudio-b1.png`)}" alt="SingleAudio Distribution" width="228" style="display:block;max-width:228px;height:auto;margin:0" />
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding:36px 40px">
-                    <h1 style="margin:0 0 12px;color:#0f172a;font:900 30px/1.15 Arial,sans-serif">${escapeHtml(subject)}</h1>
+                  <td style="padding:38px 40px 30px">
+                    <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">${escapeHtml(subject)}</h1>
                     ${paragraphs}
-                    <p style="margin:30px 0 0;color:#94a3b8;font:500 12px/1.5 Arial,sans-serif">This is an automated SingleAudio Distribution notification.</p>
+                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Automated notification from SingleAudio Distribution.</p>
+                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">© ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
                   </td>
                 </tr>
               </table>

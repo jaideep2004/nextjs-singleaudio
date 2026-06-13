@@ -4,15 +4,16 @@ export const fieldSx: SxProps<Theme> = {
   '& .MuiOutlinedInput-root': {
     minHeight: 60,
     borderRadius: '16px',
-    backgroundColor: 'rgba(255,255,255,0.035)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.12)' },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.24)' },
-    '&.Mui-focused fieldset': { borderColor: '#4a6cf7' },
+    backgroundColor: 'var(--auth-field-bg, rgba(255,255,255,0.035))',
+    '& fieldset': { borderColor: 'var(--auth-field-border, rgba(255,255,255,0.12))' },
+    '&:hover fieldset': { borderColor: 'var(--auth-field-hover-border, rgba(237,30,121,0.38))' },
+    '&.Mui-focused fieldset': { borderColor: '#ed1e79' },
   },
-  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.52)' },
-  '& .MuiInputLabel-root.Mui-focused': { color: '#4a6cf7' },
-  '& .MuiInputBase-input': { color: '#f8fafc' },
-  '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
+  '& .MuiInputLabel-root': { color: 'var(--auth-field-label, rgba(255,255,255,0.52))' },
+  '& .MuiInputLabel-root.Mui-focused': { color: '#ed1e79' },
+  '& .MuiInputBase-input': { color: 'var(--auth-field-text, #f8fafc)' },
+  '& .MuiSvgIcon-root': { color: 'var(--auth-icon, rgba(255,255,255,0.4))' },
+  '& .MuiSelect-icon': { color: 'var(--auth-icon, rgba(255,255,255,0.4))' },
 };
 
 export const multilineFieldSx: SxProps<Theme> = {
@@ -32,18 +33,18 @@ export const twoColumnGridSx: SxProps<Theme> = {
 export const formSectionSx: SxProps<Theme> = {
   p: { xs: 2, sm: 2.5 },
   borderRadius: '20px',
-  background: 'rgba(255,255,255,0.025)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'var(--auth-card-bg, rgba(255,255,255,0.025))',
+  border: '1px solid var(--auth-card-border, rgba(255,255,255,0.08))',
 };
 
 export const sectionTitleSx: SxProps<Theme> = {
   fontWeight: 700,
-  color: '#f8fafc',
+  color: 'var(--auth-text, #f8fafc)',
   mb: 0.5,
 };
 
 export const sectionCaptionSx: SxProps<Theme> = {
-  color: 'rgba(255,255,255,0.52)',
+  color: 'var(--auth-muted, rgba(255,255,255,0.52))',
 };
 
 export const compactToggleGroupSx: SxProps<Theme> = {
@@ -52,17 +53,17 @@ export const compactToggleGroupSx: SxProps<Theme> = {
   flexWrap: 'wrap',
   '& .MuiToggleButton-root': {
     minHeight: 44,
-    color: 'rgba(255,255,255,0.58)',
-    borderColor: 'rgba(255,255,255,0.12)',
+    color: 'var(--auth-muted, rgba(255,255,255,0.58))',
+    borderColor: 'var(--auth-field-border, rgba(255,255,255,0.12))',
     borderRadius: '12px !important',
     px: 2.5,
     py: 1,
     textTransform: 'none',
     fontWeight: 600,
     '&.Mui-selected': {
-      color: '#93c5fd',
-      background: 'rgba(74, 108, 247, 0.14)',
-      borderColor: '#4a6cf7 !important',
+      color: '#ff7ab8',
+      background: 'rgba(237, 30, 121, 0.14)',
+      borderColor: '#ed1e79 !important',
     },
   },
 };

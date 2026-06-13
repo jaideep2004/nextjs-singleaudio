@@ -73,13 +73,13 @@ export default function Step2AccountType({
                   color: 'rgba(255,255,255,0.6)',
                   background: 'rgba(255,255,255,0.02)',
                   '&.Mui-selected': {
-                    color: '#4a6cf7',
-                    background: 'rgba(74, 108, 247, 0.12)',
-                    borderColor: '#4a6cf7 !important',
-                    boxShadow: '0 0 0 1px #4a6cf7',
+                    color: '#ed1e79',
+                    background: 'rgba(237, 30, 121, 0.12)',
+                    borderColor: '#ed1e79 !important',
+                    boxShadow: '0 0 0 1px #ed1e79',
                   },
                   '&:hover': {
-                    background: 'rgba(74, 108, 247, 0.06)',
+                    background: 'rgba(237, 30, 121, 0.06)',
                   },
                 }}
               >
@@ -92,7 +92,7 @@ export default function Step2AccountType({
                     placeItems: 'center',
                     background:
                       field.value === 'artist'
-                        ? 'rgba(74, 108, 247, 0.2)'
+                        ? 'rgba(237, 30, 121, 0.2)'
                         : 'rgba(255,255,255,0.06)',
                     transition: 'background 200ms',
                   }}
@@ -124,13 +124,13 @@ export default function Step2AccountType({
                   color: 'rgba(255,255,255,0.6)',
                   background: 'rgba(255,255,255,0.02)',
                   '&.Mui-selected': {
-                    color: '#4a6cf7',
-                    background: 'rgba(74, 108, 247, 0.12)',
-                    borderColor: '#4a6cf7 !important',
-                    boxShadow: '0 0 0 1px #4a6cf7',
+                    color: '#ed1e79',
+                    background: 'rgba(237, 30, 121, 0.12)',
+                    borderColor: '#ed1e79 !important',
+                    boxShadow: '0 0 0 1px #ed1e79',
                   },
                   '&:hover': {
-                    background: 'rgba(74, 108, 247, 0.06)',
+                    background: 'rgba(237, 30, 121, 0.06)',
                   },
                 }}
               >
@@ -143,7 +143,7 @@ export default function Step2AccountType({
                     placeItems: 'center',
                     background:
                       field.value === 'label'
-                        ? 'rgba(74, 108, 247, 0.2)'
+                        ? 'rgba(237, 30, 121, 0.2)'
                         : 'rgba(255,255,255,0.06)',
                     transition: 'background 200ms',
                   }}
@@ -186,13 +186,13 @@ export default function Step2AccountType({
         }}
       >
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.55)', lineHeight: 1.7 }}>
-          <Box component="span" sx={{ color: '#4a6cf7', fontWeight: 600 }}>
+          <Box component="span" sx={{ color: '#ed1e79', fontWeight: 600 }}>
             Artist accounts
           </Box>{' '}
           are for individual musicians, producers, and performers who want to distribute their
           music and manage their catalog.
           <br />
-          <Box component="span" sx={{ color: '#4a6cf7', fontWeight: 600 }}>
+          <Box component="span" sx={{ color: '#ed1e79', fontWeight: 600 }}>
             Label accounts
           </Box>{' '}
           are for record labels and management companies that represent multiple artists and

@@ -6,7 +6,6 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Divider,
   IconButton,
   InputAdornment,
@@ -26,6 +25,13 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
+import {
+  AUTH_BUTTON_GRADIENT,
+  AuthLogo,
+  AuthCopyrightFooter,
+  authStyleVars,
+  getAuthTokens,
+} from '@/components/auth/authBrand';
 
 const trustPoints = [
   'Release music with a cleaner artist workflow',
@@ -51,18 +57,25 @@ const featureCards = [
   },
 ];
 
-const authBackground = `
-  radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.18) 0%, transparent 60%),
-  radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.10) 0%, transparent 60%),
-  radial-gradient(ellipse 50% 60% at 50% 50%, rgba(83,12,195,0.07) 0%, transparent 70%),
-  #05050A
-`;
-
-const authButtonGradient = 'linear-gradient(135deg,#ed1e79,#7b1fa2)';
+const authFieldSx = {
+  '& .MuiOutlinedInput-root': {
+    minHeight: 60,
+    borderRadius: '18px',
+    backgroundColor: 'var(--auth-field-bg, rgba(255,255,255,0.035))',
+    '& fieldset': { borderColor: 'var(--auth-field-border, rgba(255,255,255,0.12))' },
+    '&:hover fieldset': { borderColor: 'var(--auth-field-hover-border, rgba(237,30,121,0.38))' },
+    '&.Mui-focused fieldset': { borderColor: '#ed1e79' },
+  },
+  '& .MuiInputLabel-root': { color: 'var(--auth-field-label, rgba(255,255,255,0.58))' },
+  '& .MuiInputLabel-root.Mui-focused': { color: '#ed1e79' },
+  '& .MuiInputBase-input': { color: 'var(--auth-field-text, #f8fafc)' },
+  '& .MuiSvgIcon-root': { color: 'var(--auth-icon, rgba(255,255,255,0.42))' },
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
   const theme = useTheme();
+  const authTokens = getAuthTokens(theme.palette.mode);
 
   const [mounted, setMounted] = useState(false);
   const [email, setEmail] = useState('');
@@ -93,6 +106,7 @@ export default function LoginPage() {
 
   return (
     <Box
+      style={authStyleVars(theme.palette.mode)}
       sx={{
         width: '100vw',
         ml: 'calc(50% - 50vw)',
@@ -102,8 +116,9 @@ export default function LoginPage() {
         minHeight: 'calc(100vh - 96px)',
         px: { xs: 2, sm: 3, md: 5, lg: 6 },
         py: { xs: 3, md: 6 },
-        background: authBackground,
-        bgcolor: '#05050a',
+        background: authTokens.pageBackground,
+        bgcolor: authTokens.pageBgColor,
+        color: authTokens.text,
       }}
     >
       <Box
@@ -139,10 +154,7 @@ export default function LoginPage() {
           height: { xs: 180, md: 280 },
           borderRadius: '36px',
           transform: 'rotate(24deg)',
-          background:
-            theme.palette.mode === 'dark'
-              ? 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))'
-              : 'linear-gradient(135deg, rgba(255,255,255,0.7), rgba(255,255,255,0.2))',
+          background: 'linear-gradient(135deg, rgba(237,30,121,0.08), rgba(123,31,162,0.03))',
           border: `1px solid ${
             theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.06)'
           }`,
@@ -173,12 +185,11 @@ export default function LoginPage() {
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              color: '#f8fafc',
+              color: authTokens.panelText,
               position: 'relative',
               overflow: 'hidden',
-              background:
-                'linear-gradient(150deg, rgba(7, 19, 39, 0.92) 0%, rgba(13, 28, 51, 0.88) 54%, rgba(20, 48, 76, 0.92) 100%)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              background: authTokens.panelBackground,
+              border: `1px solid ${authTokens.border}`,
               boxShadow: '0 28px 80px rgba(3, 10, 24, 0.34)',
               transform: mounted ? 'translateY(0)' : 'translateY(16px)',
               opacity: mounted ? 1 : 0,
@@ -190,23 +201,12 @@ export default function LoginPage() {
                 position: 'absolute',
                 inset: 0,
                 background:
-                  'radial-gradient(circle at top right, rgba(89, 153, 255, 0.22), transparent 22%), radial-gradient(circle at bottom left, rgba(255, 168, 106, 0.18), transparent 18%)',
+                  authTokens.panelOverlay,
               }}
             />
 
             <Stack spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
-              <Chip
-                label="Single Audio"
-                sx={{
-                  alignSelf: 'flex-start',
-                  height: 34,
-                  px: 1,
-                  color: '#dbeafe',
-                  bgcolor: 'rgba(148, 163, 184, 0.12)',
-                  border: '1px solid rgba(191, 219, 254, 0.14)',
-                  fontWeight: 700,
-                }}
-              />
+              <AuthLogo width={230} />
 
               <Box>
                 <Typography
@@ -226,7 +226,7 @@ export default function LoginPage() {
                     maxWidth: 640,
                     fontSize: { xs: '1rem', md: '1.08rem' },
                     lineHeight: 1.7,
-                    color: 'rgba(226, 232, 240, 0.76)',
+                    color: 'var(--auth-panel-muted)',
                   }}
                 >
                   Manage releases, artist workflows, royalties, and approvals inside a
@@ -242,7 +242,7 @@ export default function LoginPage() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: 1.5,
-                      color: 'rgba(248, 250, 252, 0.92)',
+                      color: 'var(--auth-panel-text)',
                     }}
                   >
                     <Box
@@ -250,8 +250,8 @@ export default function LoginPage() {
                         width: 10,
                         height: 10,
                         borderRadius: '50%',
-                        bgcolor: '#7dd3fc',
-                        boxShadow: '0 0 0 6px rgba(125, 211, 252, 0.12)',
+                        bgcolor: '#ed1e79',
+                        boxShadow: '0 0 0 6px rgba(237,30,121,0.14)',
                         flexShrink: 0,
                       }}
                     />
@@ -277,8 +277,8 @@ export default function LoginPage() {
                     sx={{
                       p: 2.5,
                       borderRadius: '24px',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'var(--auth-card-bg)',
+                      border: '1px solid var(--auth-card-border)',
                       backdropFilter: 'blur(10px)',
                     }}
                   >
@@ -289,15 +289,15 @@ export default function LoginPage() {
                         borderRadius: '14px',
                         display: 'grid',
                         placeItems: 'center',
-                        bgcolor: 'rgba(125, 211, 252, 0.14)',
-                        color: '#93c5fd',
+                        bgcolor: 'rgba(237,30,121,0.14)',
+                        color: '#ff7ab8',
                         mb: 1.5,
                       }}
                     >
                       {card.icon}
                     </Box>
                     <Typography sx={{ fontWeight: 700, mb: 0.75 }}>{card.title}</Typography>
-                    <Typography sx={{ color: 'rgba(226, 232, 240, 0.7)', lineHeight: 1.65 }}>
+                    <Typography sx={{ color: 'var(--auth-panel-muted)', lineHeight: 1.65 }}>
                       {card.text}
                     </Typography>
                   </Box>
@@ -317,19 +317,9 @@ export default function LoginPage() {
                 width: '100%',
                 borderRadius: { xs: '28px', md: '32px' },
                 p: { xs: 3, sm: 4, md: 5 },
-                background:
-                  theme.palette.mode === 'dark'
-                    ? 'linear-gradient(180deg, rgba(17, 24, 39, 0.92), rgba(15, 23, 42, 0.85))'
-                    : 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,252,255,0.92))',
-                border: `1px solid ${
-                  theme.palette.mode === 'dark'
-                    ? 'rgba(255,255,255,0.08)'
-                    : 'rgba(15, 23, 42, 0.08)'
-                }`,
-                boxShadow:
-                  theme.palette.mode === 'dark'
-                    ? '0 24px 60px rgba(2, 8, 23, 0.38)'
-                    : '0 24px 60px rgba(15, 23, 42, 0.10)',
+                background: authTokens.surfaceBackground,
+                border: `1px solid ${authTokens.border}`,
+                boxShadow: authTokens.shadow,
                 backdropFilter: 'blur(18px)',
                 transform: mounted ? 'translateY(0)' : 'translateY(20px)',
                 opacity: mounted ? 1 : 0,
@@ -344,7 +334,7 @@ export default function LoginPage() {
                         fontSize: { xs: '1.85rem', sm: '2.2rem' },
                         lineHeight: 1.1,
                         fontWeight: 800,
-                        color: theme.palette.mode === 'dark' ? '#f8fafc' : '#0f172a',
+                        color: 'var(--auth-text)',
                         letterSpacing: 0,
                       }}
                     >
@@ -356,7 +346,7 @@ export default function LoginPage() {
                         color:
                           theme.palette.mode === 'dark'
                             ? 'rgba(226, 232, 240, 0.72)'
-                            : 'rgba(15, 23, 42, 0.62)',
+                            : 'var(--auth-muted)',
                         lineHeight: 1.7,
                       }}
                     >
@@ -380,6 +370,9 @@ export default function LoginPage() {
                     <TextField
                       label="Email address"
                       type="email"
+                      name="email"
+                      autoComplete="email"
+                      spellCheck={false}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -388,25 +381,18 @@ export default function LoginPage() {
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Email sx={{ color: 'text.secondary' }} />
+                            <Email sx={{ color: 'var(--auth-icon)' }} />
                           </InputAdornment>
                         ),
                       }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          minHeight: 60,
-                          borderRadius: '18px',
-                          backgroundColor:
-                            theme.palette.mode === 'dark'
-                              ? 'rgba(255,255,255,0.03)'
-                              : 'rgba(248, 250, 252, 0.96)',
-                        },
-                      }}
+                      sx={authFieldSx}
                     />
 
                     <TextField
                       label="Password"
                       type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -414,7 +400,7 @@ export default function LoginPage() {
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Lock sx={{ color: 'text.secondary' }} />
+                            <Lock sx={{ color: 'var(--auth-icon)' }} />
                           </InputAdornment>
                         ),
                         endAdornment: (
@@ -430,16 +416,7 @@ export default function LoginPage() {
                           </InputAdornment>
                         ),
                       }}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          minHeight: 60,
-                          borderRadius: '18px',
-                          backgroundColor:
-                            theme.palette.mode === 'dark'
-                              ? 'rgba(255,255,255,0.03)'
-                              : 'rgba(248, 250, 252, 0.96)',
-                        },
-                      }}
+                      sx={authFieldSx}
                     />
                   </Stack>
 
@@ -457,13 +434,13 @@ export default function LoginPage() {
                         color:
                           theme.palette.mode === 'dark'
                             ? 'rgba(226, 232, 240, 0.64)'
-                            : 'rgba(15, 23, 42, 0.56)',
+                            : 'var(--auth-muted)',
                         fontSize: '0.95rem',
                       }}
                     >
                       Secure access for artists and admins
                     </Typography>
-                    <Link href="/forgot-password" style={{ color: theme.palette.primary.main }}>
+                    <Link href="/forgot-password" style={{ color: '#ed1e79' }}>
                       Forgot password?
                     </Link>
                   </Box>
@@ -480,14 +457,14 @@ export default function LoginPage() {
                       fontWeight: 700,
                       fontSize: '1rem',
                       boxShadow: '0 18px 34px rgba(237,30,121,0.24)',
-                      background: authButtonGradient,
+                      background: AUTH_BUTTON_GRADIENT,
                       '&:hover': {
-                        background: authButtonGradient,
+                        background: AUTH_BUTTON_GRADIENT,
                         boxShadow: '0 22px 38px rgba(123,31,162,0.32)',
                       },
                     }}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign in'}
+                    {isLoading ? 'Signing in…' : 'Sign in'}
                   </Button>
 
                   <Divider />
@@ -506,15 +483,16 @@ export default function LoginPage() {
                         color:
                           theme.palette.mode === 'dark'
                             ? 'rgba(226, 232, 240, 0.72)'
-                            : 'rgba(15, 23, 42, 0.62)',
+                            : 'var(--auth-muted)',
                       }}
                     >
                       Need an account?
                     </Typography>
-                    <Link href="/signup" style={{ color: theme.palette.primary.main, fontWeight: 700 }}>
-                      Create one
+                    <Link href="/signup" style={{ color: '#ed1e79', fontWeight: 700 }}>
+                      Create an account
                     </Link>
                   </Box>
+                  <AuthCopyrightFooter />
                 </Stack>
               </Box>
             </Box>
