@@ -30,6 +30,15 @@ export const bootstrapPhase1Providers = async (_req: AuthRequest, res: Response)
   }
 };
 
+export const syncBromaOutlets = async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await dspDeliveryService.syncBromaOutlets();
+    successResponse(res, result, 'Broma outlets synced');
+  } catch (error) {
+    errorResponse(res, 'Failed to sync Broma outlets', error);
+  }
+};
+
 export const dispatchDelivery = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { trackId, providerKey, operation = 'deliver' } = req.body;

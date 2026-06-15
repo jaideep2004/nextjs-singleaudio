@@ -7,7 +7,6 @@ import { Email, KeyboardBackspace } from '@mui/icons-material';
 import {
   AUTH_BUTTON_GRADIENT,
   AuthLogo,
-  AuthCopyrightFooter,
   authStyleVars,
   getAuthTokens,
 } from '@/components/auth/authBrand';
@@ -149,7 +148,6 @@ export default function ForgotPasswordPage() {
           >
             Back to Login
           </Button>
-          <AuthCopyrightFooter />
         </Stack>
       </Box>
     </Box>

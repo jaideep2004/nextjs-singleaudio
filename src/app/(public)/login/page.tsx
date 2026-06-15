@@ -28,7 +28,6 @@ import { useAuth } from '@/context/AppContext';
 import {
   AUTH_BUTTON_GRADIENT,
   AuthLogo,
-  AuthCopyrightFooter,
   authStyleVars,
   getAuthTokens,
 } from '@/components/auth/authBrand';
@@ -438,7 +437,7 @@ export default function LoginPage() {
                         fontSize: '0.95rem',
                       }}
                     >
-                      Secure access for artists and admins
+                      Secure access for artists and labels
                     </Typography>
                     <Link href="/forgot-password" style={{ color: '#ed1e79' }}>
                       Forgot password?
@@ -492,7 +491,6 @@ export default function LoginPage() {
                       Create an account
                     </Link>
                   </Box>
-                  <AuthCopyrightFooter />
                 </Stack>
               </Box>
             </Box>

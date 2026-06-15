@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
 import { PaletteMode } from '@mui/material/styles';
 import type { CSSProperties } from 'react';
 
@@ -25,8 +25,6 @@ export const AUTH_PANEL_GRADIENT =
 
 export const AUTH_SURFACE_GRADIENT =
   'linear-gradient(180deg, rgba(16,10,24,0.94), rgba(8,8,18,0.9))';
-
-export const AUTH_COPYRIGHT = `© ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.`;
 
 export const getAuthTokens = (mode: PaletteMode) => {
   const isDark = mode === 'dark';
@@ -107,24 +105,5 @@ export function AuthLogo({
         display: 'block',
       }}
     />
-  );
-}
-
-export function AuthCopyrightFooter() {
-  return (
-    <Typography
-      component="p"
-      translate="no"
-      sx={{
-        mt: 2.5,
-        color: 'var(--auth-faint, rgba(255,255,255,0.36))',
-        fontSize: '0.72rem',
-        fontWeight: 300,
-        letterSpacing: 0,
-        textAlign: 'center',
-      }}
-    >
-      {AUTH_COPYRIGHT}
-    </Typography>
   );
 }

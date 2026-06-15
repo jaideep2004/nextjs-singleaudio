@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -17,6 +17,7 @@ import {
   Album as AlbumIcon,
   CloudUpload,
   ArrowForward,
+  EditNote,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
@@ -24,6 +25,32 @@ import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSur
 import { DspLogo } from '@/components/dsp/DspLogo';
 import RouteTabs from '@/components/navigation/RouteTabs';
 import { getDspDisplayName } from '@/lib/platforms';
+import { useAuth } from '@/context/AppContext';
+
+const RELEASE_DRAFT_PREFIX = 'singleaudio.releaseDraft.v1.';
+const RELEASE_DRAFT_BACKUP_KEY = `${RELEASE_DRAFT_PREFIX}latest`;
+
+const getNormalizedReleaseStatus = (status?: string) => {
+  if (status === 'pending_review') return 'pending';
+  return status || 'pending';
+};
+
+const getDraftArtist = (draft: any) => {
+  const firstTrack = Array.isArray(draft?.trackInfos) ? draft.trackInfos[0] : null;
+  const contributor = Array.isArray(firstTrack?.contributors)
+    ? firstTrack.contributors.find((item: any) => item?.role === 'artist' && item?.name)
+    : null;
+  return contributor?.name || firstTrack?.artist || draft?.primaryArtist || 'Draft artist';
+};
+
+const hasDraftContent = (draft: any) =>
+  Boolean(
+    draft?.releaseTitle ||
+      draft?.label ||
+      draft?.artworkUploadedUrl ||
+      (Array.isArray(draft?.trackInfos) && draft.trackInfos.length > 0) ||
+      (Array.isArray(draft?.audioUploadedUrls) && draft.audioUploadedUrls.some(Boolean))
+  );
 
 export default function ReleasesPage() {
   return (
@@ -35,10 +62,12 @@ export default function ReleasesPage() {
 
 function ReleasesContent() {
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
   const [releases, setReleases] = useState<any[]>([]);
+  const [draftReleases, setDraftReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -63,19 +92,82 @@ function ReleasesContent() {
     fetchReleases();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return;
+    let cancelled = false;
+
+    const buildDraftRow = (draft: any, key: string) => {
+        if (draft?.status !== 'draft' || !hasDraftContent(draft)) return [];
+        return [{
+          ...draft,
+          _id: key,
+          status: 'draft',
+          isLocalDraft: true,
+          primaryArtist: getDraftArtist(draft),
+          artworkUrl: draft.artworkUploadedUrl,
+          releaseDate: draft.releaseDate || draft.updatedAt,
+          stores: draft.selectedDSPs || [],
+          trackCount: Math.max(
+            Array.isArray(draft.trackInfos) ? draft.trackInfos.length : 0,
+            Array.isArray(draft.audioUploadedUrls) ? draft.audioUploadedUrls.length : 0
+          ),
+        }];
+    };
+
+    const loadDrafts = async () => {
+      const seenDrafts = new Set<string>();
+      const nextDrafts: any[] = [];
+
+      try {
+        const response = await fetch('/api/releases/draft', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload?.success && payload?.draft) {
+          nextDrafts.push(...buildDraftRow(payload.draft, 'server-release-draft'));
+          if (!cancelled) setDraftReleases(nextDrafts);
+          return;
+        }
+      } catch {}
+
+      const keys = [`${RELEASE_DRAFT_PREFIX}${user.id}`, RELEASE_DRAFT_BACKUP_KEY, `${RELEASE_DRAFT_PREFIX}anonymous`];
+      for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        if (!raw || seenDrafts.has(raw)) continue;
+        try {
+          const draft = JSON.parse(raw);
+          seenDrafts.add(raw);
+          nextDrafts.push(...buildDraftRow(draft, key));
+          if (nextDrafts.length) break;
+        } catch {}
+      }
+
+      if (!cancelled) setDraftReleases(nextDrafts);
+    };
+
+    void loadDrafts();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  const catalogReleases = useMemo(
+    () => [...draftReleases, ...releases],
+    [draftReleases, releases]
+  );
+
   const filteredReleases = currentStatus
-    ? releases.filter(r => r.status === currentStatus)
-    : releases;
+    ? catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === currentStatus)
+    : catalogReleases;
   const getTrackCount = (release: any) =>
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
 
   const getStatusChip = (status: string) => {
     const map: Record<string, { color: string; bg: string; label: string }> = {
+      draft: { color: '#94a3b8', bg: isDark ? 'rgba(148,163,184,0.14)' : 'rgba(100,116,139,0.10)', label: 'Draft' },
       approved: { color: '#10b981', bg: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)', label: 'Approved' },
       pending: { color: '#f59e0b', bg: isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', label: 'Pending' },
       rejected: { color: '#ef4444', bg: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', label: 'Rejected' },
     };
-    const s = map[status] || map.pending;
+    const s = map[getNormalizedReleaseStatus(status)] || map.pending;
     return (
       <Box
         sx={{
@@ -127,10 +219,11 @@ function ReleasesContent() {
   };
 
   const tabCounts = {
-    '': releases.length,
-    pending: releases.filter(r => r.status === 'pending').length,
-    approved: releases.filter(r => r.status === 'approved').length,
-    rejected: releases.filter(r => r.status === 'rejected').length,
+    '': catalogReleases.length,
+    pending: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending').length,
+    approved: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved').length,
+    rejected: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected').length,
+    draft: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'draft').length,
   };
 
   return (
@@ -160,6 +253,7 @@ function ReleasesContent() {
           { label: `Pending (${tabCounts.pending})`, href: '/dashboard/releases?status=pending' },
           { label: `Approved (${tabCounts.approved})`, href: '/dashboard/releases?status=approved' },
           { label: `Rejected (${tabCounts.rejected})`, href: '/dashboard/releases?status=rejected' },
+          { label: `Drafts (${tabCounts.draft})`, href: '/dashboard/releases?status=draft' },
           { label: 'Tracks', href: '/dashboard/tracks' },
         ]}
       />
@@ -190,6 +284,7 @@ function ReleasesContent() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
             {currentStatus === 'pending' ? 'No releases awaiting review' :
              currentStatus === 'rejected' ? 'No rejected releases' :
+             currentStatus === 'draft' ? 'No saved draft releases' :
              'Upload your first release to get started'}
           </Typography>
           <Button
@@ -247,7 +342,7 @@ function ReleasesContent() {
             <Box
               key={release._id || idx}
               component={Link}
-              href={`/dashboard/releases/${release._id}`}
+              href={release.isLocalDraft ? '/dashboard/upload' : `/dashboard/releases/${release._id}`}
               sx={{
                 display: { xs: 'flex', md: 'grid' },
                 gridTemplateColumns: { md: '2fr 1fr 0.7fr 1fr 0.8fr' },
@@ -279,7 +374,7 @@ function ReleasesContent() {
                     flexShrink: 0,
                   }}
                 >
-                  <AlbumIcon sx={{ fontSize: 20 }} />
+                  {release.isLocalDraft ? <EditNote sx={{ fontSize: 20 }} /> : <AlbumIcon sx={{ fontSize: 20 }} />}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography

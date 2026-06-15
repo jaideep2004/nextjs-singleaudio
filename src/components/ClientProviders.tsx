@@ -3,6 +3,7 @@
 import { AppContextProvider } from '@/context/AppContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { ColorModeProvider } from '@/context/ColorModeContext';
+import GlobalFooter from '@/components/GlobalFooter';
 import React from 'react';
 import { Toaster } from 'sonner';
 
@@ -12,6 +13,7 @@ export default function ClientProviders({ children }: { children: React.ReactNod
       <NotificationsProvider>
         <ColorModeProvider>
           {children}
+          <GlobalFooter />
           <Toaster position="top-right" richColors closeButton />
         </ColorModeProvider>
       </NotificationsProvider>

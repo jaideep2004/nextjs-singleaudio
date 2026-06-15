@@ -37,7 +37,6 @@ import {
   type KnowledgeBaseTree,
 } from '@/services/api';
 import { HelpSidebar } from '@/components/knowledge-base/HelpCenterClient';
-import HelpCopyrightFooter from '@/components/knowledge-base/HelpCopyrightFooter';
 import { addHeadingIds, extractHeadings } from '@/components/knowledge-base/kbUtils';
 import { useColorMode } from '@/context/ColorModeContext';
 
@@ -459,7 +458,6 @@ export default function HelpArticleClient({
           )}
         </Paper>
       </Box>
-      <HelpCopyrightFooter />
     </Box>
   );
 }

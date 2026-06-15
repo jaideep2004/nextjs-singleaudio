@@ -431,6 +431,9 @@ const getLocalDateInputValue = (date = new Date()) => {
   return offsetDate.toISOString().slice(0, 10);
 };
 
+const RELEASE_DRAFT_PREFIX = 'singleaudio.releaseDraft.v1.';
+const RELEASE_DRAFT_BACKUP_KEY = `${RELEASE_DRAFT_PREFIX}latest`;
+
 const cloneTrackInfo = (info: TrackInfo): TrackInfo => ({
   ...info,
   contributors: info.contributors.map(contributor => ({ ...contributor })),
@@ -624,9 +627,69 @@ export default function UploadPage() {
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
-  const releaseDraftKey = `singleaudio.releaseDraft.v1.${auth.user?.id || 'anonymous'}`;
+  const releaseDraftUserId = auth.user?.id || '';
+  const releaseDraftKey = `${RELEASE_DRAFT_PREFIX}${releaseDraftUserId || 'anonymous'}`;
   const releaseDraftRestoredRef = useRef(false);
   const [releaseDraftReady, setReleaseDraftReady] = useState(false);
+  const releaseDraftServerSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const buildReleaseDraft = () => ({
+    status: 'draft',
+    updatedAt: new Date().toISOString(),
+    ownerUserId: releaseDraftUserId,
+    activeStep,
+    releaseType,
+    releaseTitle,
+    label,
+    upc,
+    autoGenerateCodes,
+    autoGenerateIsrcs,
+    releaseDate,
+    originalReleaseDate,
+    artworkUploadedUrl,
+    artworkUploadedFilename,
+    territoryCountries,
+    territoryMode,
+    rightsType,
+    rightsDescription,
+    selectedDSPs,
+    releaseWorldwide,
+    distributionTermsAccepted,
+    trackInfos,
+    audioUploadedUrls,
+    audioUploadedFilenames,
+    audioAcrCloudStatuses,
+  });
+
+  const releaseDraftHasData = (draft = buildReleaseDraft()) =>
+    Boolean(
+      String(draft.releaseTitle || '').trim() ||
+        String(draft.label || '').trim() ||
+        String(draft.upc || '').trim() ||
+        draft.releaseDate ||
+        draft.originalReleaseDate ||
+        draft.artworkUploadedUrl ||
+        draft.trackInfos.some((track) => Object.values(track).some((value) => {
+          if (Array.isArray(value)) return value.some((item) => Object.values(item).some(Boolean));
+          return Boolean(value);
+        })) ||
+        draft.audioUploadedUrls.some(Boolean)
+    );
+
+  const persistReleaseDraftLocally = (draft = buildReleaseDraft()) => {
+    const serializedDraft = JSON.stringify(draft);
+    localStorage.setItem(releaseDraftKey, serializedDraft);
+    localStorage.setItem(RELEASE_DRAFT_BACKUP_KEY, serializedDraft);
+    return serializedDraft;
+  };
+
+  const saveReleaseDraftToServer = (draft = buildReleaseDraft(), keepalive = false) =>
+    fetch('/api/releases/draft', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft }),
+      keepalive,
+    }).catch(() => undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -819,7 +882,14 @@ export default function UploadPage() {
       const data = await res.json();
       if (data.success) {
         setSubmitState('success');
-        if (typeof window !== 'undefined') localStorage.removeItem(releaseDraftKey);
+        void fetch('/api/releases/draft', { method: 'DELETE' }).catch(() => undefined);
+        if (typeof window !== 'undefined') {
+          [
+            releaseDraftKey,
+            RELEASE_DRAFT_BACKUP_KEY,
+            `${RELEASE_DRAFT_PREFIX}anonymous`,
+          ].forEach(key => localStorage.removeItem(key));
+        }
         toast.success(
           isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.'
         );
@@ -1065,19 +1135,7 @@ export default function UploadPage() {
     }
     releaseDraftRestoredRef.current = true;
 
-    const raw = localStorage.getItem(releaseDraftKey);
-    if (!raw) {
-      setReleaseDraftReady(true);
-      return;
-    }
-
-    try {
-      const draft = JSON.parse(raw);
-      if (draft?.status !== 'draft') {
-        setReleaseDraftReady(true);
-        return;
-      }
-
+    const applyDraft = (draft: any) => {
       setActiveStep(Number(draft.activeStep || 0));
       setReleaseType((draft.releaseType || 'single') as ReleaseType);
       setReleaseTitle(draft.releaseTitle || '');
@@ -1112,60 +1170,60 @@ export default function UploadPage() {
       setTrackUploading(Array.from({ length: trackCount }, () => false));
       setAnalysisLoading(Array.from({ length: trackCount }, () => false));
       toast.info('Recovered your draft release.');
-    } catch {
-      localStorage.removeItem(releaseDraftKey);
-    } finally {
-      setReleaseDraftReady(true);
-    }
-  }, [editReleaseId, mounted, releaseDraftKey]);
+    };
+
+    const loadDraft = async () => {
+      try {
+        const response = await fetch('/api/releases/draft', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload?.success && payload?.draft?.status === 'draft') {
+          applyDraft(payload.draft);
+          return;
+        }
+
+        const candidateKeys = [
+          releaseDraftKey,
+          RELEASE_DRAFT_BACKUP_KEY,
+          `${RELEASE_DRAFT_PREFIX}anonymous`,
+        ];
+        const draftEntry = candidateKeys
+          .map(key => ({ key, raw: localStorage.getItem(key) }))
+          .find(entry => Boolean(entry.raw));
+
+        if (!draftEntry?.raw) return;
+
+        try {
+          const draft = JSON.parse(draftEntry.raw);
+          if (draft?.status !== 'draft') return;
+          applyDraft(draft);
+          if (releaseDraftUserId) void saveReleaseDraftToServer(draft);
+        } catch {
+          localStorage.removeItem(draftEntry.key);
+        }
+      } finally {
+        setReleaseDraftReady(true);
+      }
+    };
+
+    void loadDraft();
+  }, [editReleaseId, mounted, releaseDraftKey, releaseDraftUserId]);
 
   useEffect(() => {
     if (!mounted || !releaseDraftReady || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
 
-    const hasDraftData =
-      releaseTitle.trim() ||
-      label.trim() ||
-      upc.trim() ||
-      releaseDate ||
-      originalReleaseDate ||
-      artworkUploadedUrl ||
-      trackInfos.some((track) => Object.values(track).some((value) => {
-        if (Array.isArray(value)) return value.some((item) => Object.values(item).some(Boolean));
-        return Boolean(value);
-      })) ||
-      audioUploadedUrls.some(Boolean);
+    const draft = buildReleaseDraft();
+    if (!releaseDraftHasData(draft)) return;
 
-    if (!hasDraftData) return;
+    persistReleaseDraftLocally(draft);
 
-    localStorage.setItem(
-      releaseDraftKey,
-      JSON.stringify({
-        status: 'draft',
-        updatedAt: new Date().toISOString(),
-        activeStep,
-        releaseType,
-        releaseTitle,
-        label,
-        upc,
-        autoGenerateCodes,
-        autoGenerateIsrcs,
-        releaseDate,
-        originalReleaseDate,
-        artworkUploadedUrl,
-        artworkUploadedFilename,
-        territoryCountries,
-        territoryMode,
-        rightsType,
-        rightsDescription,
-        selectedDSPs,
-        releaseWorldwide,
-        distributionTermsAccepted,
-        trackInfos,
-        audioUploadedUrls,
-        audioUploadedFilenames,
-        audioAcrCloudStatuses,
-      })
-    );
+    if (releaseDraftServerSaveRef.current) clearTimeout(releaseDraftServerSaveRef.current);
+    releaseDraftServerSaveRef.current = setTimeout(() => {
+      void saveReleaseDraftToServer(draft);
+    }, 450);
+
+    return () => {
+      if (releaseDraftServerSaveRef.current) clearTimeout(releaseDraftServerSaveRef.current);
+    };
   }, [
     activeStep,
     artworkUploadedFilename,
@@ -1183,6 +1241,59 @@ export default function UploadPage() {
     releaseDate,
     releaseDraftKey,
     releaseDraftReady,
+    releaseDraftUserId,
+    releaseTitle,
+    releaseType,
+    releaseWorldwide,
+    rightsDescription,
+    rightsType,
+    selectedDSPs,
+    submitState,
+    territoryCountries,
+    territoryMode,
+    trackInfos,
+    upc,
+  ]);
+
+  useEffect(() => {
+    if (!mounted || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+
+    const persistBeforeExit = () => {
+      const draft = buildReleaseDraft();
+      if (!releaseDraftHasData(draft)) return;
+      persistReleaseDraftLocally(draft);
+      void saveReleaseDraftToServer(draft, true);
+    };
+
+    const persistWhenHidden = () => {
+      if (document.visibilityState === 'hidden') persistBeforeExit();
+    };
+
+    window.addEventListener('pagehide', persistBeforeExit);
+    document.addEventListener('visibilitychange', persistWhenHidden);
+
+    return () => {
+      persistBeforeExit();
+      window.removeEventListener('pagehide', persistBeforeExit);
+      document.removeEventListener('visibilitychange', persistWhenHidden);
+    };
+  }, [
+    activeStep,
+    artworkUploadedFilename,
+    artworkUploadedUrl,
+    audioAcrCloudStatuses,
+    audioUploadedFilenames,
+    audioUploadedUrls,
+    autoGenerateCodes,
+    autoGenerateIsrcs,
+    distributionTermsAccepted,
+    editReleaseId,
+    label,
+    mounted,
+    originalReleaseDate,
+    releaseDate,
+    releaseDraftKey,
+    releaseDraftUserId,
     releaseTitle,
     releaseType,
     releaseWorldwide,
@@ -1303,23 +1414,30 @@ export default function UploadPage() {
   useEffect(() => {
     // Revoke old URLs
     return () => {
-      trackPreviewUrls.forEach(url => url && URL.revokeObjectURL(url));
+      trackPreviewUrls.forEach(url => {
+        if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+      });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     setTrackPreviewUrls(prev => {
-      // Revoke URLs that are no longer needed
+      // Revoke only local object URLs. Uploaded server URLs must survive draft restore.
       prev.forEach((url, i) => {
-        if (url && (!tracks[i] || i >= tracks.length)) {
+        const uploadedUrl = audioUploadedUrls[i];
+        if (url?.startsWith('blob:') && (!tracks[i] || i >= tracks.length || uploadedUrl)) {
           URL.revokeObjectURL(url);
         }
       });
-      const next = tracks.map((f, i) => (f ? prev[i] || URL.createObjectURL(f) : null));
+      const next = tracks.map((f, i) => {
+        if (audioUploadedUrls[i]) return audioUploadedUrls[i];
+        if (!f) return null;
+        return prev[i]?.startsWith('blob:') ? prev[i] : URL.createObjectURL(f);
+      });
       return next;
     });
-  }, [tracks]);
+  }, [audioUploadedUrls, tracks]);
 
   // Keep uploaded audio arrays in sync with tracks length
   useEffect(() => {
@@ -1441,6 +1559,8 @@ export default function UploadPage() {
     setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
     setTrackUploading(prev => prev.map((u, i) => (i === index ? true : u)));
     setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 1 : p)));
+    setAudioUploadedUrls(prev => prev.map((url, i) => (i === index ? null : url)));
+    setAudioUploadedFilenames(prev => prev.map((name, i) => (i === index ? null : name)));
     setAcrCloudPending(index);
     delete acrCloudPollRef.current[index];
     setTrackTitleFromFile(index, file);
@@ -1593,6 +1713,8 @@ export default function UploadPage() {
     setAnalysisErrors(prev => prev.map((e, i) => (i === index ? null : e)));
     setTrackUploading(prev => prev.map((u, i) => (i === index ? true : u)));
     setAudioUploadPct(prev => prev.map((p, i) => (i === index ? 1 : p)));
+    setAudioUploadedUrls(prev => prev.map((url, i) => (i === index ? null : url)));
+    setAudioUploadedFilenames(prev => prev.map((name, i) => (i === index ? null : name)));
     setAcrCloudPending(index);
     delete acrCloudPollRef.current[index];
 

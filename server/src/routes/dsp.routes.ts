@@ -35,6 +35,7 @@ const protectAdminOrCronSecret = (req: AuthRequest, res: Response, next: NextFun
 router.get('/providers', protect, authorize([UserRole.ADMIN]), dspController.listProviders);
 router.post('/providers', protect, authorize([UserRole.ADMIN]), dspController.registerProvider);
 router.post('/providers/bootstrap-phase1', protect, authorize([UserRole.ADMIN]), dspController.bootstrapPhase1Providers);
+router.post('/broma/outlets/sync', protectAdminOrCronSecret, dspController.syncBromaOutlets);
 
 router.get('/deliveries', protect, authorize([UserRole.ADMIN]), dspController.listDeliveries);
 router.get('/deliveries/:jobId', protect, authorize([UserRole.ADMIN]), dspController.getDeliveryById);

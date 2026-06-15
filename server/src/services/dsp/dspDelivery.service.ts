@@ -24,6 +24,7 @@ import {
   getConfiguredCredentialKeys,
   isPlainCredentialMap,
 } from './dspCredentialVault';
+import { syncBromaOutlets } from './bromaOutlet.service';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const WORKER_LOCK_MS = 5 * 60_000;
@@ -84,6 +85,13 @@ const normalizeConfigAndCredentials = (
 const hashPayload = (payload: unknown) =>
   crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 
+const asDate = (value: unknown) => {
+  if (value instanceof Date) return value;
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+};
+
 class DspDeliveryService {
   private buildProviderView(provider: any) {
     const plain = toPlainObject(provider);
@@ -125,17 +133,7 @@ class DspDeliveryService {
   async bootstrapPhase1Providers() {
     const defaults = [
       { key: 'mock_dsp', displayName: 'Mock DSP', enabled: true, integrationMode: 'sandbox' as DspIntegrationMode },
-      { key: 'spotify', displayName: 'Spotify' },
-      { key: 'apple_music', displayName: 'Apple Music' },
-      { key: 'amazon_music', displayName: 'Amazon Music' },
-      { key: 'youtube_music', displayName: 'YouTube Music' },
-      { key: 'youtube_content_id', displayName: 'YouTube Content ID' },
-      { key: 'youtube_music_video', displayName: 'YouTube Music Video' },
-      { key: 'youtube_art_track', displayName: 'YouTube Art Track' },
-      { key: 'tiktok', displayName: 'TikTok' },
-      { key: 'deezer', displayName: 'Deezer' },
-      { key: 'soundcloud', displayName: 'SoundCloud' },
-      { key: 'tidal', displayName: 'TIDAL' },
+      { key: 'broma', displayName: 'Broma', enabled: false, integrationMode: 'shell' as DspIntegrationMode },
     ];
 
     const created = [];
@@ -206,6 +204,7 @@ class DspDeliveryService {
         explicit: track.explicit,
         audioFile: track.audioFile,
         artwork: track.artwork,
+        contributors: Array.isArray(track.contributors) ? track.contributors : [],
         releaseDate: payload.releaseDate,
         territories: Array.isArray(payload.territories) ? payload.territories : ['WORLD'],
         contentRating: track.explicit ? 'explicit' : 'clean',
@@ -213,12 +212,17 @@ class DspDeliveryService {
         metadata: {
           source: 'releaseDeliverySnapshot',
           releaseId: String(payload.releaseId || snapshot.releaseId || ''),
+          contributors: track.contributors || [],
+          composers: track.composers || [],
+          lyricists: track.lyricists || [],
+          publishers: track.publishers || [],
         },
       })),
       metadata: {
         source: 'releaseDeliverySnapshot',
         payloadHash: snapshot.payloadHash,
         snapshotId: snapshot._id?.toString?.(),
+        ...(payload.metadata || {}),
       },
     };
   }
@@ -319,7 +323,19 @@ class DspDeliveryService {
 
   async listProviders() {
     const dbProviders = await DspProvider.find().sort({ displayName: 1 }).select('+credentials +credentialEnvelopeVersion');
-    if (dbProviders.length > 0) return dbProviders.map((provider) => this.buildProviderView(provider));
+    if (dbProviders.length > 0) {
+      const supportedProviders = dbProviders
+        .filter((provider) => {
+          try {
+            dspRegistry.get(provider.key);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+        .map((provider) => this.buildProviderView(provider));
+      if (supportedProviders.length > 0) return supportedProviders;
+    }
 
     return dspRegistry.list().map((connector) => ({
       key: connector.key,
@@ -341,6 +357,18 @@ class DspDeliveryService {
       region: null,
       config: {},
     }));
+  }
+
+  async syncBromaOutlets() {
+    const providerRecord = await this.getProviderWithDecryptedCredentials('broma');
+    if (!providerRecord || !providerRecord.provider.enabled) {
+      throw new Error('Broma provider is not active');
+    }
+
+    return syncBromaOutlets({
+      credentials: providerRecord.credentials,
+      config: providerRecord.provider.config || {},
+    });
   }
 
   async dispatchDelivery(trackId: string, providerKey: string, operation: DspDeliveryOperation, createdBy?: string) {
@@ -459,6 +487,43 @@ class DspDeliveryService {
     return DeliveryJob.findById(jobId);
   }
 
+  private async updateReleaseLifecycle(job: IDeliveryJob, state: string, metadata: Record<string, any> = {}) {
+    if (job.targetType !== 'release' || !job.releaseId) return;
+
+    let releaseStatus: string | null = null;
+    const step = String(metadata.bromaStep || '');
+    const moderationStatus = String(metadata.bromaModerationStatus || '').toLowerCase();
+    if (state === 'delivered') releaseStatus = 'live';
+    else if (step === 'send_moderation') releaseStatus = 'broma_moderation';
+    else if (step === 'poll_status') {
+      releaseStatus = ['accepted', 'approved', 'processing', 'distributed', 'in_distribution'].includes(moderationStatus)
+        ? 'dsp_processing'
+        : 'broma_moderation';
+    }
+    else if (step === 'done') releaseStatus = 'live';
+    else if (state === 'processing') releaseStatus = 'uploading_to_broma';
+    else if (state === 'needs_attention') releaseStatus = 'approved';
+
+    if (!releaseStatus) return;
+    await mongoose.connection.collection('releases').updateOne(
+      { _id: job.releaseId },
+      {
+        $set: {
+          status: releaseStatus,
+          updatedAt: new Date(),
+          bromaDelivery: {
+            releaseId: metadata.bromaReleaseId,
+            recordingIds: metadata.bromaRecordingIds || {},
+            step,
+            moderationStatus: metadata.bromaModerationStatus,
+            outletIds: metadata.bromaOutletIds || [],
+            updatedAt: new Date(),
+          },
+        },
+      }
+    );
+  }
+
   async processJob(jobId: string): Promise<IDeliveryJob | null> {
     const job = await DeliveryJob.findById(jobId);
     if (!job) return null;
@@ -489,7 +554,12 @@ class DspDeliveryService {
       return this.failJob(jobId, `${job.targetType === 'release' ? 'Release package' : 'Metadata/DDEX'} validation failed: ${payloadResult.errors.join(', ')}`);
     }
 
-    const connector = dspRegistry.get(job.providerKey);
+    let connector;
+    try {
+      connector = dspRegistry.get(job.providerKey);
+    } catch (error) {
+      return this.markJobNeedsAttention(jobId, job, getErrorMessage(error));
+    }
     const validation = await connector.validateTrack(payloadResult.payload);
     if (!validation.valid) {
       return this.failJob(jobId, `Connector validation failed: ${validation.errors.join(', ')}`);
@@ -500,6 +570,12 @@ class DspDeliveryService {
       lastAttemptAt: new Date(),
       $push: { events: { state: 'processing', message: 'Connector dispatch started', source: 'system' } },
     });
+    if (job.targetType === 'release' && job.releaseId && job.providerKey === 'broma') {
+      await mongoose.connection.collection('releases').updateOne(
+        { _id: job.releaseId },
+        { $set: { status: 'uploading_to_broma', updatedAt: new Date() } }
+      );
+    }
 
     try {
       let result;
@@ -509,6 +585,8 @@ class DspDeliveryService {
         region: provider.region,
         config: provider.config,
         operation: job.operation,
+        jobId,
+        jobMetadata: job.metadata || {},
       };
       if (job.operation === 'deliver') {
         result = await connector.deliver(payloadResult.payload, context);
@@ -522,12 +600,16 @@ class DspDeliveryService {
 
       const finalState: DspDeliveryState = result.state;
       const successLike = ['processing', 'delivered'].includes(finalState);
+      const connectorMetadata = result.metadata || {};
+      const nextRetryAt = finalState === 'processing' ? asDate(connectorMetadata.nextPollAt) : undefined;
       const completionUpdate: Record<string, any> = {
         state: finalState,
         externalId: result.externalId,
+        nextRetryAt,
         metadata: {
           ...job.metadata,
-          connectorMetadata: result.metadata || {},
+          ...connectorMetadata,
+          connectorMetadata,
           metadataWarnings: payloadResult.warnings,
         },
         $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
@@ -549,20 +631,27 @@ class DspDeliveryService {
       };
       if (successLike) completionUpdate.$unset.errorMessage = '';
       else completionUpdate.errorMessage = result.message;
+      if (!nextRetryAt) completionUpdate.$unset.nextRetryAt = '';
 
       await DeliveryJob.findByIdAndUpdate(jobId, completionUpdate);
+      await this.updateReleaseLifecycle(job, finalState, {
+        ...job.metadata,
+        ...connectorMetadata,
+      });
       return DeliveryJob.findById(jobId);
     } catch (error) {
       const message = getErrorMessage(error);
+      const statusCode = typeof (error as any)?.statusCode === 'number' ? (error as any).statusCode : undefined;
+      const needsAttention = Boolean(statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 401 && statusCode !== 429);
       const retryCount = job.retryCount + 1;
-      const shouldRetry = retryCount <= job.maxRetries;
+      const shouldRetry = !needsAttention && retryCount <= job.maxRetries;
       const nextRetryAt = shouldRetry ? new Date(Date.now() + BASE_RETRY_DELAY_MS * retryCount) : undefined;
 
       await DeliveryJob.findByIdAndUpdate(jobId, {
-        state: shouldRetry ? 'queued' : 'failed',
+        state: needsAttention ? 'needs_attention' : shouldRetry ? 'queued' : 'failed',
         retryCount,
         nextRetryAt,
-        deadLettered: !shouldRetry,
+        deadLettered: !needsAttention && !shouldRetry,
         errorMessage: message,
         $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
         $push: {
@@ -573,12 +662,16 @@ class DspDeliveryService {
             retryable: shouldRetry,
           },
           events: {
-            state: shouldRetry ? 'queued' : 'failed',
-            message: shouldRetry ? `Retry scheduled: ${message}` : `Dead-lettered: ${message}`,
+            state: needsAttention ? 'needs_attention' : shouldRetry ? 'queued' : 'failed',
+            message: needsAttention ? `Broma needs attention: ${message}` : shouldRetry ? `Retry scheduled: ${message}` : `Dead-lettered: ${message}`,
             source: 'system',
           },
         },
       });
+
+      if (needsAttention) {
+        await this.updateReleaseLifecycle(job, 'needs_attention', job.metadata || {});
+      }
 
       return DeliveryJob.findById(jobId);
     }
@@ -589,14 +682,22 @@ class DspDeliveryService {
     const lockExpiresAt = new Date(now.getTime() + WORKER_LOCK_MS);
     return DeliveryJob.findOneAndUpdate(
       {
-        state: 'queued',
         deadLettered: false,
         $and: [
           {
             $or: [
-              { nextRetryAt: { $exists: false } },
-              { nextRetryAt: null },
-              { nextRetryAt: { $lte: now } },
+              {
+                state: 'queued',
+                $or: [
+                  { nextRetryAt: { $exists: false } },
+                  { nextRetryAt: null },
+                  { nextRetryAt: { $lte: now } },
+                ],
+              },
+              {
+                state: 'processing',
+                nextRetryAt: { $lte: now },
+              },
             ],
           },
           {

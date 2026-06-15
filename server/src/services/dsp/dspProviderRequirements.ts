@@ -35,6 +35,15 @@ const baseRequirement = (
 });
 
 const REQUIREMENTS: Record<string, DspProviderRequirement> = {
+  broma: baseRequirement('broma', 'Broma', {
+    docsStatus: 'official_public',
+    docsUrl: 'https://broma16.com/partner-api/partner-api.en.html',
+    payloadStandard: 'platform_api',
+    requiredCredentialKeys: ['email', 'password'],
+    requiredConfigKeys: ['baseUrl', 'accountId'],
+    readinessChecks: ['credentials', 'account_id', 'outlet_mapping'],
+    notes: 'Broma is the live mediator for release delivery to DSP outlets.',
+  }),
   mock_dsp: baseRequirement('mock_dsp', 'Mock DSP', {
     docsStatus: 'official_public',
     payloadStandard: 'platform_api',

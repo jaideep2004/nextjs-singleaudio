@@ -45,6 +45,8 @@ type CityOption = { name: string };
 type PostOffice = { Name: string; District: string; State: string; Country: string; Pincode: string };
 
 const steps = ['Profile', 'Address', 'Identity', 'Payout'];
+const KYC_DRAFT_PREFIX = 'singleaudio.kycDraft.v1.';
+const KYC_DRAFT_BACKUP_KEY = `${KYC_DRAFT_PREFIX}latest`;
 const fileFields = [
   'aadhaarFrontFile',
   'aadhaarBackFile',
@@ -92,15 +94,18 @@ const FieldShell = ({ title, children }: { title: string; children: ReactNode })
 const UploadBox = ({
   label,
   value,
+  restoredFileName,
   required,
   onChange,
 }: {
   label: string;
   value?: File;
+  restoredFileName?: string;
   required?: boolean;
   onChange: (file?: File) => void;
 }) => {
   const [previewUrl, setPreviewUrl] = useState('');
+  const displayName = value?.name || restoredFileName || '';
 
   useEffect(() => {
     if (!value || !value.type.startsWith('image/')) {
@@ -126,7 +131,7 @@ const UploadBox = ({
         textAlign: 'left',
         px: 1.25,
         py: 1.25,
-        color: value ? 'success.main' : 'text.primary',
+        color: value ? 'success.main' : restoredFileName ? 'warning.main' : 'text.primary',
         borderStyle: value ? 'solid' : 'dashed',
         fontWeight: 800,
         overflow: 'hidden',
@@ -160,8 +165,13 @@ const UploadBox = ({
             {label}{required ? ' *' : ''}
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {value?.name || 'JPG, PNG, or PDF under 10 MB'}
+            {displayName || 'JPG, PNG, or PDF under 10 MB'}
           </Typography>
+          {!value && restoredFileName && (
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 800 }}>
+              Re-upload required before submit
+            </Typography>
+          )}
           {value && (
             <Typography variant="caption" sx={{ display: 'block', mt: 0.5, fontWeight: 800 }}>
               Click to replace
@@ -231,15 +241,44 @@ export default function KycGate({ children }: { children: ReactNode }) {
   const status = user?.verification?.status || 'pending';
   const needsKyc = userNeedsKyc(user);
   const isIndia = form.region === 'india';
-  const kycDraftKey = `singleaudio.kycDraft.v1.${user?.id || 'anonymous'}`;
+  const kycDraftKey = `${KYC_DRAFT_PREFIX}${user?.id || 'anonymous'}`;
   const kycDraftRestoredRef = useRef(false);
+  const kycDraftServerSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [kycDraftReady, setKycDraftReady] = useState(false);
+  const [hasKycDraft, setHasKycDraft] = useState(false);
+  const [restoredFileNames, setRestoredFileNames] = useState<Partial<Record<FileField, string>>>({});
+
+  const buildKycDraft = () => ({
+    status: 'draft',
+    updatedAt: new Date().toISOString(),
+    activeStep,
+    form,
+    fileNames: Object.fromEntries(
+      fileFields.map((key) => [key, files[key]?.name || restoredFileNames[key] || ''])
+    ),
+  });
+
+  const persistKycDraftLocally = (draft = buildKycDraft()) => {
+    const serializedDraft = JSON.stringify(draft);
+    localStorage.setItem(kycDraftKey, serializedDraft);
+    localStorage.setItem(KYC_DRAFT_BACKUP_KEY, serializedDraft);
+    return serializedDraft;
+  };
+
+  const saveKycDraftToServer = (draft = buildKycDraft(), keepalive = false) =>
+    fetch('/api/auth/me/kyc-draft', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft }),
+      keepalive,
+    }).catch(() => undefined);
 
   const statusMeta = useMemo(() => {
     if (status === 'submitted') return { label: 'Submitted for review', color: 'warning' as const };
+    if (hasKycDraft) return { label: 'Draft', color: 'default' as const };
     if (status === 'rejected') return { label: 'Rejected', color: 'error' as const };
     return { label: 'KYC required', color: 'info' as const };
-  }, [status]);
+  }, [hasKycDraft, status]);
 
   useEffect(() => {
     if (form.region !== 'international' || countries.length) return;
@@ -263,54 +302,101 @@ export default function KycGate({ children }: { children: ReactNode }) {
     if (!needsKyc || kycDraftRestoredRef.current || typeof window === 'undefined') return;
     kycDraftRestoredRef.current = true;
 
-    const raw = localStorage.getItem(kycDraftKey);
-    if (!raw) {
-      setKycDraftReady(true);
-      return;
-    }
-
-    try {
-      const draft = JSON.parse(raw);
+    const applyDraft = (draft: any) => {
       if (draft?.status !== 'draft' || !draft.form) {
-        setKycDraftReady(true);
         return;
       }
       setActiveStep(Math.min(steps.length - 1, Math.max(0, Number(draft.activeStep || 0))));
       setForm((prev) => ({ ...prev, ...draft.form }));
-    } catch {
-      localStorage.removeItem(kycDraftKey);
-    } finally {
-      setKycDraftReady(true);
-    }
+      setRestoredFileNames(draft.fileNames || {});
+      setHasKycDraft(true);
+    };
+
+    const loadDraft = async () => {
+      try {
+        const response = await fetch('/api/auth/me/kyc-draft', { cache: 'no-store' });
+        const payload = await response.json().catch(() => null);
+        if (response.ok && payload?.success && payload?.draft?.status === 'draft') {
+          applyDraft(payload.draft);
+          return;
+        }
+
+        const keys = [kycDraftKey, KYC_DRAFT_BACKUP_KEY, `${KYC_DRAFT_PREFIX}anonymous`];
+        const draftEntry = keys
+          .map((key) => ({ key, raw: localStorage.getItem(key) }))
+          .find((entry) => Boolean(entry.raw));
+
+        if (!draftEntry?.raw) return;
+
+        try {
+          const draft = JSON.parse(draftEntry.raw);
+          applyDraft(draft);
+          if (draft?.status === 'draft' && draft.form) void saveKycDraftToServer(draft);
+        } catch {
+          localStorage.removeItem(draftEntry.key);
+        }
+      } finally {
+        setKycDraftReady(true);
+      }
+    };
+
+    void loadDraft();
   }, [kycDraftKey, needsKyc]);
 
   useEffect(() => {
     if (!needsKyc || !kycDraftReady || typeof window === 'undefined') return;
-    localStorage.setItem(
-      kycDraftKey,
-      JSON.stringify({
-        status: 'draft',
-        updatedAt: new Date().toISOString(),
-        activeStep,
-        form,
-        fileNames: Object.fromEntries(
-          Object.entries(files).map(([key, file]) => [key, file?.name || ''])
-        ),
-      })
-    );
-  }, [activeStep, files, form, kycDraftKey, kycDraftReady, needsKyc]);
+    if (!hasKycDraft) return;
+    const draft = buildKycDraft();
+    persistKycDraftLocally(draft);
+
+    if (kycDraftServerSaveRef.current) clearTimeout(kycDraftServerSaveRef.current);
+    kycDraftServerSaveRef.current = setTimeout(() => {
+      void saveKycDraftToServer(draft);
+    }, 450);
+
+    return () => {
+      if (kycDraftServerSaveRef.current) clearTimeout(kycDraftServerSaveRef.current);
+    };
+  }, [activeStep, files, form, hasKycDraft, kycDraftKey, kycDraftReady, needsKyc, restoredFileNames]);
+
+  useEffect(() => {
+    if (!needsKyc || !hasKycDraft || typeof window === 'undefined') return;
+
+    const persistBeforeExit = () => {
+      const draft = buildKycDraft();
+      persistKycDraftLocally(draft);
+      void saveKycDraftToServer(draft, true);
+    };
+
+    const persistWhenHidden = () => {
+      if (document.visibilityState === 'hidden') persistBeforeExit();
+    };
+
+    window.addEventListener('pagehide', persistBeforeExit);
+    document.addEventListener('visibilitychange', persistWhenHidden);
+
+    return () => {
+      persistBeforeExit();
+      window.removeEventListener('pagehide', persistBeforeExit);
+      document.removeEventListener('visibilitychange', persistWhenHidden);
+    };
+  }, [activeStep, files, form, hasKycDraft, kycDraftKey, needsKyc, restoredFileNames]);
 
   if (!needsKyc) return <>{children}</>;
 
   const setValue = (key: keyof typeof form, value: string | boolean) => {
+    setHasKycDraft(true);
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const setFile = (key: FileField, file?: File) => {
+    setHasKycDraft(true);
+    setRestoredFileNames((prev) => ({ ...prev, [key]: file?.name || '' }));
     setFiles((prev) => ({ ...prev, [key]: file }));
   };
 
   const resetRegion = (region: Region) => {
+    setHasKycDraft(true);
     setForm((prev) => ({
       ...prev,
       region,
@@ -377,6 +463,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
       if (!offices.length) throw new Error('No postal records found for this pincode.');
       setPostOffices(offices);
       const first = offices[0] as PostOffice;
+      setHasKycDraft(true);
       setForm((prev) => ({ ...prev, country: first.Country, state: first.State, city: first.District }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pincode lookup failed.');
@@ -396,6 +483,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
     try {
       const data = await readLookup<any>(`/api/geo/ifsc/${code}`, null);
       if (!data?.BANK) throw new Error('No bank found for this IFSC.');
+      setHasKycDraft(true);
       setForm((prev) => ({
         ...prev,
         ifscCode: code,
@@ -482,7 +570,11 @@ export default function KycGate({ children }: { children: ReactNode }) {
       const response = await fetch('/api/auth/me/kyc', { method: 'PUT', body: payload });
       const json = await response.json().catch(() => null);
       if (!response.ok || !json?.success) throw new Error(json?.message || json?.error || 'KYC submission failed');
-      if (typeof window !== 'undefined') localStorage.removeItem(kycDraftKey);
+      void fetch('/api/auth/me/kyc-draft', { method: 'DELETE' }).catch(() => undefined);
+      if (typeof window !== 'undefined') {
+        [kycDraftKey, KYC_DRAFT_BACKUP_KEY, `${KYC_DRAFT_PREFIX}anonymous`].forEach((key) => localStorage.removeItem(key));
+      }
+      setHasKycDraft(false);
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'KYC submission failed');
@@ -647,6 +739,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
                           value={form.city}
                           onChange={(event) => {
                             const office = postOffices.find((item) => `${item.District} - ${item.Name}` === event.target.value);
+                            setHasKycDraft(true);
                             setForm((prev) => ({
                               ...prev,
                               city: String(event.target.value),
@@ -672,6 +765,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
                           value={form.countryIso}
                           onChange={(event) => {
                             const country = countries.find((item) => item.iso2 === event.target.value);
+                            setHasKycDraft(true);
                             setForm((prev) => ({
                               ...prev,
                               countryIso: country?.iso2 || '',
@@ -694,6 +788,7 @@ export default function KycGate({ children }: { children: ReactNode }) {
                           value={form.stateIso}
                           onChange={(event) => {
                             const state = states.find((item) => item.iso2 === event.target.value);
+                            setHasKycDraft(true);
                             setForm((prev) => ({ ...prev, stateIso: state?.iso2 || '', state: state?.name || '', city: '' }));
                           }}
                         >
@@ -738,15 +833,15 @@ export default function KycGate({ children }: { children: ReactNode }) {
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                     <TextField label="Aadhaar number" value={form.aadhaarNumber} onChange={(event) => setValue('aadhaarNumber', event.target.value.replace(/\D/g, '').slice(0, 12))} required />
                     <TextField label="PAN number" value={form.panNumber} onChange={(event) => setValue('panNumber', event.target.value.toUpperCase().slice(0, 10))} required />
-                    <UploadBox label="Aadhaar front" value={files.aadhaarFrontFile} required onChange={(file) => setFile('aadhaarFrontFile', file)} />
-                    <UploadBox label="Aadhaar back" value={files.aadhaarBackFile} required onChange={(file) => setFile('aadhaarBackFile', file)} />
-                    <UploadBox label="PAN card" value={files.panCardFile} required onChange={(file) => setFile('panCardFile', file)} />
+                    <UploadBox label="Aadhaar front" value={files.aadhaarFrontFile} restoredFileName={restoredFileNames.aadhaarFrontFile} required onChange={(file) => setFile('aadhaarFrontFile', file)} />
+                    <UploadBox label="Aadhaar back" value={files.aadhaarBackFile} restoredFileName={restoredFileNames.aadhaarBackFile} required onChange={(file) => setFile('aadhaarBackFile', file)} />
+                    <UploadBox label="PAN card" value={files.panCardFile} restoredFileName={restoredFileNames.panCardFile} required onChange={(file) => setFile('panCardFile', file)} />
                   </Box>
                 ) : (
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
                     <TextField label="Government ID number" value={form.nationalIdNumber} onChange={(event) => setValue('nationalIdNumber', event.target.value)} required />
-                    <UploadBox label="National ID front" value={files.nationalIdFrontFile} required onChange={(file) => setFile('nationalIdFrontFile', file)} />
-                    <UploadBox label="National ID back" value={files.nationalIdBackFile} onChange={(file) => setFile('nationalIdBackFile', file)} />
+                    <UploadBox label="National ID front" value={files.nationalIdFrontFile} restoredFileName={restoredFileNames.nationalIdFrontFile} required onChange={(file) => setFile('nationalIdFrontFile', file)} />
+                    <UploadBox label="National ID back" value={files.nationalIdBackFile} restoredFileName={restoredFileNames.nationalIdBackFile} onChange={(file) => setFile('nationalIdBackFile', file)} />
                   </Box>
                 )}
               </Box>

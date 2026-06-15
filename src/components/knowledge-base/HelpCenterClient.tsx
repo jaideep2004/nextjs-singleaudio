@@ -44,7 +44,6 @@ import {
   type KnowledgeBaseTree,
 } from '@/services/api';
 import { groupKnowledgeBase } from '@/components/knowledge-base/kbUtils';
-import HelpCopyrightFooter from '@/components/knowledge-base/HelpCopyrightFooter';
 import { useColorMode } from '@/context/ColorModeContext';
 
 type HelpCenterClientProps = {
@@ -672,7 +671,6 @@ export default function HelpCenterClient({
                 </Paper>
               )}
             </Box>
-            <HelpCopyrightFooter />
           </Stack>
         ) : mode === 'category' ? (
           <Stack spacing={0}>
@@ -890,7 +888,6 @@ export default function HelpCenterClient({
                 </Paper>
               )}
             </Box>
-            <HelpCopyrightFooter />
           </Stack>
         ) : null}
       </Box>

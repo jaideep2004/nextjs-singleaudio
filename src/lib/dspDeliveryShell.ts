@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Db, ObjectId } from 'mongodb';
 import { validateReleaseAssetsForDelivery } from './dspAssetReadiness';
+import { evaluateBromaReleaseReadiness } from './bromaDeliveryReadiness';
 import { hydrateReleasesWithCanonicalTracks } from '@/lib/repositories/tracks';
 import { releasesCollection } from '@/lib/repositories/releases';
 
@@ -11,19 +12,6 @@ type ReleaseDoc = Record<string, any> & {
   stores?: string[];
   tracks?: Array<Record<string, any>>;
 };
-
-const PROVIDER_KEY_MAP: Record<string, string> = {
-  apple: 'apple_music',
-  amazon: 'amazon_music',
-  youtube: 'youtube_music',
-  facebook: 'facebook_audio_library',
-  netease: 'netease_cloud_music',
-  wynk: 'wynk_music',
-  hungama: 'hungama_music',
-};
-
-const toProviderKey = (key: string) =>
-  (PROVIDER_KEY_MAP[key] || key).toLowerCase().trim();
 
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
@@ -42,6 +30,7 @@ const sha256 = (value: unknown) =>
 function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: string) {
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
   const assetChecks = release.deliveryAssetReadiness?.checks || [];
+  const bromaReadiness = release.bromaReadiness || {};
   const payload = {
     releaseId: release._id.toString(),
     releaseTitle: release.releaseTitle || release.title || 'Untitled release',
@@ -51,7 +40,7 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
     genre: release.genre,
     language: release.language,
     releaseDate: release.releaseDate,
-    stores: providerKeys,
+    stores: Array.isArray(release.stores) ? release.stores : [],
     tracks: tracks.map((track) => ({
       id: String(track._id || track.id || track.isrc || track.title || ''),
       title: track.title,
@@ -62,6 +51,10 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
       audioFile: track.audioFile || track.audioUrl || track.fileUrl,
       artwork: track.artwork || release.artwork || release.coverArt,
       duration: track.duration,
+      contributors: track.contributors || track.rightsHolders || [],
+      composers: track.composers || [],
+      lyricists: track.lyricists || [],
+      publishers: track.publishers || [],
     })),
     territories: release.territories || ['WORLD'],
     assetChecks: assetChecks.map((check: any) => ({
@@ -71,6 +64,14 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
       sizeBytes: check.sizeBytes,
       checksumSha256: check.checksumSha256,
     })),
+    metadata: {
+      artwork: release.artworkUrl || release.artwork || release.coverArt,
+      releaseType: release.releaseType,
+      pline: release.pline || release.pLine,
+      cline: release.cline || release.cLine,
+      bromaOutletIds: bromaReadiness.outletIds || [],
+      bromaOutletMappings: bromaReadiness.outletMappings || [],
+    },
   };
 
   return {
@@ -101,11 +102,19 @@ function evaluateNativeProviderReadiness(provider: any) {
   const config = provider.config || {};
   const hasEncryptedCredential = (key: string) =>
     Boolean(provider.credentials?.__encrypted && provider.credentials?.values?.[key]);
-  const requiredConfig = provider.key === 'mock_dsp' ? ['webhookSecret'] : ['baseUrl', 'webhookSecret'];
-  const missing = requiredConfig.filter((key) => {
-    if (key === 'webhookSecret') return !config[key] && !hasEncryptedCredential('webhookSecret');
-    return !config[key];
-  });
+  const requiredConfig = provider.key === 'mock_dsp'
+    ? ['webhookSecret']
+    : provider.key === 'broma'
+      ? ['baseUrl', 'accountId']
+      : ['baseUrl', 'webhookSecret'];
+  const requiredCredentials = provider.key === 'broma' ? ['email', 'password'] : [];
+  const missing = [
+    ...requiredConfig.filter((key) => {
+      if (key === 'webhookSecret') return !config[key] && !hasEncryptedCredential('webhookSecret');
+      return !config[key];
+    }),
+    ...requiredCredentials.filter((key) => !hasEncryptedCredential(key)),
+  ];
   if (missing.length > 0) {
     return { state: 'missing_credentials', canDispatch: false, missing };
   }
@@ -121,33 +130,37 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
   const [releaseForDelivery] = await hydrateReleasesWithCanonicalTracks(db, [release]);
   release = releaseForDelivery;
   const rawStores = Array.isArray(release.stores) ? release.stores : [];
-  const providerKeys = Array.from(new Set(rawStores.map(toProviderKey).filter(Boolean)));
-  if (providerKeys.length === 0) {
-    return { snapshotId: null, jobsCreated: 0, providerKeys: [] };
+  if (rawStores.length === 0) {
+    return { snapshotId: null, jobsCreated: 0, providerKeys: [], blocked: true };
   }
+  const providerKeys = ['broma'];
 
   const assetReadiness = await validateReleaseAssetsForDelivery(release);
+  const bromaReadiness = await evaluateBromaReleaseReadiness(db, release);
   await releasesCollection(db).updateOne(
     { _id: release._id },
     {
       $set: {
         deliveryAssetReadiness: assetReadiness,
+        bromaReadiness,
         deliveryReadinessCheckedAt: new Date(),
       },
     }
   );
 
-  if (!assetReadiness.ok) {
+  if (!assetReadiness.ok || !bromaReadiness.ok) {
     return {
       snapshotId: null,
       jobsCreated: 0,
       providerKeys,
       blocked: true,
       assetReadiness,
+      bromaReadiness,
     };
   }
 
   release.deliveryAssetReadiness = assetReadiness;
+  release.bromaReadiness = bromaReadiness;
   const snapshot = buildSnapshot(release, providerKeys, createdBy);
   const snapshotResult = await db.collection('releaseDeliverySnapshots').insertOne(snapshot);
   const providers = await db
@@ -184,6 +197,9 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
       metadata: {
         releaseTitle: snapshot.payload.releaseTitle,
         payloadHash: snapshot.payloadHash,
+        bromaStep: 'create_release',
+        bromaOutletIds: bromaReadiness.outletIds,
+        bromaOutletMappings: bromaReadiness.outletMappings,
         readiness,
         deliverySnapshot: {
           upc: snapshot.payload.upc,

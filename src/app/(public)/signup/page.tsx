@@ -34,7 +34,6 @@ import {
 import {
   AUTH_BUTTON_GRADIENT,
   AuthLogo,
-  AuthCopyrightFooter,
   authStyleVars,
   getAuthTokens,
 } from '@/components/auth/authBrand';
@@ -223,7 +222,6 @@ export default function SignupPage() {
           >
             Go to Login
           </Button>
-          <AuthCopyrightFooter />
         </Box>
       </Box>
     );
@@ -594,7 +592,6 @@ export default function SignupPage() {
                 )}
               </Stack>
             </Box>
-            <AuthCopyrightFooter />
           </Box>
         </Box>
       </Box>

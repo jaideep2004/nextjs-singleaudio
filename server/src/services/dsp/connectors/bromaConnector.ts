@@ -1,0 +1,257 @@
+import { BaseDspConnector } from './baseConnector';
+import { BromaClient } from './bromaClient';
+import { DspCapability, DspConnectorContext, DspDeliveryPayload, DspDeliveryResult, DspReleasePayload } from '../../../types/dsp';
+import DeliveryJob from '../../../models/deliveryJob.model';
+
+type BromaStep =
+  | 'create_release'
+  | 'upload_recordings'
+  | 'update_recordings'
+  | 'add_compositions'
+  | 'upload_cover'
+  | 'update_distribution'
+  | 'send_moderation'
+  | 'poll_status'
+  | 'done';
+
+const STEP_ORDER: BromaStep[] = [
+  'create_release',
+  'upload_recordings',
+  'update_recordings',
+  'add_compositions',
+  'upload_cover',
+  'update_distribution',
+  'send_moderation',
+  'poll_status',
+  'done',
+];
+
+const firstString = (...values: unknown[]) =>
+  values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+
+const getResponseId = (response: any) =>
+  String(response?.data?.id || response?.data?.release_id || response?.id || response?.release_id || '');
+
+const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
+  const tracks = payload.tracks.length;
+  const configured = config.releaseTypeIds as Record<string, unknown> | undefined;
+  const releaseType = String(payload.metadata?.releaseType || '').toLowerCase();
+  if (releaseType && configured?.[releaseType]) return Number(configured[releaseType]);
+  if (tracks === 1) return Number(config.defaultSingleReleaseTypeId || 51);
+  if (tracks <= 7) return Number(config.defaultEpReleaseTypeId || 52);
+  return Number(config.defaultAlbumReleaseTypeId || 53);
+};
+
+const contentYear = (date?: string) => {
+  const parsed = date ? new Date(date) : new Date();
+  return String(Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear());
+};
+
+export class BromaConnector extends BaseDspConnector {
+  key = 'broma';
+  displayName = 'Broma';
+  capabilities: DspCapability[] = ['audio_delivery', 'reporting', 'takedown'];
+
+  async validateCredentials(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }> {
+    const missing = ['email', 'password'].filter((key) => !credentials[key]);
+    return missing.length ? { valid: false, error: `Missing credentials: ${missing.join(', ')}` } : { valid: true };
+  }
+
+  async validateTrack(payload: DspDeliveryPayload): Promise<{ valid: boolean; errors: string[] }> {
+    const base = await super.validateTrack(payload);
+    const errors = [...base.errors];
+    if (!('releaseId' in payload)) errors.push('Broma delivery requires release payload');
+    if ('releaseId' in payload) {
+      if (!payload.upc) errors.push('Missing release UPC/EAN');
+      payload.tracks.forEach((track, index) => {
+        if (!track.isrc) errors.push(`Track ${index + 1}: missing ISRC`);
+        if (!track.audioFile) errors.push(`Track ${index + 1}: missing audio file`);
+      });
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  async deliver(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
+    if (!('releaseId' in payload)) return { state: 'failed', message: 'Broma accepts release deliveries only' };
+
+    const metadata = { ...(context.jobMetadata || {}) } as Record<string, any>;
+    const config = context.config || {};
+    const client = new BromaClient({ credentials: context.credentials, config });
+    const currentStep = (metadata.bromaStep || 'create_release') as BromaStep;
+    const releaseId = String(metadata.bromaReleaseId || '');
+    const step = STEP_ORDER.includes(currentStep) ? currentStep : 'create_release';
+
+    if (step === 'poll_status' && releaseId) {
+      const response = await client.getRelease(releaseId);
+      const status = String(response?.data?.moderation_status || response?.data?.status || response?.status || '').toLowerCase();
+      const live = ['live', 'published', 'delivered', 'processed', 'done', 'accepted', 'active', 'success', 'moderated'].includes(status);
+      return {
+        state: live ? 'delivered' : 'processing',
+        externalId: releaseId,
+        message: live ? 'Broma release is live/processed' : 'Broma release still processing',
+        metadata: {
+          ...metadata,
+          bromaStep: live ? 'done' : 'poll_status',
+          bromaModerationStatus: status || 'processing',
+          nextPollAt: live ? undefined : new Date(Date.now() + Number(config.pollIntervalMs || 30 * 60_000)).toISOString(),
+        },
+      };
+    }
+
+    const next = await this.runUntilNextBoundary(client, payload, config, metadata, step, context.jobId);
+    return {
+      state: 'processing',
+      externalId: String(next.bromaReleaseId || releaseId || ''),
+      message: `Broma step completed: ${next.bromaStep}`,
+      metadata: {
+        ...next,
+        nextPollAt: new Date(Date.now() + Number(config.pollIntervalMs || 30 * 60_000)).toISOString(),
+      },
+    };
+  }
+
+  private async runUntilNextBoundary(
+    client: BromaClient,
+    payload: DspReleasePayload,
+    config: Record<string, unknown>,
+    metadata: Record<string, any>,
+    startStep: BromaStep,
+    jobId?: string
+  ) {
+    const next = { ...metadata };
+    let step = startStep;
+
+    if (step === 'create_release') {
+      if (!next.bromaReleaseId) {
+        const response = await client.createRelease(this.buildReleasePayload(payload, config));
+        next.bromaReleaseId = getResponseId(response);
+        if (!next.bromaReleaseId) throw new Error('Broma create release response missing release id');
+      }
+      step = next.bromaStep = 'upload_recordings';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'upload_recordings') {
+      const recordingIds = { ...(next.bromaRecordingIds || {}) };
+      for (const track of payload.tracks) {
+        const key = track.trackId;
+        if (recordingIds[key]) continue;
+        const response = await client.uploadRecording(String(next.bromaReleaseId), track.audioFile);
+        const recordingId = getResponseId(response);
+        if (!recordingId) throw new Error(`Broma upload response missing recording id for ${track.title}`);
+        recordingIds[key] = recordingId;
+        next.bromaRecordingIds = recordingIds;
+        await this.persistProgress(jobId, next);
+      }
+      next.bromaRecordingIds = recordingIds;
+      step = next.bromaStep = 'update_recordings';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'update_recordings') {
+      for (const track of payload.tracks) {
+        const recordingId = next.bromaRecordingIds?.[track.trackId];
+        if (!recordingId) throw new Error(`Missing Broma recording id for ${track.title}`);
+        await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track));
+      }
+      step = next.bromaStep = 'add_compositions';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'add_compositions') {
+      for (const track of payload.tracks) {
+        const recordingId = next.bromaRecordingIds?.[track.trackId];
+        await client.addComposition(String(next.bromaReleaseId), String(recordingId), this.buildCompositionPayload(track));
+      }
+      step = next.bromaStep = 'upload_cover';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'upload_cover') {
+      if (!next.bromaCoverUploaded) {
+        const artwork = firstString(payload.metadata?.artwork, payload.tracks[0]?.artwork);
+        if (!artwork) throw new Error('Missing release artwork for Broma cover upload');
+        await client.uploadCover(String(next.bromaReleaseId), artwork);
+        next.bromaCoverUploaded = true;
+      }
+      step = next.bromaStep = 'update_distribution';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'update_distribution') {
+      const outletIds = Array.isArray(next.bromaOutletIds) ? next.bromaOutletIds : [];
+      if (!outletIds.length) throw new Error('Missing Broma outlet ids');
+      await client.updateDistribution(String(next.bromaReleaseId), {
+        distribution_outlets: outletIds.map((id) => ({ outlet_id: id })),
+        delivery_start_time: payload.releaseDate,
+      });
+      step = next.bromaStep = 'send_moderation';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (step === 'send_moderation') {
+      if (!next.bromaModerationSentAt) {
+        await client.sendModeration(String(next.bromaReleaseId));
+        next.bromaModerationSentAt = new Date().toISOString();
+      }
+      next.bromaStep = 'poll_status';
+      await this.persistProgress(jobId, next);
+    }
+
+    return next;
+  }
+
+  private async persistProgress(jobId: string | undefined, metadata: Record<string, any>) {
+    if (!jobId) return;
+    await DeliveryJob.findByIdAndUpdate(jobId, {
+      metadata,
+      $push: {
+        events: {
+          state: 'processing',
+          message: `Broma progress saved: ${metadata.bromaStep || 'unknown'}`,
+          source: 'connector',
+        },
+      },
+    });
+  }
+
+  private buildReleasePayload(payload: DspReleasePayload, config: Record<string, unknown>) {
+    const year = contentYear(payload.releaseDate);
+    return {
+      title: payload.releaseTitle,
+      release_type_id: releaseTypeId(payload, config),
+      performers: [payload.primaryArtist].filter(Boolean),
+      genres: [payload.genre].filter(Boolean),
+      ean: payload.upc,
+      parental_warning_type: payload.tracks.some((track) => track.explicit) ? 1 : 0,
+      account_id: Number(config.accountId),
+      p_line: String(payload.metadata?.pline || payload.label || payload.primaryArtist || payload.releaseTitle),
+      c_line: String(payload.metadata?.cline || payload.label || payload.primaryArtist || payload.releaseTitle),
+      date_p_line: year,
+      date_c_line: year,
+      created_date: payload.releaseDate,
+      generate_ean: !payload.upc,
+      various_artists: Boolean(payload.metadata?.variousArtists),
+    };
+  }
+
+  private buildRecordingPayload(payload: DspReleasePayload, track: DspReleasePayload['tracks'][number]) {
+    return {
+      title: track.title,
+      performers: [track.artistName].filter(Boolean),
+      main_performer: [track.artistName].filter(Boolean),
+      isrc: track.isrc,
+      genres: [payload.genre || track.genre].filter(Boolean),
+      language: track.language || payload.language,
+      parental_warning_type: track.explicit ? 1 : 0,
+    };
+  }
+
+  private buildCompositionPayload(track: DspReleasePayload['tracks'][number]) {
+    const contributors = Array.isArray(track.metadata?.contributors) ? track.metadata.contributors : track.contributors || [];
+    return {
+      title: track.title,
+      contributors,
+    };
+  }
+}

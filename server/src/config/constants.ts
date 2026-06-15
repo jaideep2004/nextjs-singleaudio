@@ -62,8 +62,16 @@ export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 // Release statuses
 export enum ReleaseStatus {
+  DRAFT = 'draft',
+  PENDING_REVIEW = 'pending_review',
   PENDING = 'pending',
   APPROVED = 'approved',
+  UPLOADING_TO_BROMA = 'uploading_to_broma',
+  BROMA_MODERATION = 'broma_moderation',
+  DSP_PROCESSING = 'dsp_processing',
+  LIVE = 'live',
+  TAKEDOWN_REQUESTED = 'takedown_requested',
+  REMOVED = 'removed',
   REJECTED = 'rejected'
 }
 

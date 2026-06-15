@@ -5,6 +5,7 @@ import { getCurrentBackendUser } from '@/lib/currentUser';
 import { getGs1DatakartApprovalErrorMessage, Gs1DatakartError } from '@/lib/gs1Datakart';
 import { assignIsrcsToTracks, markIsrcsAssigned } from '@/lib/isrcAllocator';
 import { assignReleaseUpcWithGs1 } from '@/lib/releaseCodeAssignment';
+import { assertBromaReleaseReady } from '@/lib/bromaDeliveryReadiness';
 import { createReleaseDeliveryShellJobs } from '@/lib/dspDeliveryShell';
 import {
   appUrl,
@@ -39,7 +40,7 @@ export async function PATCH(
     const body = await req.json().catch(() => ({}));
     const { status, reason } = body as { status?: string; reason?: string };
 
-    if (!status || !['approved', 'rejected', 'pending'].includes(status)) {
+    if (!status || !['approved', 'rejected', 'pending', 'pending_review'].includes(status)) {
       return NextResponse.json({ success: false, error: 'Invalid status' }, { status: 400 });
     }
 
@@ -88,6 +89,11 @@ export async function PATCH(
         recordStatus: assignment.recordStatus,
         isComplete: assignment.isComplete,
       };
+      await assertBromaReleaseReady(db, {
+        ...existing,
+        ...update,
+        tracks: assignedTracks,
+      });
       await replaceReleaseCanonicalTracks(db, existing, assignedTracks);
       await markIsrcsAssigned(
         db,

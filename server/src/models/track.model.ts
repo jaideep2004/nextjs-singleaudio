@@ -14,6 +14,38 @@ export interface ITrack extends Document {
   cline?: string;
   label?: string; 
   publisher?: string;
+  composers?: Array<{
+    name: string;
+    role?: string;
+    share: number;
+    ipi?: string;
+    ipn?: string;
+    isni?: string;
+  }>;
+  lyricists?: Array<{
+    name: string;
+    role?: string;
+    share: number;
+    ipi?: string;
+    ipn?: string;
+    isni?: string;
+  }>;
+  publishers?: Array<{
+    name: string;
+    role?: string;
+    share: number;
+    ipi?: string;
+    ipn?: string;
+    isni?: string;
+  }>;
+  contributors?: Array<{
+    name: string;
+    role: string;
+    share: number;
+    ipi?: string;
+    ipn?: string;
+    isni?: string;
+  }>;
   explicit?: boolean;
   iswc?: string;
   isni?: string;
@@ -103,6 +135,22 @@ const TrackSchema: Schema = new Schema(
       type: String,
       trim: true,
       maxlength: [100, 'Publisher cannot be more than 100 characters']
+    },
+    composers: {
+      type: [Schema.Types.Mixed],
+      default: []
+    },
+    lyricists: {
+      type: [Schema.Types.Mixed],
+      default: []
+    },
+    publishers: {
+      type: [Schema.Types.Mixed],
+      default: []
+    },
+    contributors: {
+      type: [Schema.Types.Mixed],
+      default: []
     },
     explicit: {
       type: Boolean,

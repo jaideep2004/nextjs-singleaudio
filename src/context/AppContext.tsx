@@ -150,6 +150,40 @@ const API_URL =
     ? '/api'
     : 'http://localhost:5000/api';
 
+const RELEASE_DRAFT_BACKUP_KEY = 'singleaudio.releaseDraft.v1.latest';
+const KYC_DRAFT_BACKUP_KEY = 'singleaudio.kycDraft.v1.latest';
+
+const sendDraftBeacon = (url: string, rawDraft: string | null) => {
+  if (typeof window === 'undefined') return;
+
+  if (!rawDraft) return;
+
+  try {
+    const draft = JSON.parse(rawDraft);
+    if (draft?.status !== 'draft') return;
+
+    const body = JSON.stringify({ draft });
+    const blob = new Blob([body], { type: 'application/json' });
+
+    if (navigator.sendBeacon?.(url, blob)) return;
+
+    void fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => undefined);
+  } catch {
+    // Invalid local draft should not block logout.
+  }
+};
+
+const flushDraftsBeforeLogout = () => {
+  if (typeof window === 'undefined') return;
+  sendDraftBeacon('/api/releases/draft', window.localStorage.getItem(RELEASE_DRAFT_BACKUP_KEY));
+  sendDraftBeacon('/api/auth/me/kyc-draft', window.localStorage.getItem(KYC_DRAFT_BACKUP_KEY));
+};
+
 const fallbackAuthContext: AuthContextType = {
   user: null,
   isLoading: true,
@@ -232,6 +266,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     if (typeof window === 'undefined') return;
 
+    flushDraftsBeforeLogout();
     removeAuthTokenCookie();
     setUser(null);
     setIsLoading(false);

@@ -48,7 +48,7 @@ export async function createRelease(
     ownerArtistName: user.artistName || user.name,
     createdAt: now,
     updatedAt: now,
-    status: 'pending',
+    status: 'pending_review',
   };
 
   const result = await releasesCollection(db).insertOne(release as ReleaseDocument);

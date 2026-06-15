@@ -10,11 +10,11 @@ export const metadata: Metadata = {
     icon: '/images/favicon-s3.png',
     shortcut: '/images/favicon-s3.png',
     apple: '/images/favicon-s3.png',
-  },
+  }, 
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
+  return (  
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ThemeRegistry>

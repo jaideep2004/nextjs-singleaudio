@@ -71,6 +71,8 @@ export interface DspConnectorContext {
   region?: string;
   config?: Record<string, unknown>;
   operation?: DspDeliveryOperation;
+  jobId?: string;
+  jobMetadata?: Record<string, unknown>;
 }
 
 export interface DspDeliveryResult {

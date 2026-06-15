@@ -1102,4 +1102,13 @@ export const adminAPI = {
       return handleApiError(error);
     }
   },
+
+  syncBromaOutlets: async () => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/dsp/broma/outlets/sync');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 };

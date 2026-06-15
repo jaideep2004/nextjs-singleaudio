@@ -31,6 +31,7 @@ import ReplayIcon from '@mui/icons-material/Replay';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SyncIcon from '@mui/icons-material/Sync';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DspLogo } from '@/components/dsp/DspLogo';
@@ -114,6 +115,7 @@ export default function AdminDspDeliveriesPage() {
   const [dispatching, setDispatching] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [processingDue, setProcessingDue] = useState(false);
+  const [syncingOutlets, setSyncingOutlets] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
 
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
@@ -218,6 +220,19 @@ export default function AdminDspDeliveriesPage() {
     }
   };
 
+  const handleSyncBromaOutlets = async () => {
+    try {
+      setSyncingOutlets(true);
+      const response = await adminAPI.syncBromaOutlets();
+      toast.success(`Synced ${response?.data?.synced || 0} Broma outlet${response?.data?.synced === 1 ? '' : 's'}`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Broma outlet sync failed');
+    } finally {
+      setSyncingOutlets(false);
+    }
+  };
+
   if (isAdmin === null) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight={420}>
@@ -233,16 +248,19 @@ export default function AdminDspDeliveriesPage() {
   return (
     <Box>
       <PremiumHeader
-        eyebrow="DSP Delivery Ops"
-        title="Delivery Matrix"
-        description="Queue delivery jobs, monitor status by DSP, and retry failed attempts."
+        eyebrow="Broma Delivery Ops"
+        title="Mediator Delivery"
+        description="Queue release deliveries through Broma, sync outlets, monitor moderation, and retry failed attempts."
         action={
           <Stack direction="row" spacing={1}>
+            <Button startIcon={<SyncIcon />} variant="outlined" onClick={handleSyncBromaOutlets} disabled={syncingOutlets}>
+              {syncingOutlets ? 'Syncing...' : 'Sync Outlets'}
+            </Button>
             <Button startIcon={<ConstructionIcon />} variant="outlined" onClick={handleBootstrapPhase1} disabled={bootstrapping}>
-              {bootstrapping ? 'Bootstrapping…' : 'Bootstrap Phase 1'}
+              {bootstrapping ? 'Bootstrapping...' : 'Bootstrap Providers'}
             </Button>
             <Button startIcon={<PlayArrowIcon />} variant="contained" onClick={handleProcessDue} disabled={processingDue}>
-              {processingDue ? 'Processing…' : 'Run Worker'}
+              {processingDue ? 'Processing...' : 'Run Worker'}
             </Button>
             <Button startIcon={<RefreshIcon />} variant="outlined" onClick={load}>
               Refresh
