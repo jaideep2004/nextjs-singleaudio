@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       db,
       { name: user.name, email: user.email },
       {
-        subject: 'New Release Submitted',
+        subject: `Release submitted for review: ${body.releaseTitle || body.title || 'Untitled release'}`,
         title: 'Release Submitted',
         intro: `${user.name} submitted a new release for review.`,
         details: {
@@ -50,6 +50,18 @@ export async function POST(req: NextRequest) {
           User: user.name,
           Email: user.email,
           Status: 'pending',
+        },
+        release: {
+          title: body.releaseTitle || body.title || 'Untitled release',
+          coverUrl: body.artworkUrl || body.artworkUploadedUrl || body.coverUrl,
+          artist: body.primaryArtist || body.artist || user.artistName || user.name,
+          label: body.label,
+          genre: body.genre,
+          releaseDate: body.releaseDate,
+          upc: body.upc,
+          status: 'pending review',
+          tracks: Array.isArray(body.tracks) ? body.tracks : [],
+          stores: Array.isArray(body.stores) ? body.stores : [],
         },
         actionLabel: 'Review Releases',
         actionUrl: appUrl('/admin/releases?status=pending'),

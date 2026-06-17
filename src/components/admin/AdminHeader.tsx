@@ -35,6 +35,7 @@ import { useAuth } from '@/context/AppContext';
 import { isSubadmin } from '@/lib/adminAccess';
 import { removeAuthTokenCookie } from '@/lib/authCookie';
 import { getNotificationTitle } from '@/lib/notificationTitles';
+import { getNotificationRoute } from '@/lib/notificationRoutes';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -83,9 +84,10 @@ export default function AdminHeader() {
     }).format(date);
   };
 
-  const handleNotificationClick = async (id: string) => {
-    await markAsRead(id);
+  const handleNotificationClick = async (notification: typeof notifications[number]) => {
+    await markAsRead(notification._id);
     handleNotificationsClose();
+    router.push(getNotificationRoute(notification, 'admin'));
   };
 
   const handleLogout = async () => {
@@ -260,7 +262,7 @@ export default function AdminHeader() {
                 return (
                   <MenuItem
                     key={notification._id}
-                    onClick={() => handleNotificationClick(notification._id)}
+                    onClick={() => handleNotificationClick(notification)}
                     sx={{
                       px: 2.5,
                       py: 1.5,

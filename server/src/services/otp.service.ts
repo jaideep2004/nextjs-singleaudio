@@ -9,7 +9,10 @@ export const getOtpExpiry = () => new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1
 export const generateOtp = () => crypto.randomInt(100000, 999999).toString();
 
 export const hashOtp = (otp: string) =>
-  crypto.createHash('sha256').update(`${otp}:${process.env.JWT_SECRET || 'otp-secret'}`).digest('hex');
+  crypto
+    .createHash('sha256')
+    .update(`${otp}:${process.env.JWT_SECRET || 'otp-secret'}`)
+    .digest('hex');
 
 export const verifyOtpHash = (otp: string, hash: string) => hashOtp(otp) === hash;
 
@@ -82,35 +85,41 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-const getFrontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+const getFrontendUrl = () =>
+  (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+const getLogoUrl = () => `${getFrontendUrl()}/images/singleaudio-b1.png`;
+const getHelpCenterUrl = () => `${getFrontendUrl()}/help`;
 
 function renderBasicEmail(subject: string, text: string) {
   const paragraphs = text
     .split(/\n{2,}/)
-    .map((part) => part.trim())
+    .map(part => part.trim())
     .filter(Boolean)
-    .map((part) => `<p style="margin:0 0 14px;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(part).replace(/\n/g, '<br />')}</p>`)
+    .map(
+      part =>
+        `<p style="margin:0 0 14px;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">${escapeHtml(part).replace(/\n/g, '<br />')}</p>`
+    )
     .join('');
 
   return `
     <!doctype html>
     <html>
-      <body style="margin:0;padding:0;background:#05050a;color:#171018">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#05050a;padding:28px 12px">
+      <body style="margin:0;padding:0;background:#ffffff;color:#171018">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:26px 12px">
           <tr>
             <td align="center">
-              <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;max-width:680px;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #1f1326;box-shadow:0 28px 70px rgba(0,0,0,.32)">
+              <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
                 <tr>
-                  <td style="padding:34px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.30) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.20) 0%, transparent 60%),#05050a;color:#ffffff;border-bottom:1px solid rgba(255,255,255,.08)">
-                    <img src="${escapeHtml(`${getFrontendUrl()}/images/singleaudio-b1.png`)}" alt="SingleAudio Distribution" width="228" style="display:block;max-width:228px;height:auto;margin:0" />
+                  <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
+                    <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:38px 40px 30px">
                     <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">${escapeHtml(subject)}</h1>
                     ${paragraphs}
-                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Automated notification from SingleAudio Distribution.</p>
-                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">© ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.</p>
+                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
                   </td>
                 </tr>
               </table>
@@ -122,7 +131,51 @@ function renderBasicEmail(subject: string, text: string) {
   `;
 }
 
-export async function sendEmailMessage(email: string, subject: string, text: string, html?: string): Promise<void> {
+function renderOtpEmail(otp: string) {
+  return `
+    <!doctype html>
+    <html>
+      <body style="margin:0;padding:0;background:#ffffff;color:#171018">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:26px 12px">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
+                <tr>
+                  <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
+                    <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:38px 40px 30px">
+                    <p style="margin:0 0 10px;color:#7b1fa2;font:900 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em">Secure verification</p>
+                    <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">Your SingleAudio OTP</h1>
+                    <p style="margin:0 0 22px;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">Use this code to finish verification. It expires in ${OTP_TTL_MINUTES} minutes. Do not share it with anyone.</p>
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;margin:0 0 22px">
+                      <tr>
+                        <td style="padding:18px 24px;border-radius:18px 0 0 18px;background:#fbf7ff;border:1px solid #eadff0;color:#171018;font:900 34px/1 Arial,sans-serif;letter-spacing:.28em;user-select:all">${escapeHtml(otp)}</td>
+                        <td style="padding:18px 20px;border-radius:0 18px 18px 0;background:linear-gradient(135deg,#ed1e79,#7b1fa2);color:#ffffff;font:900 13px Arial,sans-serif;text-transform:uppercase;letter-spacing:.06em">Copy this code</td>
+                      </tr>
+                    </table>
+                    <p style="margin:0;color:#8d808c;font:500 13px/1.6 Arial,sans-serif">Tip: select the OTP above and copy it into the signup form.</p>
+                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.</p>
+                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+export async function sendEmailMessage(
+  email: string,
+  subject: string,
+  text: string,
+  html?: string
+): Promise<void> {
   const user = process.env.SMTP_GMAIL_USER;
   const pass = process.env.SMTP_GMAIL_APP_PASSWORD;
   if (!user || !pass) {
@@ -165,7 +218,8 @@ export async function sendEmailMessage(email: string, subject: string, text: str
 export async function sendEmailOtp(email: string, otp: string): Promise<void> {
   return sendEmailMessage(
     email,
-    'Your SingleAudio Distribution OTP',
-    `Your OTP for SingleAudio Distribution is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`
+    'Your SingleAudio Distribution verification code',
+    `Your OTP for SingleAudio Distribution is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`,
+    renderOtpEmail(otp)
   );
 }

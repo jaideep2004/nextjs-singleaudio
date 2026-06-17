@@ -64,7 +64,7 @@ import {
 import { useAuth } from '@/context/AppContext';
 import Cookies from 'js-cookie';
 import countries from '@/utils/countries';
-import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey } from '@/lib/platforms';
+import { ALL_DSP_KEYS, DSP_META, DspMeta, DspKey, SOCIAL_RIGHTS_DSP_KEYS } from '@/lib/platforms';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import languagesData from '@/data/languages.json';
@@ -601,12 +601,16 @@ export default function UploadPage() {
   // Multi-track info state for Track Information step
   const [trackInfos, setTrackInfos] = useState<TrackInfo[]>([]);
   // Distribution Step State
-  const DSP_LIST = DSP_META;
   type DspItem = DspMeta;
   const visibleDSPs = useMemo(() => {
     const allow = new Set((allowedDspKeys ?? ALL_DSP_KEYS) as string[]);
-    return DSP_LIST.filter((dsp: DspItem) => allow.has(dsp.key));
+    return DSP_META.filter((dsp: DspItem) => allow.has(dsp.key));
   }, [allowedDspKeys]);
+  const socialRightsDspKeySet = useMemo(() => new Set(SOCIAL_RIGHTS_DSP_KEYS), []);
+  const socialRightsDSPs = useMemo(
+    () => visibleDSPs.filter((dsp: DspItem) => socialRightsDspKeySet.has(dsp.key)),
+    [socialRightsDspKeySet, visibleDSPs]
+  );
 
   const [selectedDSPs, setSelectedDSPs] = useState<DspKey[]>([]);
   const [releaseWorldwide, setReleaseWorldwide] = useState(true);
@@ -620,6 +624,7 @@ export default function UploadPage() {
   const [trackPreviewUrls, setTrackPreviewUrls] = useState<(string | null)[]>([]);
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [distributionTermsAccepted, setDistributionTermsAccepted] = useState(false);
+  const [socialDistributionTermsAccepted, setSocialDistributionTermsAccepted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
   const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
   const [editReleaseLoading, setEditReleaseLoading] = useState(false);
@@ -627,6 +632,7 @@ export default function UploadPage() {
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
+  const requiresSocialDistributionTerms = selectedDSPs.some(key => socialRightsDspKeySet.has(key));
   const releaseDraftUserId = auth.user?.id || '';
   const releaseDraftKey = `${RELEASE_DRAFT_PREFIX}${releaseDraftUserId || 'anonymous'}`;
   const releaseDraftRestoredRef = useRef(false);
@@ -655,6 +661,7 @@ export default function UploadPage() {
     selectedDSPs,
     releaseWorldwide,
     distributionTermsAccepted,
+    socialDistributionTermsAccepted,
     trackInfos,
     audioUploadedUrls,
     audioUploadedFilenames,
@@ -905,7 +912,10 @@ export default function UploadPage() {
   };
 
   const hasSelectedDistributionProviders = selectedDSPs.length > 0;
-  const isDistributionValid = hasSelectedDistributionProviders && distributionTermsAccepted;
+  const isDistributionValid =
+    hasSelectedDistributionProviders &&
+    distributionTermsAccepted &&
+    (!requiresSocialDistributionTerms || socialDistributionTermsAccepted);
 
   // Event handlers
   const handleDSPToggle = (key: DspKey) => {
@@ -1004,7 +1014,18 @@ export default function UploadPage() {
     delete (shareable as Partial<TrackInfo>).explicit;
 
     window.setTimeout(() => {
-      setTrackInfos(prev => prev.map((info, i) => (i === idx ? info : { ...info, ...shareable })));
+      setTrackInfos(prev => {
+        const targetLength = Math.max(tracks.length, prev.length);
+        return Array.from({ length: targetLength }, (_, i) => {
+          const info =
+            prev[i] ||
+            ({
+              ...createDefaultTrackInfo(),
+              trackNumber: i + 1,
+            } as TrackInfo);
+          return i === idx ? info : { ...info, ...cloneTrackInfo(shareable) };
+        });
+      });
       toast.success('Applied to all tracks');
       setApplyingTrackInfoToAll(false);
     }, 1200);
@@ -1133,6 +1154,14 @@ export default function UploadPage() {
       setReleaseDraftReady(true);
       return;
     }
+
+    const shouldRestoreDraft = new URLSearchParams(window.location.search).get('draft') === '1';
+    if (!shouldRestoreDraft) {
+      releaseDraftRestoredRef.current = true;
+      setReleaseDraftReady(true);
+      return;
+    }
+
     releaseDraftRestoredRef.current = true;
 
     const applyDraft = (draft: any) => {
@@ -1155,6 +1184,7 @@ export default function UploadPage() {
       setSelectedDSPs(Array.isArray(draft.selectedDSPs) ? draft.selectedDSPs : []);
       setReleaseWorldwide(Boolean(draft.releaseWorldwide));
       setDistributionTermsAccepted(Boolean(draft.distributionTermsAccepted));
+      setSocialDistributionTermsAccepted(Boolean(draft.socialDistributionTermsAccepted));
 
       const nextTrackInfos = Array.isArray(draft.trackInfos) ? draft.trackInfos : [];
       const nextAudioUrls = Array.isArray(draft.audioUploadedUrls) ? draft.audioUploadedUrls : [];
@@ -1248,6 +1278,7 @@ export default function UploadPage() {
     rightsDescription,
     rightsType,
     selectedDSPs,
+    socialDistributionTermsAccepted,
     submitState,
     territoryCountries,
     territoryMode,
@@ -1300,6 +1331,7 @@ export default function UploadPage() {
     rightsDescription,
     rightsType,
     selectedDSPs,
+    socialDistributionTermsAccepted,
     submitState,
     territoryCountries,
     territoryMode,
@@ -3611,68 +3643,84 @@ export default function UploadPage() {
               >
                 {visibleDSPs.map((dsp: DspItem) => {
                   const selected = selectedDSPs.includes(dsp.key);
+                  const isFirstSocialRightsProvider = dsp.key === socialRightsDSPs[0]?.key;
                   return (
-                    <Paper
-                      key={dsp.key}
-                      variant="outlined"
-                      onClick={() => handleDSPToggle(dsp.key)}
-                      sx={{
-                        cursor: 'pointer',
-                        p: 1.5,
-                        minHeight: 96,
-                        borderRadius: 2,
-                        border: 'none',
-                        background: 'transparent',
-                        backgroundColor: 'transparent',
-                       
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        transition:
-                          'border-color 160ms, transform 160ms, box-shadow 160ms, background-color 160ms',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: theme =>
-                            theme.palette.mode === 'dark'
-                              ? '0 14px 34px rgba(0,0,0,0.28)'
-                              : '0 14px 34px rgba(15,23,42,0.08)',
-                        },
-                      }}
-                    >
-                      <DspLogo
-                        value={dsp.key}
-                        alt={dsp.name}
-                        size={64}
-                        padding={0.75}
-                        sx={{ fontSize: 14 }}
-                      />
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography fontWeight={850} noWrap>
-                          {dsp.name}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
+                    <Box key={dsp.key} sx={{ display: 'contents' }}>
+                      {isFirstSocialRightsProvider && (
+                        <Box
                           sx={{
-                            mt: 0.35,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
+                            gridColumn: '1 / -1',
+                            mt: 1,
+                            pt: 1,
+                            borderTop: '1px solid',
+                            borderColor: 'divider',
                           }}
                         >
-                          {dsp.info}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ flex: '0 0 auto' }}>
-                        <Checkbox
-                          checked={selected}
-                          onClick={event => event.stopPropagation()}
-                          onChange={() => handleDSPToggle(dsp.key)}
-                          inputProps={{ 'aria-label': `Select ${dsp.name}` }}
+                          <Typography variant="overline" color="text.secondary" fontWeight={900}>
+                            Social delivery and rights management
+                          </Typography>
+                        </Box>
+                      )}
+                      <Paper
+                        variant="outlined"
+                        onClick={() => handleDSPToggle(dsp.key)}
+                        sx={{
+                          cursor: 'pointer',
+                          p: 1.5,
+                          minHeight: 96,
+                          borderRadius: 2,
+                          border: 'none',
+                          background: 'transparent',
+                          backgroundColor: 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          transition:
+                            'border-color 160ms, transform 160ms, box-shadow 160ms, background-color 160ms',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: theme =>
+                              theme.palette.mode === 'dark'
+                                ? '0 14px 34px rgba(0,0,0,0.28)'
+                                : '0 14px 34px rgba(15,23,42,0.08)',
+                          },
+                        }}
+                      >
+                        <DspLogo
+                          value={dsp.key}
+                          alt={dsp.name}
+                          size={64}
+                          padding={0.75}
+                          sx={{ fontSize: 14 }}
                         />
-                      </Box>
-                    </Paper>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography fontWeight={850} noWrap>
+                            {dsp.name}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            sx={{
+                              mt: 0.35,
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {dsp.info}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: '0 0 auto' }}>
+                          <Checkbox
+                            checked={selected}
+                            onClick={event => event.stopPropagation()}
+                            onChange={() => handleDSPToggle(dsp.key)}
+                            inputProps={{ 'aria-label': `Select ${dsp.name}` }}
+                          />
+                        </Box>
+                      </Paper>
+                    </Box>
                   );
                 })}
               </Box>
@@ -3702,6 +3750,49 @@ export default function UploadPage() {
                   </Typography>
                 }
               />
+            </Paper>
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 1.5,
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 2,
+                borderColor:
+                  !requiresSocialDistributionTerms || socialDistributionTermsAccepted
+                    ? 'success.main'
+                    : 'warning.main',
+                bgcolor: theme =>
+                  theme.palette.mode === 'dark' ? 'rgba(237,30,121,0.08)' : 'rgba(237,30,121,0.035)',
+              }}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={socialDistributionTermsAccepted}
+                    onChange={event => setSocialDistributionTermsAccepted(event.target.checked)}
+                    inputProps={{ 'aria-label': 'Agree to Facebook and YouTube terms' }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" fontWeight={800}>
+                    I confirm this release complies with Facebook, YouTube, WhatsApp, and rights-management delivery terms.{' '}
+                    <Box
+                      component="a"
+                      href="/terms/facebook-youtube"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ color: 'primary.main', textDecoration: 'none', fontWeight: 900 }}
+                    >
+                      Terms and conditions
+                    </Box>
+                  </Typography>
+                }
+              />
+              {requiresSocialDistributionTerms && !socialDistributionTermsAccepted && (
+                <Typography variant="caption" color="warning.main" sx={{ display: 'block', pl: 4 }}>
+                  Required because a social delivery or rights-management provider is selected.
+                </Typography>
+              )}
             </Paper>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
               <Button onClick={handleBack}>Back</Button>
@@ -4116,7 +4207,7 @@ export default function UploadPage() {
                 {selectedDSPs.map(key => {
                   const dsp =
                     visibleDSPs.find((d: DspItem) => d.key === key) ||
-                    DSP_LIST.find((d: DspItem) => d.key === key);
+                    DSP_META.find((d: DspItem) => d.key === key);
                   if (!dsp) return null;
                   return (
                     <Chip

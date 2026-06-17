@@ -42,6 +42,17 @@ export const ALL_DSP_KEYS: DspKey[] = [
   'boom',
   'unitedmedia',
   'peloton',
+  'whatsapp',
+  'facebook-delivery',
+  'youtube-delivery',
+  'facebook-rights-management',
+];
+
+export const SOCIAL_RIGHTS_DSP_KEYS: DspKey[] = [
+  'whatsapp',
+  'facebook-delivery',
+  'youtube-delivery',
+  'facebook-rights-management',
 ];
 
 export interface DspMeta {
@@ -62,6 +73,8 @@ const DSP_LOGOS = {
   bugs: '/images/dsp/bugs.png',
   deezer: '/images/dsp/deezer.png',
   facebook: '/images/dsp/facebook-audio-library.png',
+  facebookDelivery: '/images/dsp/facebook.png',
+  facebookRightsManagement: '/images/dsp/facebook-rights-management.png',
   flo: '/images/dsp/flomusic.png',
   gaana: '/images/dsp/gaana.png',
   genie: '/images/dsp/geniemusic.png',
@@ -92,6 +105,8 @@ const DSP_LOGOS = {
   wynk: '/images/dsp/wynkmusic.png',
   yandex: '/images/dsp/yandexmusic.png',
   youtube: '/images/dsp/ytmusic.png',
+  youtubeDelivery: '/images/dsp/youtube.png',
+  whatsapp: '/images/dsp/whatsapp.png',
   zvuk: '/images/dsp/zvuk.png',
 } as const;
 
@@ -237,6 +252,15 @@ export const DSP_META: DspMeta[] = [
     info: 'Additional delivery partner network.',
   },
   { key: 'peloton', name: 'Peloton', logo: DSP_LOGOS.peloton, info: 'Fitness and workout music usage.' },
+  { key: 'whatsapp', name: 'WhatsApp', logo: DSP_LOGOS.whatsapp, info: 'Music usage across WhatsApp social products.' },
+  { key: 'facebook-delivery', name: 'Facebook', logo: DSP_LOGOS.facebookDelivery, info: 'Delivery for Facebook music surfaces.' },
+  { key: 'youtube-delivery', name: 'YouTube', logo: DSP_LOGOS.youtubeDelivery, info: 'Delivery for YouTube music and creator surfaces.' },
+  {
+    key: 'facebook-rights-management',
+    name: 'Facebook Rights Management',
+    logo: DSP_LOGOS.facebookRightsManagement,
+    info: 'Rights management and protection across Facebook surfaces.',
+  },
 ];
 
 export const DSP_META_BY_KEY: Record<DspKey, DspMeta> = Object.fromEntries(
@@ -260,6 +284,12 @@ const DSP_ALIASES: Record<string, DspKey> = {
   youtubearttrack: 'youtube',
   facebook_audio_library: 'facebook',
   facebookaudiolibrary: 'facebook',
+  facebook_delivery: 'facebook-delivery',
+  facebookdelivery: 'facebook-delivery',
+  facebook_rights_management: 'facebook-rights-management',
+  facebookrightsmanagement: 'facebook-rights-management',
+  youtube_delivery: 'youtube-delivery',
+  youtubedelivery: 'youtube-delivery',
   instagram_music: 'instagram',
   instagrammusic: 'instagram',
   tiktok_music_library: 'tiktok',

@@ -27,17 +27,18 @@ const escapeHtml = (value: unknown) =>
 
 const getFrontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const getLogoUrl = () => `${getFrontendUrl()}/images/singleaudio-b1.png`;
+const getHelpCenterUrl = () => `${getFrontendUrl()}/help`;
 
 const renderDetails = (details?: ActionEmail['details']) => {
   const rows = Object.entries(details || {}).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
   if (!rows.length) return '';
 
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-collapse:separate;border-spacing:0;border:1px solid #eadde8;border-radius:16px;overflow:hidden;background:#ffffff">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-collapse:separate;border-spacing:0;border:1px solid #e7ddea;border-radius:18px;overflow:hidden;background:#ffffff">
       ${rows.map(([label, value]) => `
         <tr>
-          <td style="padding:14px 16px;background:#fbf7fb;color:#7d6f7b;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%;border-bottom:1px solid #f0e6ee">${escapeHtml(label)}</td>
-          <td style="padding:14px 16px;color:#171018;font:700 14px Arial,sans-serif;border-bottom:1px solid #f0e6ee">${escapeHtml(value)}</td>
+          <td style="padding:14px 16px;background:#fbf7ff;color:#6b6070;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%;border-bottom:1px solid #f1e9f3">${escapeHtml(label)}</td>
+          <td style="padding:14px 16px;color:#171018;font:700 14px Arial,sans-serif;border-bottom:1px solid #f1e9f3">${escapeHtml(value)}</td>
         </tr>
       `).join('')}
     </table>
@@ -47,14 +48,14 @@ const renderDetails = (details?: ActionEmail['details']) => {
 const renderEmail = ({ title, intro, details, actionLabel, actionUrl }: ActionEmail) => `
   <!doctype html>
   <html>
-    <body style="margin:0;padding:0;background:#05050a;color:#171018">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:transparent;padding:28px 12px">
+    <body style="margin:0;padding:0;background:#ffffff;color:#171018">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:26px 12px">
         <tr>
           <td align="center">
-            <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #1f1326;box-shadow:0 28px 70px rgba(0,0,0,.32)">
+            <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
               <tr>
-                <td style="padding:34px 40px;background:radial-gradient(ellipse 80% 50% at 80% 20%, rgba(123,31,162,0.30) 0%, transparent 60%),radial-gradient(ellipse 60% 40% at 10% 80%, rgba(237,30,121,0.20) 0%, transparent 60%),#05050a;color:#ffffff;border-bottom:1px solid rgba(255,255,255,.08)">
-                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" style="display:block;max-width:228px;height:auto;margin:0" />
+                <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
+                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                 </td>
               </tr>
               <tr>
@@ -65,8 +66,18 @@ const renderEmail = ({ title, intro, details, actionLabel, actionUrl }: ActionEm
                   ${actionLabel && actionUrl ? `
                     <a href="${escapeHtml(actionUrl)}" style="display:inline-block;margin-top:28px;padding:14px 22px;border-radius:14px;background:linear-gradient(135deg,#ed1e79,#7b1fa2);color:#ffffff;text-decoration:none;font:900 14px Arial,sans-serif;box-shadow:0 14px 26px rgba(237,30,121,.22)">${escapeHtml(actionLabel)}</a>
                   ` : ''}
-                  <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Automated notification from SingleAudio Distribution.</p>
-                  <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">© ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:34px;padding-top:18px;border-top:1px solid #f0e6ee">
+                    <tr>
+                      <td style="color:#8d808c;font:500 12px/1.6 Arial,sans-serif">
+                        Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding-top:6px;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">
+                        Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.
+                      </td>
+                    </tr>
+                  </table>
                 </td>
               </tr>
             </table>

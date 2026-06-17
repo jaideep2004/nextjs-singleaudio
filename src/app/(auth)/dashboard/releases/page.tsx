@@ -342,7 +342,7 @@ function ReleasesContent() {
             <Box
               key={release._id || idx}
               component={Link}
-              href={release.isLocalDraft ? '/dashboard/upload' : `/dashboard/releases/${release._id}`}
+              href={release.isLocalDraft ? '/dashboard/upload?draft=1' : `/dashboard/releases/${release._id}`}
               sx={{
                 display: { xs: 'flex', md: 'grid' },
                 gridTemplateColumns: { md: '2fr 1fr 0.7fr 1fr 0.8fr' },

@@ -181,6 +181,9 @@ export default function AdminUsersPage() {
     setDeleteDialogOpen(true);
   };
 
+  const canDeleteUser = (selectedUser: AdminUser) =>
+    canCreateUsers && selectedUser.role !== 'admin';
+
   const handleKycFilter = (event: React.ChangeEvent<HTMLInputElement>) => {
     setKycFilter(event.target.value);
     setPage(0);
@@ -588,12 +591,11 @@ export default function AdminUsersPage() {
                         </Tooltip>
                       </>
                     )}
-                    {canCreateUsers && (
+                    {canDeleteUser(user) && (
                       <Tooltip title="Delete User">
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteClick(user)}
-                          disabled={user.role === 'admin' && totalUsers <= 1}
                           sx={{
                             color: mode === 'dark' ? '#f44336' : '#d32f2f',
                             '&:disabled': {

@@ -1,6 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Alert,
   Box,
@@ -74,6 +75,8 @@ const supportMessageBody = (message: any) =>
     : message.body;
 
 export default function AdminSupportPage() {
+  const searchParams = useSearchParams();
+  const requestedTicketId = searchParams.get('ticket') || '';
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -117,13 +120,18 @@ export default function AdminSupportPage() {
       const response = await adminSupportAPI.getTickets(params);
       const nextTickets = response?.data?.tickets || [];
       setTickets(nextTickets);
+      if (requestedTicketId) {
+        setSelectedId(requestedTicketId);
+        setQueueCollapsed(true);
+        return;
+      }
       setSelectedId(current => (current && nextTickets.some((ticket: any) => ticket._id === current) ? current : ''));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load support queue');
     } finally {
       setLoading(false);
     }
-  }, [categoryFilter, fromFilter, monthFilter, searchFilter, sort, statusFilter, toFilter]);
+  }, [categoryFilter, fromFilter, monthFilter, requestedTicketId, searchFilter, sort, statusFilter, toFilter]);
 
   const loadDetail = async (id: string) => {
     if (!id) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Alert,
   Box,
@@ -38,6 +39,8 @@ const supportMessageBody = (message: any) =>
     : message.body;
 
 export default function UserSupportPage() {
+  const searchParams = useSearchParams();
+  const requestedTicketId = searchParams.get('ticket') || '';
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [ticketDetail, setTicketDetail] = useState<any | null>(null);
@@ -67,6 +70,10 @@ export default function UserSupportPage() {
       const response = await supportAPI.getTickets();
       const nextTickets = response?.data?.tickets || [];
       setTickets(nextTickets);
+      if (requestedTicketId) {
+        setSelectedId(requestedTicketId);
+        return;
+      }
       setSelectedId((current) =>
         current && nextTickets.some((ticket: any) => ticket._id === current) ? current : ''
       );
@@ -101,7 +108,8 @@ export default function UserSupportPage() {
 
   useEffect(() => {
     void loadTickets();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTicketId]);
 
   useEffect(() => {
     void loadTicketDetail(selectedId);

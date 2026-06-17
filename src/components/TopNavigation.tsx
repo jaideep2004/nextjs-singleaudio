@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   AppBar,
   Toolbar,
@@ -36,6 +36,7 @@ import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getNotificationTitle } from '@/lib/notificationTitles';
+import { getNotificationRoute } from '@/lib/notificationRoutes';
 
 interface TopNavigationProps {
   title?: string;
@@ -53,6 +54,7 @@ function getHelpCenterHref() {
 
 export default function TopNavigation({ title = 'Single Audio' }: TopNavigationProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const theme = useTheme();
   const [isClient, setIsClient] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -99,9 +101,10 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date);
   };
 
-  const handleNotificationClick = async (id: string) => {
-    await markAsRead(id);
+  const handleNotificationClick = async (notification: typeof notifications[number]) => {
+    await markAsRead(notification._id);
     handleNotificationsClose();
+    router.push(getNotificationRoute(notification, 'user'));
   };
 
   // Generate breadcrumb from pathname
@@ -310,7 +313,7 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
                 return (
                   <MenuItem
                     key={notification._id}
-                    onClick={() => handleNotificationClick(notification._id)}
+                    onClick={() => handleNotificationClick(notification)}
                     sx={{
                       px: 2.5,
                       py: 1.5,

@@ -219,7 +219,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'SingleAudio Distribution Account Created',
+        subject: `Welcome to SingleAudio Distribution, ${user.name}`,
         title: 'Account Created',
         intro: `${user.name} now has a SingleAudio Distribution account.`,
         details: {
@@ -385,7 +385,7 @@ export const verifySignup = async (req: Request, res: Response): Promise<void> =
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'Welcome to SingleAudio Distribution',
+        subject: `Welcome to SingleAudio Distribution, ${user.name}`,
         title: 'Account Created',
         intro: `${user.name} completed signup and can now submit KYC.`,
         details: {
@@ -732,7 +732,7 @@ export const submitKyc = async (req: AuthRequest, res: Response): Promise<void> 
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'KYC Submitted for Review',
+        subject: `KYC submitted for review: ${user.name}`,
         title: 'KYC Submitted',
         intro: `${user.name} submitted KYC details for admin review.`,
         details: {
@@ -807,7 +807,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'SingleAudio Distribution Profile Updated',
+        subject: `SingleAudio Distribution profile updated for ${user.name}`,
         title: 'Profile Updated',
         intro: `${user.name} updated profile details.`,
         details: {

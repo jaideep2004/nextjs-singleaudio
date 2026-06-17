@@ -28,10 +28,8 @@ export async function PATCH(
   const { id } = await params;
   let dbForFailure: Db | null = null;
   let releaseForFailure: Record<string, any> | null = null;
-  let actorEmail = '';
   try {
     const user = await getCurrentBackendUser();
-    actorEmail = user.email || '';
     const permissions = Array.isArray(user.permissions) ? user.permissions : [];
     if (user.role !== 'admin' && !(user.role === 'subadmin' && permissions.includes('review'))) {
       return NextResponse.json({ success: false, error: 'Review permission is required' }, { status: 403 });
@@ -145,7 +143,7 @@ export async function PATCH(
                 Provider: String(upcAuditDetails.provider || ''),
                 Action: String(upcAuditDetails.action || ''),
                 Status: String(upcAuditDetails.recordStatus || 'validated'),
-                ReviewedBy: user.email,
+                ReviewedBy: 'SingleAudio Distribution',
               },
               actionLabel: 'Open Release',
               actionUrl: appUrl(`/admin/releases/${id}`),
@@ -171,7 +169,7 @@ export async function PATCH(
         db,
         { name: existing.ownerName || existing.primaryArtist || existing.artist, email: existing.ownerEmail },
         {
-          subject: `Release ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+          subject: `Release ${status === 'approved' ? 'approved' : 'needs correction'}: ${existing.releaseTitle || existing.title || 'Untitled release'}`,
           title: `Release ${status === 'approved' ? 'Approved' : 'Rejected'}`,
           intro: status === 'approved'
             ? 'Your release has been approved for distribution.'
@@ -182,7 +180,19 @@ export async function PATCH(
             UPC: status === 'approved' ? String(res.value.upc || '') : undefined,
             UPCProvider: status === 'approved' ? String(res.value.upcProvider || '') : undefined,
             Reason: reason,
-            ReviewedBy: user.email,
+            ReviewedBy: 'SingleAudio Distribution',
+          },
+          release: {
+            title: existing.releaseTitle || existing.title || 'Untitled release',
+            coverUrl: existing.artworkUrl || existing.artwork || existing.coverUrl,
+            artist: existing.primaryArtist || existing.artist || existing.ownerName,
+            label: existing.label,
+            genre: existing.genre,
+            releaseDate: existing.releaseDate,
+            upc: String(res.value.upc || existing.upc || ''),
+            status,
+            tracks: Array.isArray(res.value.tracks) ? res.value.tracks : Array.isArray(existing.tracks) ? existing.tracks : [],
+            stores: Array.isArray(existing.stores) ? existing.stores : [],
           },
           actionLabel: status === 'approved' ? 'Open Releases' : 'Review Release',
           actionUrl: appUrl(status === 'approved' ? '/dashboard/releases' : `/dashboard/releases/${id}`),
@@ -223,7 +233,7 @@ export async function PATCH(
                 Provider: 'gs1-datakart',
                 Error: responseMessage,
                 ProviderError: responseMessage === e.message ? undefined : e.message,
-                ReviewedBy: actorEmail,
+                ReviewedBy: 'SingleAudio Distribution',
               },
               actionLabel: 'Open Release',
               actionUrl: appUrl(`/admin/releases/${id}`),

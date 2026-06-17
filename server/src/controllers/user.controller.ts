@@ -81,14 +81,14 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'SingleAudio Distribution Account Created by Admin',
+        subject: `SingleAudio Distribution account created for ${user.name}`,
         title: 'Account Created',
         intro: `${user.name} was created by an admin.`,
         details: {
           User: user.name,
           Email: user.email,
           Role: user.role,
-          CreatedBy: req.user.email || String(req.user._id),
+          CreatedBy: 'SingleAudio Distribution',
         },
         actionLabel: 'Open Account',
         actionUrl: buildDashboardUrl(user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN ? '/admin/dashboard' : '/dashboard'),
@@ -303,14 +303,14 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: 'SingleAudio Distribution User Profile Updated',
+        subject: `SingleAudio Distribution profile updated for ${user.name}`,
         title: 'User Profile Updated',
         intro: `${user.name} account details were updated by an admin.`,
         details: {
           User: user.name,
           Email: user.email,
           Role: user.role,
-          UpdatedBy: req.user.email || String(req.user._id),
+          UpdatedBy: 'SingleAudio Distribution',
         },
         actionLabel: 'Open User',
         actionUrl: buildDashboardUrl(`/admin/users/${user._id}`),
@@ -390,7 +390,7 @@ export const reviewUserVerification = async (req: AuthRequest, res: Response): P
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: `KYC ${status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Updated'}`,
+        subject: `KYC ${status === 'approved' ? 'approved' : status === 'rejected' ? 'needs correction' : 'updated'} for ${user.name}`,
         title: `KYC ${status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Updated'}`,
         intro: status === 'rejected'
           ? 'KYC needs correction. Please review the reason and resubmit.'
@@ -402,7 +402,7 @@ export const reviewUserVerification = async (req: AuthRequest, res: Response): P
           Email: user.email,
           Status: status,
           Reason: rejectionReason,
-          ReviewedBy: req.user.email || String(req.user._id),
+          ReviewedBy: 'SingleAudio Distribution',
         },
         actionLabel: status === 'rejected' ? 'Resubmit KYC' : 'Open Dashboard',
         actionUrl: buildDashboardUrl(status === 'rejected' ? '/dashboard' : '/dashboard'),

@@ -10,6 +10,8 @@ interface Notification {
   type: string;
   read?: boolean;
   isRead?: boolean;
+  relatedId?: string;
+  refModel?: string;
   createdAt: string;
 }
 
