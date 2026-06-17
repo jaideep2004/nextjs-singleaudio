@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Alert,
@@ -38,7 +38,7 @@ const supportMessageBody = (message: any) =>
     ? 'Attachment uploaded'
     : message.body;
 
-export default function UserSupportPage() {
+function UserSupportContent() {
   const searchParams = useSearchParams();
   const requestedTicketId = searchParams.get('ticket') || '';
   const [tickets, setTickets] = useState<any[]>([]);
@@ -414,5 +414,19 @@ export default function UserSupportPage() {
         </Paper>
       </Box>
     </Box>
+  );
+}
+
+export default function UserSupportPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <UserSupportContent />
+    </Suspense>
   );
 }
