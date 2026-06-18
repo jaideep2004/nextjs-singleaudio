@@ -24,7 +24,7 @@ export async function sendAmazeSmsOtp(phoneNumber: string, otp: string): Promise
     return;
   }
 
-  const body = `Your OTP for SingleAudio Login is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`;
+  const body = `Your OTP for Single Audio Login is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`;
   const url = new URL(baseUrl);
   url.searchParams.set('key', apiKey);
   url.searchParams.set('from', process.env.AMAZE_SMS_SENDER_ID || 'SNGLAU');
@@ -111,15 +111,15 @@ function renderBasicEmail(subject: string, text: string) {
               <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
                 <tr>
                   <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
-                    <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
+                    <img src="${escapeHtml(getLogoUrl())}" alt="Single Audio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:38px 40px 30px">
                     <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">${escapeHtml(subject)}</h1>
                     ${paragraphs}
-                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.</p>
-                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">Single Audio Help Center</a>.</p>
+                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} Single Audio Distribution. All rights reserved.</p>
                   </td>
                 </tr>
               </table>
@@ -142,13 +142,13 @@ function renderOtpEmail(otp: string) {
               <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
                 <tr>
                   <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
-                    <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
+                    <img src="${escapeHtml(getLogoUrl())}" alt="Single Audio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:38px 40px 30px">
                     <p style="margin:0 0 10px;color:#7b1fa2;font:900 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.12em">Secure verification</p>
-                    <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">Your SingleAudio OTP</h1>
+                    <h1 style="margin:0 0 14px;color:#171018;font:900 30px/1.15 Arial,sans-serif;letter-spacing:-.01em">Your Single Audio OTP</h1>
                     <p style="margin:0 0 22px;color:#4d4350;font:500 16px/1.65 Arial,sans-serif">Use this code to finish verification. It expires in ${OTP_TTL_MINUTES} minutes. Do not share it with anyone.</p>
                     <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0;margin:0 0 22px">
                       <tr>
@@ -157,8 +157,8 @@ function renderOtpEmail(otp: string) {
                       </tr>
                     </table>
                     <p style="margin:0;color:#8d808c;font:500 13px/1.6 Arial,sans-serif">Tip: select the OTP above and copy it into the signup form.</p>
-                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.</p>
-                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                    <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">Single Audio Help Center</a>.</p>
+                    <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} Single Audio Distribution. All rights reserved.</p>
                   </td>
                 </tr>
               </table>
@@ -200,7 +200,7 @@ export async function sendEmailMessage(
 
   const bodyHtml = html || renderBasicEmail(subject, text);
   const message = [
-    `From: SingleAudio Distribution <${user}>`,
+    `From: Single Audio Distribution <${user}>`,
     `To: ${email}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
@@ -218,8 +218,8 @@ export async function sendEmailMessage(
 export async function sendEmailOtp(email: string, otp: string): Promise<void> {
   return sendEmailMessage(
     email,
-    'Your SingleAudio Distribution verification code',
-    `Your OTP for SingleAudio Distribution is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`,
+    'Your Single Audio Distribution verification code',
+    `Your OTP for Single Audio Distribution is ${otp}. It is valid for ${OTP_TTL_MINUTES} minutes. Do not share this OTP.`,
     renderOtpEmail(otp)
   );
 }

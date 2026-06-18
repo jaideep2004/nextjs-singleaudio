@@ -13,13 +13,13 @@ export async function generateMetadata({ params }: HelpCategoryPageProps): Promi
 
   if (!category) {
     return {
-      title: 'Help Category Not Found | SingleAudio Help Center',
+      title: 'Help Category Not Found | Single Audio Help Center',
       robots: { index: false, follow: true },
     };
   }
 
-  const title = `${category.name} | SingleAudio Help Center`;
-  const description = category.description || `SingleAudio help articles for ${category.name}.`;
+  const title = `${category.name} | Single Audio Help Center`;
+  const description = category.description || `Single Audio help articles for ${category.name}.`;
 
   return {
     title,

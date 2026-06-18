@@ -95,7 +95,7 @@ export default function PublicNavBar() {
       <Box
         component="img"
         src={theme.palette.mode === 'dark' ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-        alt="SingleAudio Distribution"
+        alt="Single Audio Distribution"
         sx={{ width: 190, maxWidth: '80%', my: 2 }}
       />
       <Divider />
@@ -157,7 +157,7 @@ export default function PublicNavBar() {
             <Box
               component="img"
               src={theme.palette.mode === 'dark' ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-              alt="SingleAudio Distribution"
+              alt="Single Audio Distribution"
               sx={{ width: { xs: 180, sm: 220 }, maxHeight: 44, objectFit: 'contain' }}
             />
           </Box>

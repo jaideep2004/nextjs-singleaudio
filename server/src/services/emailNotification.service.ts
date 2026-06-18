@@ -55,7 +55,7 @@ const renderEmail = ({ title, intro, details, actionLabel, actionUrl }: ActionEm
             <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="width:100%;background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
               <tr>
                 <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
-                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
+                  <img src="${escapeHtml(getLogoUrl())}" alt="Single Audio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                 </td>
               </tr>
               <tr>
@@ -69,12 +69,12 @@ const renderEmail = ({ title, intro, details, actionLabel, actionUrl }: ActionEm
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:34px;padding-top:18px;border-top:1px solid #f0e6ee">
                     <tr>
                       <td style="color:#8d808c;font:500 12px/1.6 Arial,sans-serif">
-                        Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.
+                        Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">Single Audio Help Center</a>.
                       </td>
                     </tr>
                     <tr>
                       <td style="padding-top:6px;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">
-                        Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.
+                        Copyright ${new Date().getFullYear()} Single Audio Distribution. All rights reserved.
                       </td>
                     </tr>
                   </table>
@@ -126,7 +126,7 @@ const createEmailNotifications = async (recipients: MailRecipient[], email: Acti
       users.map((user) => createNotification(user._id, message, NotificationType.EMAIL))
     );
   } catch (error) {
-    console.warn('SingleAudio Distribution email notification skipped:', error);
+    console.warn('Single Audio Distribution email notification skipped:', error);
   }
 };
 
@@ -147,7 +147,7 @@ export const sendActionEmail = async (recipients: MailRecipient[], email: Action
 
   results.forEach((result) => {
     if (result.status === 'rejected') {
-      console.warn('SingleAudio Distribution email skipped:', result.reason);
+      console.warn('Single Audio Distribution email skipped:', result.reason);
     }
   });
 

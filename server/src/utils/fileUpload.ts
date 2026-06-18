@@ -19,6 +19,7 @@ import {
   KNOWLEDGE_BASE_MEDIA_MAX_FILE_SIZE
 } from '../config/constants';
 import { ApiError } from '../middleware/errorHandler.middleware';
+import SettingsModel from '../models/settings.model';
 
 // Ensure upload directories exist
 [TRACKS_DIR, ARTWORK_DIR, REGISTRATION_DIR, SUPPORT_ATTACHMENT_DIR, KNOWLEDGE_BASE_MEDIA_DIR].forEach(dir => {
@@ -69,11 +70,36 @@ const mixedTrackStorage = multer.diskStorage({
 
 // File filter for audio files
 const audioFileFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  if (ALLOWED_AUDIO_TYPES.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new ApiError(`Invalid file type. Allowed types: ${ALLOWED_AUDIO_TYPES.join(', ')}`, 400));
-  }
+  void (async () => {
+    const configuredSetting = await SettingsModel.findOne({ key: 'allowedFileTypes' }).lean();
+    const configuredTypes = configuredSetting?.value || ['mp3', 'wav', 'aac', 'flac'];
+    const allowedExtensions = new Set(
+      (Array.isArray(configuredTypes) ? configuredTypes : [])
+        .map(item => String(item || '').trim().toLowerCase().replace(/^\./, ''))
+        .filter(Boolean)
+    );
+    const extension = path.extname(file.originalname).slice(1).toLowerCase();
+    const knownMime = ALLOWED_AUDIO_TYPES.includes(file.mimetype);
+
+    if (allowedExtensions.has(extension) && (knownMime || file.mimetype === 'application/octet-stream')) {
+      cb(null, true);
+      return;
+    }
+
+    cb(
+      new ApiError(
+        `Invalid audio file type. Allowed extensions: ${Array.from(allowedExtensions).join(', ')}`,
+        400
+      )
+    );
+  })().catch(error => {
+    cb(
+      new ApiError(
+        error instanceof Error ? error.message : 'Failed to validate audio file type',
+        500
+      )
+    );
+  });
 };
 
 // File filter for image files

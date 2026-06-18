@@ -44,15 +44,14 @@ export const ALL_DSP_KEYS: DspKey[] = [
   'peloton',
   'whatsapp',
   'facebook-delivery',
-  'youtube-delivery',
+  'acr-cloud',
   'facebook-rights-management',
+  'youtube-delivery',
 ];
 
 export const SOCIAL_RIGHTS_DSP_KEYS: DspKey[] = [
-  'whatsapp',
-  'facebook-delivery',
-  'youtube-delivery',
   'facebook-rights-management',
+  'youtube-delivery',
 ];
 
 export interface DspMeta {
@@ -63,6 +62,7 @@ export interface DspMeta {
 }
 
 const DSP_LOGOS = {
+  acrCloud: '/images/dsp/acr-cloud.png',
   amazon: '/images/dsp/amazonmusic.png',
   anghami: '/images/dsp/anghami.png',
   apple: '/images/dsp/applemusic.png',
@@ -105,7 +105,7 @@ const DSP_LOGOS = {
   wynk: '/images/dsp/wynkmusic.png',
   yandex: '/images/dsp/yandexmusic.png',
   youtube: '/images/dsp/ytmusic.png',
-  youtubeDelivery: '/images/dsp/youtube.png',
+  youtubeDelivery: '/images/dsp/youtube-content-id.png',
   whatsapp: '/images/dsp/whatsapp.png',
   zvuk: '/images/dsp/zvuk.png',
 } as const;
@@ -254,13 +254,14 @@ export const DSP_META: DspMeta[] = [
   { key: 'peloton', name: 'Peloton', logo: DSP_LOGOS.peloton, info: 'Fitness and workout music usage.' },
   { key: 'whatsapp', name: 'WhatsApp', logo: DSP_LOGOS.whatsapp, info: 'Music usage across WhatsApp social products.' },
   { key: 'facebook-delivery', name: 'Facebook', logo: DSP_LOGOS.facebookDelivery, info: 'Delivery for Facebook music surfaces.' },
-  { key: 'youtube-delivery', name: 'YouTube', logo: DSP_LOGOS.youtubeDelivery, info: 'Delivery for YouTube music and creator surfaces.' },
+  { key: 'acr-cloud', name: 'ACRCloud', logo: DSP_LOGOS.acrCloud, info: 'Audio fingerprinting and content identification.' },
   {
     key: 'facebook-rights-management',
     name: 'Facebook Rights Management',
     logo: DSP_LOGOS.facebookRightsManagement,
     info: 'Rights management and protection across Facebook surfaces.',
   },
+  { key: 'youtube-delivery', name: 'YouTube Content ID', logo: DSP_LOGOS.youtubeDelivery, info: 'Content ID protection for YouTube usage.' },
 ];
 
 export const DSP_META_BY_KEY: Record<DspKey, DspMeta> = Object.fromEntries(
@@ -286,6 +287,8 @@ const DSP_ALIASES: Record<string, DspKey> = {
   facebookaudiolibrary: 'facebook',
   facebook_delivery: 'facebook-delivery',
   facebookdelivery: 'facebook-delivery',
+  acr_cloud: 'acr-cloud',
+  acrcloud: 'acr-cloud',
   facebook_rights_management: 'facebook-rights-management',
   facebookrightsmanagement: 'facebook-rights-management',
   youtube_delivery: 'youtube-delivery',

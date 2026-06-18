@@ -177,7 +177,7 @@ export function HelpSidebar({
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <GraphicEq color="primary" />
         <Box>
-          <Typography fontWeight={950}>SingleAudio Help</Typography>
+          <Typography fontWeight={950}>Single Audio Help</Typography>
           <Typography variant="caption" color="text.secondary">
             Knowledge base
           </Typography>
@@ -455,7 +455,7 @@ export default function HelpCenterClient({
               <Box
                 component="img"
                 src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-                alt="SingleAudio"
+                alt="Single Audio"
                 sx={{
                   width: { xs: 168, sm: 210 },
                   height: 42,

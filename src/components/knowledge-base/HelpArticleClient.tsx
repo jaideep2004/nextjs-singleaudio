@@ -243,7 +243,7 @@ export default function HelpArticleClient({
               <Box
                 component="img"
                 src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-                alt="SingleAudio"
+                alt="Single Audio"
                 sx={{
                   width: { xs: 168, sm: 210 },
                   height: 42,

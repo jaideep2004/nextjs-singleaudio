@@ -28,7 +28,6 @@ import {
   Logout,
   MarkEmailRead,
   Person as PersonIcon,
-  Search as SearchIcon,
   Settings as SettingsIcon,
   TrendingUp,
 } from '@mui/icons-material';
@@ -37,6 +36,7 @@ import { useColorMode } from '@/context/ColorModeContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { getNotificationTitle } from '@/lib/notificationTitles';
 import { getNotificationRoute } from '@/lib/notificationRoutes';
+import DashboardSearch from '@/components/navigation/DashboardSearch';
 
 interface TopNavigationProps {
   title?: string;
@@ -204,22 +204,10 @@ export default function TopNavigation({ title = 'Single Audio' }: TopNavigationP
             </IconButton>
           </Tooltip>
 
-          {/* Search */}
-          <Tooltip title="Search">
-            <IconButton
-              size="small"
-              sx={{
-                width: 36,
-                height: 36,
-                color: isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)',
-                '&:hover': {
-                  bgcolor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)',
-                },
-              }}
-            >
-              <SearchIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Tooltip>
+          <DashboardSearch
+            audience="user"
+            iconColor={isDarkMode ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'}
+          />
 
           {/* Theme toggle */}
           <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>

@@ -95,7 +95,7 @@ export function AuthLogo({
     <Box
       component="img"
       src={theme.palette.mode === 'dark' ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
-      alt="SingleAudio Distribution"
+      alt="Single Audio Distribution"
       translate="no"
       sx={{
         width,

@@ -76,7 +76,8 @@ const supportMessageBody = (message: any) =>
 
 export default function AdminSupportPage() {
   const searchParams = useSearchParams();
-  const requestedTicketId = searchParams.get('ticket') || '';
+  const ticketParam = searchParams.get('ticket') || '';
+  const requestedTicketId = /^[a-f\d]{24}$/i.test(ticketParam) ? ticketParam : '';
   const { user } = useAuth();
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState('');

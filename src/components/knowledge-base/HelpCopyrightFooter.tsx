@@ -19,7 +19,7 @@ export default function HelpCopyrightFooter() {
       }}
     >
       <Typography variant="caption" color="text.secondary" fontWeight={700}>
-        Copyright 2026 SingleAudio Distribution. All rights reserved.
+        Copyright 2026 Single Audio Distribution. All rights reserved.
       </Typography>
     </Box>
   );

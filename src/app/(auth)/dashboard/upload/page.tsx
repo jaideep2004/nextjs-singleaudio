@@ -77,6 +77,12 @@ import {
   getAcrCloudState,
   getAcrCloudSummary,
 } from '@/lib/acrCloud';
+import {
+  FACEBOOK_RIGHTS_MANAGER_TERMS_URL,
+  YOUTUBE_CONTENT_ID_TERMS_URL,
+  requiresFacebookRightsPolicy,
+  requiresYoutubePolicy,
+} from '@/lib/releaseConsent';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
 const API_BASE =
@@ -433,6 +439,10 @@ const getLocalDateInputValue = (date = new Date()) => {
 
 const RELEASE_DRAFT_PREFIX = 'singleaudio.releaseDraft.v1.';
 const RELEASE_DRAFT_BACKUP_KEY = `${RELEASE_DRAFT_PREFIX}latest`;
+const createReleaseDraftId = () =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
 const cloneTrackInfo = (info: TrackInfo): TrackInfo => ({
   ...info,
@@ -470,7 +480,11 @@ const defaultTrackInfo: TrackInfo = {
   originalReleaseDate: '',
   parentalAdvisory: 'none',
   instrumental: false,
-  contributors: [{ role: 'artist', name: '' }],
+  contributors: [
+    { role: 'artist', name: '' },
+    { role: 'composer', name: '' },
+    { role: 'lyricist', name: '' },
+  ],
 };
 
 const splitNames = (value?: string) =>
@@ -481,6 +495,16 @@ const splitNames = (value?: string) =>
 
 const namesToContributors = (role: ContributorRole, value?: string): TrackContributor[] =>
   splitNames(value).map(name => ({ role, name }));
+
+const ensureRequiredContributorRows = (contributors: TrackContributor[]) => {
+  const next = contributors.map(contributor => ({ ...contributor }));
+  (['artist', 'composer', 'lyricist'] as ContributorRole[]).forEach(role => {
+    if (!next.some(contributor => contributor.role === role)) {
+      next.push({ role, name: '' });
+    }
+  });
+  return next;
+};
 
 const toDateInputValue = (value?: string) => {
   if (!value) return '';
@@ -537,9 +561,9 @@ const trackToTrackInfo = (track: any, index: number): TrackInfo => {
     originalReleaseDate: toDateInputValue(track?.originalReleaseDate),
     parentalAdvisory: track?.parentalAdvisory || 'none',
     instrumental: Boolean(track?.instrumental),
-    contributors: contributors.length
-      ? contributors
-      : [{ role: 'artist', name: track?.artist || '' }],
+    contributors: ensureRequiredContributorRows(
+      contributors.length ? contributors : [{ role: 'artist', name: track?.artist || '' }]
+    ),
   };
 };
 
@@ -548,6 +572,7 @@ export default function UploadPage() {
   const router = useRouter();
   // ...existing state
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const submitSucceededRef = useRef(false);
   const [editReleaseId, setEditReleaseId] = useState('');
   const isEditMode = Boolean(editReleaseId);
   const [releaseTitle, setReleaseTitle] = useState('');
@@ -558,6 +583,12 @@ export default function UploadPage() {
   const [allowedDspKeys, setAllowedDspKeys] = useState<DspKey[] | null>(null);
   const [platformAccessError, setPlatformAccessError] = useState('');
   const [maxUploadSizeMb, setMaxUploadSizeMb] = useState(100);
+  const [allowedAudioExtensions, setAllowedAudioExtensions] = useState([
+    'mp3',
+    'wav',
+    'aac',
+    'flac',
+  ]);
   // ...existing state
 
   // All hooks must be at the top and called unconditionally
@@ -625,6 +656,7 @@ export default function UploadPage() {
   const [trackValidationAttempted, setTrackValidationAttempted] = useState(false);
   const [distributionTermsAccepted, setDistributionTermsAccepted] = useState(false);
   const [socialDistributionTermsAccepted, setSocialDistributionTermsAccepted] = useState(false);
+  const [summaryDeclarationAccepted, setSummaryDeclarationAccepted] = useState(false);
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
   const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
   const [editReleaseLoading, setEditReleaseLoading] = useState(false);
@@ -632,15 +664,20 @@ export default function UploadPage() {
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
   const allSelected = visibleDSPs.length > 0 && selectedDSPs.length === visibleDSPs.length;
-  const requiresSocialDistributionTerms = selectedDSPs.some(key => socialRightsDspKeySet.has(key));
+  const requiresYoutubeTerms = requiresYoutubePolicy(selectedDSPs);
+  const requiresFacebookTerms = requiresFacebookRightsPolicy(selectedDSPs);
   const releaseDraftUserId = auth.user?.id || '';
-  const releaseDraftKey = `${RELEASE_DRAFT_PREFIX}${releaseDraftUserId || 'anonymous'}`;
+  const [releaseDraftId, setReleaseDraftId] = useState('');
+  const releaseDraftCreatedAtRef = useRef(new Date().toISOString());
+  const releaseDraftKey = `${RELEASE_DRAFT_PREFIX}${releaseDraftUserId || 'anonymous'}.${releaseDraftId}`;
   const releaseDraftRestoredRef = useRef(false);
   const [releaseDraftReady, setReleaseDraftReady] = useState(false);
   const releaseDraftServerSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const buildReleaseDraft = () => ({
     status: 'draft',
+    draftId: releaseDraftId,
+    createdAt: releaseDraftCreatedAtRef.current,
     updatedAt: new Date().toISOString(),
     ownerUserId: releaseDraftUserId,
     activeStep,
@@ -662,6 +699,7 @@ export default function UploadPage() {
     releaseWorldwide,
     distributionTermsAccepted,
     socialDistributionTermsAccepted,
+    summaryDeclarationAccepted,
     trackInfos,
     audioUploadedUrls,
     audioUploadedFilenames,
@@ -684,9 +722,9 @@ export default function UploadPage() {
     );
 
   const persistReleaseDraftLocally = (draft = buildReleaseDraft()) => {
+    if (!draft.draftId) return '';
     const serializedDraft = JSON.stringify(draft);
     localStorage.setItem(releaseDraftKey, serializedDraft);
-    localStorage.setItem(RELEASE_DRAFT_BACKUP_KEY, serializedDraft);
     return serializedDraft;
   };
 
@@ -694,7 +732,7 @@ export default function UploadPage() {
     fetch('/api/releases/draft', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ draft }),
+      body: JSON.stringify({ draftId: draft.draftId, draft }),
       keepalive,
     }).catch(() => undefined);
 
@@ -705,7 +743,16 @@ export default function UploadPage() {
         const response = await fetch('/api/settings/upload-limit', { cache: 'no-store' });
         const payload = await response.json().catch(() => null);
         const nextLimit = Math.min(200, Math.max(1, Number(payload?.maxUploadSize || 100)));
-        if (mounted) setMaxUploadSizeMb(nextLimit);
+        if (mounted) {
+          setMaxUploadSizeMb(nextLimit);
+          setAllowedAudioExtensions(
+            Array.isArray(payload?.allowedFileTypes) && payload.allowedFileTypes.length
+              ? payload.allowedFileTypes.map((type: unknown) =>
+                  String(type).trim().toLowerCase().replace(/^\./, '')
+                )
+              : ['mp3', 'wav', 'aac', 'flac']
+          );
+        }
       } catch {
         if (mounted) setMaxUploadSizeMb(100);
       }
@@ -843,6 +890,22 @@ export default function UploadPage() {
       artworkFile: artworkUploadedFilename,
       territories: territoryCountries,
       stores: selectedDSPs,
+      policyAcceptances: {
+        youtubeContentId: {
+          accepted: distributionTermsAccepted,
+          policyUrl: YOUTUBE_CONTENT_ID_TERMS_URL,
+          policyVersion: '2026-06-18',
+        },
+        facebookRightsManager: {
+          accepted: socialDistributionTermsAccepted,
+          policyUrl: FACEBOOK_RIGHTS_MANAGER_TERMS_URL,
+          policyVersion: '2026-06-18',
+        },
+        summaryDeclaration: {
+          accepted: summaryDeclarationAccepted,
+          policyVersion: '2026-06-18',
+        },
+      },
       tracks: trackInfos.map((t, idx) => ({
         contributors: t.contributors.filter(contributor => contributor.name.trim()),
         title: t.title,
@@ -888,14 +951,15 @@ export default function UploadPage() {
       });
       const data = await res.json();
       if (data.success) {
+        submitSucceededRef.current = true;
         setSubmitState('success');
-        void fetch('/api/releases/draft', { method: 'DELETE' }).catch(() => undefined);
+        if (releaseDraftId) {
+          void fetch(`/api/releases/draft?id=${encodeURIComponent(releaseDraftId)}`, {
+            method: 'DELETE',
+          }).catch(() => undefined);
+        }
         if (typeof window !== 'undefined') {
-          [
-            releaseDraftKey,
-            RELEASE_DRAFT_BACKUP_KEY,
-            `${RELEASE_DRAFT_PREFIX}anonymous`,
-          ].forEach(key => localStorage.removeItem(key));
+          localStorage.removeItem(releaseDraftKey);
         }
         toast.success(
           isEditMode ? 'Release updated and resubmitted.' : 'Release submitted for admin review.'
@@ -914,8 +978,8 @@ export default function UploadPage() {
   const hasSelectedDistributionProviders = selectedDSPs.length > 0;
   const isDistributionValid =
     hasSelectedDistributionProviders &&
-    distributionTermsAccepted &&
-    (!requiresSocialDistributionTerms || socialDistributionTermsAccepted);
+    (!requiresYoutubeTerms || distributionTermsAccepted) &&
+    (!requiresFacebookTerms || socialDistributionTermsAccepted);
 
   // Event handlers
   const handleDSPToggle = (key: DspKey) => {
@@ -1037,8 +1101,8 @@ export default function UploadPage() {
   const maxTracksAllowed = selectedReleaseTypeConfig?.maxTracks ?? 50;
   const todayInputValue = getLocalDateInputValue();
 
-  const trackHasListedArtist = (info: TrackInfo) =>
-    info.contributors.some(c => c.role === 'artist' && c.name.trim());
+  const trackHasRequiredContributor = (info: TrackInfo, role: ContributorRole) =>
+    info.contributors.some(c => c.role === role && c.name.trim());
 
   const getTrackInfoIssues = () => {
     const issues: Array<{ trackIndex: number | null; message: string }> = [];
@@ -1065,8 +1129,12 @@ export default function UploadPage() {
       }
       if (!info.title.trim())
         issues.push({ trackIndex: idx, message: `${label}: track title is required.` });
-      if (!trackHasListedArtist(info))
+      if (!trackHasRequiredContributor(info, 'artist'))
         issues.push({ trackIndex: idx, message: `${label}: add at least one Artist contributor.` });
+      if (!trackHasRequiredContributor(info, 'composer'))
+        issues.push({ trackIndex: idx, message: `${label}: add at least one Composer contributor.` });
+      if (!trackHasRequiredContributor(info, 'lyricist'))
+        issues.push({ trackIndex: idx, message: `${label}: add at least one Lyricist contributor.` });
       if (!info.metadataLanguage)
         issues.push({ trackIndex: idx, message: `${label}: metadata language is required.` });
       if (!(info.audioLanguage || info.language))
@@ -1100,7 +1168,15 @@ export default function UploadPage() {
   const selectedTrackMissingArtist =
     trackValidationAttempted &&
     Boolean(trackInfos[selectedTrackIdx]) &&
-    !trackHasListedArtist(trackInfos[selectedTrackIdx]);
+    !trackHasRequiredContributor(trackInfos[selectedTrackIdx], 'artist');
+  const selectedTrackMissingComposer =
+    trackValidationAttempted &&
+    Boolean(trackInfos[selectedTrackIdx]) &&
+    !trackHasRequiredContributor(trackInfos[selectedTrackIdx], 'composer');
+  const selectedTrackMissingLyricist =
+    trackValidationAttempted &&
+    Boolean(trackInfos[selectedTrackIdx]) &&
+    !trackHasRequiredContributor(trackInfos[selectedTrackIdx], 'lyricist');
 
   const isTrackInfoListValid =
     tracks.length >= minTracksRequired &&
@@ -1110,7 +1186,9 @@ export default function UploadPage() {
       if (!info) return false;
       return (
         info.title.trim() &&
-        trackHasListedArtist(info) &&
+        trackHasRequiredContributor(info, 'artist') &&
+        trackHasRequiredContributor(info, 'composer') &&
+        trackHasRequiredContributor(info, 'lyricist') &&
         info.metadataLanguage &&
         (info.audioLanguage || info.language) &&
         info.genre &&
@@ -1141,7 +1219,12 @@ export default function UploadPage() {
   // Set mounted state to true after component mounts
   useEffect(() => {
     setMounted(true);
-    setEditReleaseId(new URLSearchParams(window.location.search).get('editReleaseId') || '');
+    const search = new URLSearchParams(window.location.search);
+    setEditReleaseId(search.get('editReleaseId') || '');
+    const requestedDraftId = search.get('draft');
+    setReleaseDraftId(
+      requestedDraftId && requestedDraftId !== '1' ? requestedDraftId : createReleaseDraftId()
+    );
     return () => {
       acrCloudPollRef.current = {};
     };
@@ -1155,7 +1238,8 @@ export default function UploadPage() {
       return;
     }
 
-    const shouldRestoreDraft = new URLSearchParams(window.location.search).get('draft') === '1';
+    const requestedDraftId = new URLSearchParams(window.location.search).get('draft');
+    const shouldRestoreDraft = Boolean(requestedDraftId);
     if (!shouldRestoreDraft) {
       releaseDraftRestoredRef.current = true;
       setReleaseDraftReady(true);
@@ -1165,6 +1249,12 @@ export default function UploadPage() {
     releaseDraftRestoredRef.current = true;
 
     const applyDraft = (draft: any) => {
+      const nextDraftId =
+        String(draft.draftId || (requestedDraftId !== '1' ? requestedDraftId : '') || '').trim() ||
+        createReleaseDraftId();
+      setReleaseDraftId(nextDraftId);
+      releaseDraftCreatedAtRef.current =
+        draft.createdAt || draft.updatedAt || releaseDraftCreatedAtRef.current;
       setActiveStep(Number(draft.activeStep || 0));
       setReleaseType((draft.releaseType || 'single') as ReleaseType);
       setReleaseTitle(draft.releaseTitle || '');
@@ -1185,8 +1275,16 @@ export default function UploadPage() {
       setReleaseWorldwide(Boolean(draft.releaseWorldwide));
       setDistributionTermsAccepted(Boolean(draft.distributionTermsAccepted));
       setSocialDistributionTermsAccepted(Boolean(draft.socialDistributionTermsAccepted));
+      setSummaryDeclarationAccepted(Boolean(draft.summaryDeclarationAccepted));
 
-      const nextTrackInfos = Array.isArray(draft.trackInfos) ? draft.trackInfos : [];
+      const nextTrackInfos = Array.isArray(draft.trackInfos)
+        ? draft.trackInfos.map((track: TrackInfo) => ({
+            ...track,
+            contributors: ensureRequiredContributorRows(
+              Array.isArray(track.contributors) ? track.contributors : []
+            ),
+          }))
+        : [];
       const nextAudioUrls = Array.isArray(draft.audioUploadedUrls) ? draft.audioUploadedUrls : [];
       const nextAudioFiles = Array.isArray(draft.audioUploadedFilenames) ? draft.audioUploadedFilenames : [];
       const trackCount = Math.max(nextTrackInfos.length, nextAudioUrls.length, nextAudioFiles.length);
@@ -1204,7 +1302,11 @@ export default function UploadPage() {
 
     const loadDraft = async () => {
       try {
-        const response = await fetch('/api/releases/draft', { cache: 'no-store' });
+        const endpoint =
+          requestedDraftId && requestedDraftId !== '1'
+            ? `/api/releases/draft?id=${encodeURIComponent(requestedDraftId)}`
+            : '/api/releases/draft';
+        const response = await fetch(endpoint, { cache: 'no-store' });
         const payload = await response.json().catch(() => null);
         if (response.ok && payload?.success && payload?.draft?.status === 'draft') {
           applyDraft(payload.draft);
@@ -1212,6 +1314,7 @@ export default function UploadPage() {
         }
 
         const candidateKeys = [
+          `${RELEASE_DRAFT_PREFIX}${releaseDraftUserId || 'anonymous'}.${requestedDraftId}`,
           releaseDraftKey,
           RELEASE_DRAFT_BACKUP_KEY,
           `${RELEASE_DRAFT_PREFIX}anonymous`,
@@ -1239,7 +1342,7 @@ export default function UploadPage() {
   }, [editReleaseId, mounted, releaseDraftKey, releaseDraftUserId]);
 
   useEffect(() => {
-    if (!mounted || !releaseDraftReady || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+    if (!mounted || !releaseDraftReady || !releaseDraftId || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
 
     const draft = buildReleaseDraft();
     if (!releaseDraftHasData(draft)) return;
@@ -1270,6 +1373,7 @@ export default function UploadPage() {
     originalReleaseDate,
     releaseDate,
     releaseDraftKey,
+    releaseDraftId,
     releaseDraftReady,
     releaseDraftUserId,
     releaseTitle,
@@ -1279,6 +1383,7 @@ export default function UploadPage() {
     rightsType,
     selectedDSPs,
     socialDistributionTermsAccepted,
+    summaryDeclarationAccepted,
     submitState,
     territoryCountries,
     territoryMode,
@@ -1287,9 +1392,10 @@ export default function UploadPage() {
   ]);
 
   useEffect(() => {
-    if (!mounted || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+    if (!mounted || !releaseDraftId || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
 
     const persistBeforeExit = () => {
+      if (submitSucceededRef.current) return;
       const draft = buildReleaseDraft();
       if (!releaseDraftHasData(draft)) return;
       persistReleaseDraftLocally(draft);
@@ -1324,6 +1430,7 @@ export default function UploadPage() {
     originalReleaseDate,
     releaseDate,
     releaseDraftKey,
+    releaseDraftId,
     releaseDraftUserId,
     releaseTitle,
     releaseType,
@@ -1332,6 +1439,7 @@ export default function UploadPage() {
     rightsType,
     selectedDSPs,
     socialDistributionTermsAccepted,
+    summaryDeclarationAccepted,
     submitState,
     territoryCountries,
     territoryMode,
@@ -1486,8 +1594,9 @@ export default function UploadPage() {
 
   const validateTrackFile = (file: File | null) => {
     if (!file) return 'No file selected';
-    if (!['audio/mpeg', 'audio/wav', 'audio/flac'].includes(file.type))
-      return 'Invalid audio format (mp3, wav, flac only)';
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!allowedAudioExtensions.includes(extension))
+      return `Invalid audio format. Allowed: ${allowedAudioExtensions.join(', ')}`;
     if (file.size > maxUploadSizeMb * 1024 * 1024)
       return `${file.name} is ${formatFileSizeMb(file.size)}. Admin upload limit is ${maxUploadSizeMb}MB.`;
     return '';
@@ -1730,6 +1839,41 @@ export default function UploadPage() {
 
   const handleBack = () => {
     setActiveStep(prevActiveStep => prevActiveStep - 1);
+  };
+
+  const isWizardStepComplete = (index: number) => {
+    switch (index) {
+      case 0:
+        return Boolean(releaseTitle.trim());
+      case 1:
+        return Boolean(artworkUploadedUrl);
+      case 2:
+        return Boolean(isTrackInfoListValid && allAudioUploadsReady);
+      case 3:
+        return isDistributionValid;
+      case 4:
+        return Boolean(rightsType) && territoryCountries.length > 0;
+      case 5:
+        return summaryDeclarationAccepted;
+      default:
+        return false;
+    }
+  };
+
+  const canNavigateToStep = (targetIndex: number) => {
+    if (targetIndex <= activeStep) return true;
+    for (let index = activeStep; index < targetIndex; index += 1) {
+      if (!isWizardStepComplete(index)) return false;
+    }
+    return true;
+  };
+
+  const handleStepNavigation = (targetIndex: number, label: string) => {
+    if (!canNavigateToStep(targetIndex)) {
+      toast.error(`Complete ${steps[activeStep]} before opening ${label}.`);
+      return;
+    }
+    setActiveStep(targetIndex);
   };
 
   // Helper: analyze and upload one track (reuses same logic as handleTrackFileChange)
@@ -2303,6 +2447,10 @@ export default function UploadPage() {
                   !!artworkError || !artworkPreview || artworkValidating || artworkUploading
                 }
                 onClick={async () => {
+                  if (artworkUploadedUrl && !artworkFile) {
+                    handleNext();
+                    return;
+                  }
                   if (!artworkFile || artworkValidating || artworkUploading) return;
                   try {
                     setArtworkUploading(true);
@@ -2480,7 +2628,7 @@ export default function UploadPage() {
                   <input
                     id="multi-track-upload"
                     type="file"
-                    accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                    accept={allowedAudioExtensions.map(extension => `.${extension}`).join(',')}
                     multiple
                     style={{ display: 'none' }}
                     onChange={e => {
@@ -2501,7 +2649,7 @@ export default function UploadPage() {
                   <input
                     ref={appendTracksInputRef}
                     type="file"
-                    accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                    accept={allowedAudioExtensions.map(extension => `.${extension}`).join(',')}
                     multiple
                     style={{ display: 'none' }}
                     onChange={e => {
@@ -2579,7 +2727,7 @@ export default function UploadPage() {
                             <input
                               id={`track-replace-${idx}`}
                               type="file"
-                              accept="audio/mpeg,audio/wav,audio/flac,.mp3,.wav,.flac"
+                              accept={allowedAudioExtensions.map(extension => `.${extension}`).join(',')}
                               style={{ display: 'none' }}
                               onChange={e => {
                                 const next = e.target.files?.[0];
@@ -2967,13 +3115,23 @@ export default function UploadPage() {
                           color="text.secondary"
                           sx={{ display: 'block', mb: 1 }}
                         >
-                          Add credits here. Include at least one row with role{' '}
-                          <strong>Artist</strong> (required). Use <strong>Performer</strong> for
+                          Add credits here. <strong>Artist</strong>, <strong>Composer</strong>, and{' '}
+                          <strong>Lyricist</strong> are required. Use <strong>Performer</strong> for
                           featuring guests.
                         </Typography>
-                        {selectedTrackMissingArtist && (
+                        {(selectedTrackMissingArtist ||
+                          selectedTrackMissingComposer ||
+                          selectedTrackMissingLyricist) && (
                           <Alert severity="warning" sx={{ mb: 1.5 }}>
-                            Add at least one contributor with role Artist and a name.
+                            Add a named contributor for each required role:{' '}
+                            {[
+                              selectedTrackMissingArtist && 'Artist',
+                              selectedTrackMissingComposer && 'Composer',
+                              selectedTrackMissingLyricist && 'Lyricist',
+                            ]
+                              .filter(Boolean)
+                              .join(', ')}
+                            .
                           </Alert>
                         )}
                         <Box
@@ -3047,13 +3205,19 @@ export default function UploadPage() {
                                     )
                                   }
                                   error={
-                                    selectedTrackMissingArtist &&
-                                    contributor.role === 'artist' &&
+                                    ((selectedTrackMissingArtist && contributor.role === 'artist') ||
+                                      (selectedTrackMissingComposer &&
+                                        contributor.role === 'composer') ||
+                                      (selectedTrackMissingLyricist &&
+                                        contributor.role === 'lyricist')) &&
                                     !contributor.name.trim()
                                   }
                                   helperText={
-                                    selectedTrackMissingArtist &&
-                                    contributor.role === 'artist' &&
+                                    ((selectedTrackMissingArtist && contributor.role === 'artist') ||
+                                      (selectedTrackMissingComposer &&
+                                        contributor.role === 'composer') ||
+                                      (selectedTrackMissingLyricist &&
+                                        contributor.role === 'lyricist')) &&
                                     !contributor.name.trim()
                                       ? 'Required'
                                       : ''
@@ -3657,7 +3821,7 @@ export default function UploadPage() {
                           }}
                         >
                           <Typography variant="overline" color="text.secondary" fontWeight={900}>
-                            Social delivery and rights management
+                            Rights management
                           </Typography>
                         </Box>
                       )}
@@ -3731,7 +3895,10 @@ export default function UploadPage() {
                 mt: 2.5,
                 p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
-                borderColor: distributionTermsAccepted ? 'success.main' : 'divider',
+                borderColor:
+                  !requiresYoutubeTerms || distributionTermsAccepted
+                    ? 'success.main'
+                    : 'warning.main',
                 bgcolor: theme =>
                   theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.025)' : 'rgba(15,23,42,0.02)',
               }}
@@ -3741,15 +3908,30 @@ export default function UploadPage() {
                   <Checkbox
                     checked={distributionTermsAccepted}
                     onChange={event => setDistributionTermsAccepted(event.target.checked)}
-                    inputProps={{ 'aria-label': 'Agree to terms and conditions' }}
+                    inputProps={{ 'aria-label': 'Accept the YouTube Content ID policy' }}
                   />
                 }
                 label={
                   <Typography variant="body2" fontWeight={800}>
-                    I agree to terms & conditions
+                    I accept the YouTube Content ID policy.{' '}
+                    <Box
+                      component="a"
+                      href={YOUTUBE_CONTENT_ID_TERMS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={event => event.stopPropagation()}
+                      sx={{ color: 'primary.main', textDecoration: 'underline', fontWeight: 900 }}
+                    >
+                      Terms
+                    </Box>
                   </Typography>
                 }
               />
+              {requiresYoutubeTerms && !distributionTermsAccepted && (
+                <Typography variant="caption" color="warning.main" sx={{ display: 'block', pl: 4 }}>
+                  Required because a YouTube provider is selected.
+                </Typography>
+              )}
             </Paper>
             <Paper
               variant="outlined"
@@ -3758,7 +3940,7 @@ export default function UploadPage() {
                 p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
                 borderColor:
-                  !requiresSocialDistributionTerms || socialDistributionTermsAccepted
+                  !requiresFacebookTerms || socialDistributionTermsAccepted
                     ? 'success.main'
                     : 'warning.main',
                 bgcolor: theme =>
@@ -3770,27 +3952,28 @@ export default function UploadPage() {
                   <Checkbox
                     checked={socialDistributionTermsAccepted}
                     onChange={event => setSocialDistributionTermsAccepted(event.target.checked)}
-                    inputProps={{ 'aria-label': 'Agree to Facebook and YouTube terms' }}
+                    inputProps={{ 'aria-label': 'Accept the Facebook Rights Manager policy' }}
                   />
                 }
                 label={
                   <Typography variant="body2" fontWeight={800}>
-                    I confirm this release complies with Facebook, YouTube, WhatsApp, and rights-management delivery terms.{' '}
+                    I accept the Facebook Rights Manager policy.{' '}
                     <Box
                       component="a"
-                      href="/terms/facebook-youtube"
+                      href={FACEBOOK_RIGHTS_MANAGER_TERMS_URL}
                       target="_blank"
                       rel="noopener noreferrer"
-                      sx={{ color: 'primary.main', textDecoration: 'none', fontWeight: 900 }}
+                      onClick={event => event.stopPropagation()}
+                      sx={{ color: 'primary.main', textDecoration: 'underline', fontWeight: 900 }}
                     >
-                      Terms and conditions
+                      Terms
                     </Box>
                   </Typography>
                 }
               />
-              {requiresSocialDistributionTerms && !socialDistributionTermsAccepted && (
+              {requiresFacebookTerms && !socialDistributionTermsAccepted && (
                 <Typography variant="caption" color="warning.main" sx={{ display: 'block', pl: 4 }}>
-                  Required because a social delivery or rights-management provider is selected.
+                  Required because Facebook Rights Management is selected.
                 </Typography>
               )}
             </Paper>
@@ -4295,6 +4478,47 @@ export default function UploadPage() {
                 </Box>
               </Box>
             </Paper>
+            <Paper
+              variant="outlined"
+              sx={{
+                mt: 2,
+                p: { xs: 1.5, sm: 2 },
+                borderRadius: 2,
+                borderColor: summaryDeclarationAccepted ? 'success.main' : 'warning.main',
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={900} sx={{ mb: 0.75 }}>
+                Final declaration
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={summaryDeclarationAccepted}
+                    onChange={event => setSummaryDeclarationAccepted(event.target.checked)}
+                    inputProps={{ 'aria-label': 'Accept final release declaration' }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" fontWeight={750}>
+                    I accept and confirm that the release information, rights, contributors, audio,
+                    artwork, territories, and selected platforms are accurate.
+                  </Typography>
+                }
+              />
+              <Stack spacing={0.5} sx={{ pl: 4 }}>
+                {requiresYoutubeTerms && (
+                  <Typography variant="caption" color="text.secondary">
+                    YouTube Content ID policy: {distributionTermsAccepted ? 'Accepted' : 'Not accepted'}
+                  </Typography>
+                )}
+                {requiresFacebookTerms && (
+                  <Typography variant="caption" color="text.secondary">
+                    Facebook Rights Manager policy:{' '}
+                    {socialDistributionTermsAccepted ? 'Accepted' : 'Not accepted'}
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
             {submitState === 'idle' ? (
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
                 <Button onClick={handleBack} sx={{ borderRadius: 2 }}>
@@ -4305,7 +4529,13 @@ export default function UploadPage() {
                   color="primary"
                   sx={{ borderRadius: 2, px: 3 }}
                   onClick={handleSubmitRelease}
-                  disabled={!isTrackInfoListValid}
+                  disabled={
+                    !isTrackInfoListValid ||
+                    !isDistributionValid ||
+                    !rightsType ||
+                    territoryCountries.length === 0 ||
+                    !summaryDeclarationAccepted
+                  }
                 >
                   {isEditMode ? 'Update & Resubmit' : 'Submit Release'}
                 </Button>
@@ -4400,22 +4630,23 @@ export default function UploadPage() {
           }}
         >
           {steps.map((label, index) => (
-            <Step key={label}>
+            <Step key={label} completed={isWizardStepComplete(index)}>
               <StepLabel
                 sx={{
-                  cursor: 'pointer',
+                  cursor: canNavigateToStep(index) ? 'pointer' : 'not-allowed',
                   '& .Mui-active': { fontWeight: 700 },
                   '& .Mui-completed': { fontWeight: 600 },
                 }}
-                onClick={() => setActiveStep(index)}
+                onClick={() => handleStepNavigation(index, label)}
                 componentsProps={{
                   label: {
                     role: 'button',
                     tabIndex: 0,
+                    'aria-disabled': !canNavigateToStep(index),
                     onKeyDown: (e: React.KeyboardEvent) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setActiveStep(index);
+                        handleStepNavigation(index, label);
                       }
                     },
                     'aria-label': `Go to ${label}`,

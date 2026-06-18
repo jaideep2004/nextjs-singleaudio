@@ -1,6 +1,7 @@
 import tls from 'tls';
 import { Db } from 'mongodb';
 import { getDspMeta } from '@/lib/platforms';
+import type { ReleasePolicyAcceptances } from '@/lib/releaseConsent';
 
 type Recipient = {
   email?: string;
@@ -28,6 +29,7 @@ type ReleaseEmailSummary = {
   status?: string;
   tracks?: Array<{ title?: string; duration?: string; primaryArtist?: string; artist?: string }>;
   stores?: string[];
+  policyAcceptances?: ReleasePolicyAcceptances;
 };
 
 const getFrontendUrl = () =>
@@ -47,6 +49,11 @@ const escapeHtml = (value: unknown) =>
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+
+const formatDetailLabel = (label: string) =>
+  label
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
 
 const readSmtpResponse = (socket: tls.TLSSocket): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -85,7 +92,7 @@ const renderDetails = (details?: ActionEmail['details']) => {
         .map(
           ([label, value]) => `
         <tr>
-          <td style="padding:14px 16px;background:#fbf7ff;color:#6b6070;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%;border-bottom:1px solid #f1e9f3">${escapeHtml(label)}</td>
+          <td style="padding:14px 16px;background:#fbf7ff;color:#6b6070;font:700 12px Arial,sans-serif;text-transform:uppercase;letter-spacing:.04em;width:38%;border-bottom:1px solid #f1e9f3">${escapeHtml(formatDetailLabel(label))}</td>
           <td style="padding:14px 16px;color:#171018;font:700 14px Arial,sans-serif;border-bottom:1px solid #f1e9f3">${escapeHtml(value)}</td>
         </tr>
       `
@@ -101,7 +108,10 @@ const renderReleaseSummary = (release?: ReleaseEmailSummary) => {
   const tracks = Array.isArray(release.tracks)
     ? release.tracks.filter(track => track?.title).slice(0, 16)
     : [];
-  const stores = Array.isArray(release.stores) ? release.stores.filter(Boolean).slice(0, 40) : [];
+  const stores = Array.isArray(release.stores)
+    ? Array.from(new Set(release.stores.filter(Boolean)))
+    : [];
+  const policyAcceptances = release.policyAcceptances;
   const facts = [
     ['Artist', release.artist],
     ['Label', release.label],
@@ -114,7 +124,7 @@ const renderReleaseSummary = (release?: ReleaseEmailSummary) => {
   return `
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:28px;border-collapse:separate;border-spacing:0">
       <tr>
-        <td style="padding:16px 18px;border-radius:14px 14px 0 0;background:linear-gradient(135deg,#31c4df,#2c8bd2);color:#ffffff;font:900 22px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase">
+        <td style="padding:16px 18px;border-radius:14px 14px 0 0;background:linear-gradient(135deg,#13061f 0%,#7b1fa2 70%,#ed1e79 130%);color:#ffffff;font:900 22px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase">
           Release overview
         </td>
       </tr>
@@ -168,7 +178,7 @@ const renderReleaseSummary = (release?: ReleaseEmailSummary) => {
               ? `
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-collapse:separate;border-spacing:0">
               <tr>
-                <td style="padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#31c4df,#2c8bd2);color:#ffffff;font:900 18px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase">Chosen platforms</td>
+                <td style="padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,#13061f 0%,#7b1fa2 70%,#ed1e79 130%);color:#ffffff;font:900 18px Arial,sans-serif;letter-spacing:.08em;text-transform:uppercase">Chosen platforms</td>
               </tr>
             </table>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px">
@@ -190,6 +200,33 @@ const renderReleaseSummary = (release?: ReleaseEmailSummary) => {
           `
               : ''
           }
+          ${
+            policyAcceptances
+              ? `
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-collapse:collapse;border:1px solid #eadff0;border-radius:14px">
+              <tr>
+                <td colspan="2" style="padding:14px 16px;background:#fbf7ff;color:#171018;font:900 15px Arial,sans-serif">Policy acceptance proof</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#6b6070;font:700 12px Arial,sans-serif">YouTube Content ID</td>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#171018;font:700 12px Arial,sans-serif">${policyAcceptances.youtubeContentId.accepted ? 'Accepted' : 'Not required'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#6b6070;font:700 12px Arial,sans-serif">Facebook Rights Manager</td>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#171018;font:700 12px Arial,sans-serif">${policyAcceptances.facebookRightsManager.accepted ? 'Accepted' : 'Not required'}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#6b6070;font:700 12px Arial,sans-serif">Final declaration</td>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#171018;font:700 12px Arial,sans-serif">Accepted ${escapeHtml(policyAcceptances.acceptedAt ? new Date(policyAcceptances.acceptedAt).toISOString() : '')}</td>
+              </tr>
+              <tr>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#6b6070;font:700 12px Arial,sans-serif">Accepted by</td>
+                <td style="padding:10px 16px;border-top:1px solid #f0e6ee;color:#171018;font:700 12px Arial,sans-serif">${escapeHtml(policyAcceptances.acceptedBy?.email || policyAcceptances.acceptedBy?.name || policyAcceptances.acceptedBy?.userId || '')}</td>
+              </tr>
+            </table>
+          `
+              : ''
+          }
         </td>
       </tr>
     </table>
@@ -206,7 +243,7 @@ const renderHtml = ({ title, intro, details, release, actionLabel, actionUrl }: 
             <table role="presentation"  cellpadding="0" cellspacing="0" style="width:100%; background:#ffffff;border-radius:22px;overflow:hidden;border:1px solid #eadff0;box-shadow:0 18px 45px rgba(28,18,34,.12)">
               <tr>
                 <td style="padding:28px 36px;background:linear-gradient(135deg,#13061f 0%,#26123a 54%,#ed1e79 135%);color:#ffffff;border-bottom:4px solid #ed1e79">
-                  <img src="${escapeHtml(getLogoUrl())}" alt="SingleAudio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
+                  <img src="${escapeHtml(getLogoUrl())}" alt="Single Audio Distribution" width="228" draggable="false" style="display:block;max-width:228px;height:auto;margin:0;pointer-events:none;user-select:none" />
                 </td>
               </tr>
               <tr>
@@ -216,8 +253,8 @@ const renderHtml = ({ title, intro, details, release, actionLabel, actionUrl }: 
                   ${renderDetails(details)}
                   ${renderReleaseSummary(release)}
                   ${actionLabel && actionUrl ? `<a href="${escapeHtml(actionUrl)}" style="display:inline-block;margin-top:28px;padding:14px 22px;border-radius:14px;background:linear-gradient(135deg,#ed1e79,#7b1fa2);color:#ffffff;text-decoration:none;font:900 14px Arial,sans-serif;box-shadow:0 14px 26px rgba(237,30,121,.22)">${escapeHtml(actionLabel)}</a>` : ''}
-                  <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">SingleAudio Help Center</a>.</p>
-                  <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} SingleAudio Distribution. All rights reserved.</p>
+                  <p style="margin:32px 0 0;padding-top:18px;border-top:1px solid #f0e6ee;color:#8d808c;font:500 12px/1.6 Arial,sans-serif">Need help? Visit <a href="${escapeHtml(getHelpCenterUrl())}" style="color:#7b1fa2;text-decoration:none;font-weight:800">Single Audio Help Center</a>.</p>
+                  <p style="margin:6px 0 0;color:#aaa0aa;font:400 11px/1.5 Arial,sans-serif">Copyright ${new Date().getFullYear()} Single Audio Distribution. All rights reserved.</p>
                 </td>
               </tr>
             </table>
@@ -266,7 +303,7 @@ const sendOne = async (recipient: string, email: ActionEmail) => {
   await smtpCommand(socket, 'DATA');
 
   const message = [
-    `From: SingleAudio Distribution <${user}>`,
+    `From: Single Audio Distribution <${user}>`,
     `To: ${recipient}`,
     `Subject: ${email.subject}`,
     'MIME-Version: 1.0',
@@ -318,7 +355,7 @@ const createEmailNotifications = async (db: Db, recipients: string[], email: Act
       }))
     );
   } catch (error) {
-    console.warn('SingleAudio Distribution email notification skipped:', error);
+    console.warn('Single Audio Distribution email notification skipped:', error);
   }
 };
 
@@ -340,7 +377,7 @@ export const sendActionEmail = async (recipients: Recipient[], email: ActionEmai
   const results = await Promise.allSettled(to.map(recipient => sendOne(recipient, email)));
   results.forEach(result => {
     if (result.status === 'rejected')
-      console.warn('SingleAudio Distribution email skipped:', result.reason);
+      console.warn('Single Audio Distribution email skipped:', result.reason);
   });
 
   if (db) await createEmailNotifications(db, to, email);

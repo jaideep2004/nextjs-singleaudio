@@ -40,7 +40,8 @@ const supportMessageBody = (message: any) =>
 
 function UserSupportContent() {
   const searchParams = useSearchParams();
-  const requestedTicketId = searchParams.get('ticket') || '';
+  const ticketParam = searchParams.get('ticket') || '';
+  const requestedTicketId = /^[a-f\d]{24}$/i.test(ticketParam) ? ticketParam : '';
   const [tickets, setTickets] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [ticketDetail, setTicketDetail] = useState<any | null>(null);

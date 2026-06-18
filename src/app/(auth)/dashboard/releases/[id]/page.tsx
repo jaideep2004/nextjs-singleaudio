@@ -29,7 +29,6 @@ import {
   GraphicEq,
   InfoOutlined,
   MusicNote,
-  Pause,
   PlayArrow,
   Replay,
   Store,
@@ -46,6 +45,7 @@ import {
   getAcrCloudSummary,
 } from '@/lib/acrCloud';
 import { getDspDisplayName } from '@/lib/platforms';
+import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
 
 type Track = {
   _id?: string;
@@ -163,8 +163,9 @@ function ReleaseDetail() {
   const [release, setRelease] = useState<Release | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [playingTrack, setPlayingTrack] = useState<string | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+  const [playerIndex, setPlayerIndex] = useState(0);
+  const [playerRequestId, setPlayerRequestId] = useState(0);
+  const [playerVisible, setPlayerVisible] = useState(false);
   const [resubmitting, setResubmitting] = useState(false);
 
   useEffect(() => {
@@ -200,12 +201,6 @@ function ReleaseDetail() {
       mounted = false;
     };
   }, [releaseId]);
-
-  useEffect(() => {
-    return () => {
-      audioElement?.pause();
-    };
-  }, [audioElement]);
 
   useEffect(() => {
     if (!Array.isArray(release?.tracks)) return;
@@ -260,8 +255,22 @@ function ReleaseDetail() {
   }, [release]);
 
   const tracks = useMemo(() => (Array.isArray(release?.tracks) ? release.tracks : []), [release?.tracks]);
-  const statusStyle = getStatusStyle(release?.status, isDark);
   const artistName = release?.primaryArtist || release?.artist || 'Unknown artist';
+  const playableTracks = useMemo(
+    () =>
+      tracks
+        .map((track, sourceIndex) => ({
+          id: track._id || `track-${sourceIndex}`,
+          title: track.title || `Track ${sourceIndex + 1}`,
+          artist: artistName,
+          audioUrl: track.audioUrl || '',
+          artworkUrl: track.artworkUrl || release?.artworkUrl,
+          sourceIndex,
+        }))
+        .filter(track => Boolean(track.audioUrl)),
+    [artistName, release?.artworkUrl, tracks]
+  );
+  const statusStyle = getStatusStyle(release?.status, isDark);
   const stores = Array.isArray(release?.stores) ? release.stores : [];
   const readyAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'ready').length;
   const pendingAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'pending').length;
@@ -270,21 +279,12 @@ function ReleaseDetail() {
   const releaseGenre = release?.genre || firstTrack?.genre || '';
   const releaseSubGenre = release?.subGenre || firstTrack?.subGenre || '';
 
-  const handlePlayPause = (trackId: string, audioUrl?: string) => {
-    if (!audioUrl) return;
-
-    if (playingTrack === trackId) {
-      audioElement?.pause();
-      setPlayingTrack(null);
-      return;
-    }
-
-    audioElement?.pause();
-    const nextAudio = new Audio(audioUrl);
-    nextAudio.onended = () => setPlayingTrack(null);
-    nextAudio.play().catch(() => setPlayingTrack(null));
-    setAudioElement(nextAudio);
-    setPlayingTrack(trackId);
+  const handlePlayPause = (trackId: string) => {
+    const nextIndex = playableTracks.findIndex(track => track.id === trackId);
+    if (nextIndex < 0) return;
+    setPlayerIndex(nextIndex);
+    setPlayerRequestId(value => value + 1);
+    setPlayerVisible(true);
   };
 
   const handleResubmit = async () => {
@@ -596,6 +596,32 @@ function ReleaseDetail() {
             </Stack>
           </Box>
 
+          {playerVisible && playableTracks.length > 0 && (
+            <Box sx={{ px: { xs: 1.5, sm: 2.5 }, pb: 2 }}>
+              <PremiumAudioPlayer
+                tracks={playableTracks}
+                requestedIndex={playerIndex}
+                requestId={playerRequestId}
+                onDuration={(index, durationSeconds) => {
+                  const sourceIndex = playableTracks[index]?.sourceIndex;
+                  if (sourceIndex === undefined) return;
+                  setRelease(current =>
+                    current
+                      ? {
+                          ...current,
+                          tracks: current.tracks?.map((item, itemIndex) =>
+                            itemIndex === sourceIndex && !item.duration
+                              ? { ...item, duration: durationSeconds }
+                              : item
+                          ),
+                        }
+                      : current
+                  );
+                }}
+              />
+            </Box>
+          )}
+
           <Box
             sx={{
               display: { xs: 'none', md: 'grid' },
@@ -654,8 +680,8 @@ function ReleaseDetail() {
                       </Avatar>
                       {track.audioUrl && (
                         <IconButton
-                          aria-label={playingTrack === trackId ? 'Pause track' : 'Play track'}
-                          onClick={() => handlePlayPause(trackId, track.audioUrl)}
+                          aria-label={`Play ${track.title || `Track ${index + 1}`}`}
+                          onClick={() => handlePlayPause(trackId)}
                           size="small"
                           sx={{
                             position: 'absolute',
@@ -663,14 +689,14 @@ function ReleaseDetail() {
                             width: '100%',
                             height: '100%',
                             borderRadius: '8px',
-                            bgcolor: playingTrack === trackId ? 'rgba(74,108,247,0.88)' : 'rgba(0,0,0,0.48)',
-                            opacity: playingTrack === trackId ? 1 : 0,
+                            bgcolor: 'rgba(0,0,0,0.48)',
+                            opacity: 0,
                             color: '#fff',
                             transition: 'opacity 150ms ease',
                             '&:hover': { opacity: 1 },
                           }}
                         >
-                          {playingTrack === trackId ? <Pause sx={{ fontSize: 18 }} /> : <PlayArrow sx={{ fontSize: 18 }} />}
+                          <PlayArrow sx={{ fontSize: 18 }} />
                         </IconButton>
                       )}
                     </Box>

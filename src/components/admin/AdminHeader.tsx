@@ -26,7 +26,6 @@ import {
   DarkMode,
   LightMode,
   MarkEmailRead,
-  Search as SearchIcon,
   Shield as ShieldIcon,
 } from '@mui/icons-material';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -36,6 +35,7 @@ import { isSubadmin } from '@/lib/adminAccess';
 import { removeAuthTokenCookie } from '@/lib/authCookie';
 import { getNotificationTitle } from '@/lib/notificationTitles';
 import { getNotificationRoute } from '@/lib/notificationRoutes';
+import DashboardSearch from '@/components/navigation/DashboardSearch';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -138,20 +138,10 @@ export default function AdminHeader() {
 
         {/* Right: Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-          {/* Search */}
-          <Tooltip title="Search">
-            <IconButton
-              size="small"
-              sx={{
-                width: 36,
-                height: 36,
-                color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)',
-                '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.04)' },
-              }}
-            >
-              <SearchIcon sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Tooltip>
+          <DashboardSearch
+            audience="admin"
+            iconColor={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(15,23,42,0.5)'}
+          />
 
           {/* Theme toggle */}
           <Tooltip title={isDark ? 'Light Mode' : 'Dark Mode'}>
@@ -355,10 +345,10 @@ export default function AdminHeader() {
               sx={{
                 width: 30,
                 height: 30,
-                bgcolor: isDark ? '#ffffff' : '#ffffff',
+                bgcolor: isDark ? '#334155' : '#e2e8f0',
                 fontSize: '0.8rem',
                 fontWeight: 700,
-                color: isDark ? '#ffffff' : '#ffffff',
+                color: isDark ? '#ffffff' : '#1e293b',
                 '& img': {
                   objectFit: 'contain',
                 },
@@ -411,12 +401,12 @@ export default function AdminHeader() {
               width: '100%',
               justifyContent: 'flex-start',
               bgcolor: isDark ? 'rgba(239, 68, 68, 0.08)' : 'rgba(239, 68, 68, 0.06)',
-              color: isDark ? '#ffffff' : '#ffffff',
+              color: isDark ? '#fca5a5' : '#991b1b',
               border: '1px solid',
               borderColor: isDark ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.14)',
               fontWeight: 700,
               '& .MuiChip-icon': {
-                color: isDark ? '#ffffff' : '#ffffff',
+                color: isDark ? '#fca5a5' : '#b91c1c',
               },
             }}
           />

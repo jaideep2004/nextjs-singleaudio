@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Avatar,
   Box,
@@ -13,12 +13,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
   Paper,
   Stack,
   TextField,
   Typography,
-  useTheme,
   Card,
   CardContent,
   IconButton,
@@ -26,7 +24,6 @@ import {
   FormControlLabel,
 } from "@mui/material";
 import {
-  Album,
   CheckCircle,
   Pending,
   Cancel,
@@ -35,9 +32,7 @@ import {
   ThumbDown,
   Info,
   MusicNote,
-  Link as LinkIcon,
   PlayArrow,
-  Pause,
   PlaylistAddCheck,
   Delete,
   Replay,
@@ -54,10 +49,10 @@ import {
   getAcrCloudRightsClaims,
   getAcrCloudState,
   getAcrCloudSummary,
-  stringifyAcrCloudRawResult,
 } from '@/lib/acrCloud';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
+import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
 
 const formatAcrProbability = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
@@ -77,9 +72,23 @@ const formatAcrTimeRange = (start?: number, end?: number) => {
   return startText && endText ? `${startText}-${endText}` : null;
 };
 
+const formatTrackDuration = (value?: string | number) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return 'N/A';
+    if (/^\d+:\d{2}$/.test(trimmed)) return trimmed;
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed)) return 'N/A';
+    value = parsed;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 'N/A';
+  const minutes = Math.floor(value / 60);
+  const seconds = Math.round(value % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
 export default function AdminReleaseDetailPage() {
   const router = useRouter();   
-  const theme = useTheme();
   const { mode } = useColorMode();
   const params = useParams<{ id: string }>();
   const releaseId = params?.id as string;
@@ -89,8 +98,9 @@ export default function AdminReleaseDetailPage() {
   const [lifecycleSaving, setLifecycleSaving] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [release, setRelease] = useState<any | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
+  const [playerIndex, setPlayerIndex] = useState(0);
+  const [playerRequestId, setPlayerRequestId] = useState(0);
+  const [playerVisible, setPlayerVisible] = useState(false);
   const acrRefreshRef = useRef<Record<string, boolean>>({});
 
   const [rejectOpen, setRejectOpen] = useState(false);
@@ -140,7 +150,7 @@ export default function AdminReleaseDetailPage() {
             setRelease(null);
           }
         }
-      } catch (e) {
+      } catch {
         if (mounted) {
           setError("An error occurred while loading the release.");
           setRelease(null);
@@ -152,11 +162,6 @@ export default function AdminReleaseDetailPage() {
     if (releaseId) load();
     return () => {
       mounted = false;
-      // Clean up audio element
-      if (audioElement) {
-        audioElement.pause();
-        setAudioElement(null);
-      }
     };
   }, [releaseId]);
 
@@ -338,34 +343,6 @@ export default function AdminReleaseDetailPage() {
     }
   };
 
-  const handlePlayTrack = (audioUrl: string, trackId: string) => {
-    if (!audioUrl) return;
-    
-    if (currentlyPlaying === trackId) {
-      // Pause if same track
-      if (audioElement) {
-        audioElement.pause();
-        setCurrentlyPlaying(null);
-      }
-    } else {
-      // Stop current audio if playing
-      if (audioElement) {
-        audioElement.pause();
-      }
-      
-      // Create new audio element
-      const audio = new Audio(audioUrl);
-      audio.play();
-      setAudioElement(audio);
-      setCurrentlyPlaying(trackId);
-      
-      // Handle audio end
-      audio.onended = () => {
-        setCurrentlyPlaying(null);
-      };
-    }
-  };
-
   const handleConfirmTakedown = () => {
     if (!takedownTarget) return;
     void handleLifecycleAction(
@@ -380,6 +357,46 @@ export default function AdminReleaseDetailPage() {
   };
 
   const firstTrack = Array.isArray(release?.tracks) ? release.tracks[0] : null;
+  const releaseTracks = Array.isArray(release?.tracks)
+    ? release.tracks
+    : Array.isArray(release?.tracks?.data)
+      ? release.tracks.data
+      : [];
+  const playableTracks = releaseTracks
+    .map((track: any, sourceIndex: number) => ({
+      id: String(track._id || track.id || sourceIndex),
+      title: track.title || track.name || `Track ${sourceIndex + 1}`,
+      artist: release?.primaryArtist || release?.artist || release?.ownerName,
+      audioUrl: track.audioUrl || track.audioFile || track.audio || '',
+      artworkUrl: track.artworkUrl || release?.artworkUrl,
+      sourceIndex,
+    }))
+    .filter((track: any) => Boolean(track.audioUrl));
+  const handlePlayTrack = (trackId: string) => {
+    const nextIndex = playableTracks.findIndex((track: any) => track.id === trackId);
+    if (nextIndex < 0) return;
+    setPlayerIndex(nextIndex);
+    setPlayerRequestId(value => value + 1);
+    setPlayerVisible(true);
+  };
+  const handlePlayerDuration = useCallback((index: number, durationSeconds: number) => {
+    const sourceIndex = playableTracks[index]?.sourceIndex;
+    if (sourceIndex === undefined) return;
+    setRelease((current: any) =>
+      current
+        ? {
+            ...current,
+            tracks: Array.isArray(current.tracks)
+              ? current.tracks.map((item: any, itemIndex: number) =>
+                  itemIndex === sourceIndex && !item.duration
+                    ? { ...item, duration: durationSeconds }
+                    : item
+                )
+              : current.tracks,
+          }
+        : current
+    );
+  }, [playableTracks]);
   const releaseGenre = release?.genre || firstTrack?.genre || '';
   const releaseSubgenre = release?.subGenre || release?.subgenre || firstTrack?.subGenre || firstTrack?.subgenre || '';
   const releaseCLine = release?.copyright || release?.cLine || release?.cline || release?.copyrightC || [
@@ -412,6 +429,36 @@ export default function AdminReleaseDetailPage() {
     ['Created', release?.createdAt ? new Date(release.createdAt).toLocaleString() : ''],
     ['Updated', release?.updatedAt ? new Date(release.updatedAt).toLocaleString() : ''],
   ].filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
+  const policyAcceptances = release?.policyAcceptances;
+  const policyProofRows = policyAcceptances
+    ? [
+        [
+          'YouTube Content ID policy',
+          policyAcceptances.youtubeContentId?.accepted ? 'Accepted' : 'Not required',
+        ],
+        [
+          'Facebook Rights Manager policy',
+          policyAcceptances.facebookRightsManager?.accepted ? 'Accepted' : 'Not required',
+        ],
+        [
+          'Final declaration',
+          policyAcceptances.summaryDeclaration?.accepted ? 'Accepted' : 'Not accepted',
+        ],
+        [
+          'Accepted at',
+          policyAcceptances.acceptedAt
+            ? new Date(policyAcceptances.acceptedAt).toLocaleString()
+            : 'Not recorded',
+        ],
+        [
+          'Accepted by',
+          policyAcceptances.acceptedBy?.email ||
+            policyAcceptances.acceptedBy?.name ||
+            policyAcceptances.acceptedBy?.userId ||
+            'Not recorded',
+        ],
+      ]
+    : [];
 
   const InfoRow = ({ label, value }: { label: string; value: any }) => (
     <Stack direction="row" spacing={1} sx={{ my: 0.5 }}>
@@ -503,7 +550,6 @@ export default function AdminReleaseDetailPage() {
     const state = getAcrCloudState(acrCloud);
     const aiDetections = Array.isArray(acrCloud.aiDetection) ? acrCloud.aiDetection : [];
     const fingerprintMatches = Array.isArray(acrCloud.fingerprintMatches) ? acrCloud.fingerprintMatches : [];
-    const rawResult = stringifyAcrCloudRawResult(acrCloud);
 
     return (
       <Paper
@@ -693,12 +739,7 @@ export default function AdminReleaseDetailPage() {
   // Render tracks table
   const renderTracks = () => {
     // Check different possible track structures
-    let tracks = [];
-    if (Array.isArray(release?.tracks)) {
-      tracks = release.tracks;
-    } else if (release?.tracks?.data && Array.isArray(release.tracks.data)) {
-      tracks = release.tracks.data;
-    }
+    const tracks = releaseTracks;
     
     if (tracks.length === 0) {
       return (
@@ -729,6 +770,7 @@ export default function AdminReleaseDetailPage() {
               const title = track.title || track.name || `Track ${index + 1}`;
               const isrc = track.isrc || track.ISRC || 'No ISRC';
               const duration = track.duration || track.length || 0;
+              const isActivePlayerCard = playerVisible && playableTracks[playerIndex]?.sourceIndex === index;
               
               return (
                 <Box 
@@ -772,7 +814,7 @@ export default function AdminReleaseDetailPage() {
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1, flex: '1 1 320px', minWidth: 0, flexWrap: 'wrap' }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {duration ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}` : 'N/A'}
+                      {formatTrackDuration(duration)}
                     </Typography>
                     {track.acrCloud && (
                       <Chip
@@ -815,13 +857,13 @@ export default function AdminReleaseDetailPage() {
                     {audioUrl && (
                       <IconButton
                         size="small"
-                        aria-label={currentlyPlaying === trackId ? 'Pause track' : 'Play track'}
-                        onClick={() => handlePlayTrack(audioUrl, trackId)}
+                        aria-label={`Play ${title}`}
+                        onClick={() => handlePlayTrack(String(trackId))}
                         sx={{
                           bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
                         }}
                       >
-                        {currentlyPlaying === trackId ? <Pause /> : <PlayArrow />}
+                        <PlayArrow />
                       </IconButton>
                     )}
                     <Tooltip title="Delete track from this release">
@@ -841,6 +883,17 @@ export default function AdminReleaseDetailPage() {
                       </span>
                     </Tooltip>
                   </Box>
+                  {isActivePlayerCard && playableTracks.length > 0 && (
+                    <Box sx={{ flex: '1 1 100%', minWidth: 0, pt: 0.5 }}>
+                      <PremiumAudioPlayer
+                        tracks={playableTracks}
+                        requestedIndex={playerIndex}
+                        requestId={playerRequestId}
+                        onDuration={handlePlayerDuration}
+                        onActiveIndexChange={setPlayerIndex}
+                      />
+                    </Box>
+                  )}
                   {track.acrCloud ? (
                     <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
                       {renderAcrCloudReview(track.acrCloud)}
@@ -1154,37 +1207,19 @@ export default function AdminReleaseDetailPage() {
               </Typography>
               {renderTerritories(release.territories || [])}
             </Box>
-            
             <Box>
-              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                Links
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+                Policy acceptance proof
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  }}
-                >
-                  <LinkIcon />
-                </IconButton>
-                <IconButton 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  }}
-                >
-                  <LinkIcon />
-                </IconButton>
-                <IconButton 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
-                  }}
-                >
-                  <LinkIcon />
-                </IconButton>
-              </Box>
+              {policyProofRows.length ? (
+                policyProofRows.map(([label, value]) => (
+                  <InfoRow key={String(label)} label={String(label)} value={value} />
+                ))
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  No policy proof recorded for this legacy release.
+                </Typography>
+              )}
             </Box>
           </Paper>
           

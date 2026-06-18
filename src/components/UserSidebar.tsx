@@ -189,7 +189,7 @@ export default function UserSidebar() {
         {!desktopCollapsed && (
           <Box
             component="img"
-            src={isDark ? '/images/singleaudio-b.png' : '/images/singleaudio-w.png'}
+            src={isDark ? '/images/singleaudio-b1.png' : '/images/singleaudio-w.png'}
             alt="Single Audio"
             sx={{
               width: 195,

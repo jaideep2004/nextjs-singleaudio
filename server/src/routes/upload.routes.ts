@@ -3,6 +3,8 @@ import { uploadAudio, uploadImage, getFileUrl } from '../utils/fileUpload';
 import { protect, authorize } from '../middleware/auth.middleware';
 import { UserRole } from '../config/constants';
 import { isAcrCloudFileScanningConfigured, uploadFirstThirtySecondsForScan } from '../services/acrCloud.service';
+import SettingsModel from '../models/settings.model';
+import fs from 'fs/promises';
 
 const router = Router();
 
@@ -35,6 +37,17 @@ router.post(
   const file = req.file as Express.Multer.File | undefined;
   if (!file) {
     return res.status(400).json({ success: false, error: 'No audio file provided' });
+  }
+  const maxUploadSizeMb = Math.min(
+    200,
+    Math.max(1, Number((await SettingsModel.findOne({ key: 'maxUploadSize' }).lean())?.value || 100))
+  );
+  if (file.size > maxUploadSizeMb * 1024 * 1024) {
+    await fs.unlink(file.path).catch(() => undefined);
+    return res.status(413).json({
+      success: false,
+      error: `Audio file exceeds the ${maxUploadSizeMb} MB admin upload limit`,
+    });
   }
   const filename = file.filename;
   const url = getFileUrl(filename, 'audio');

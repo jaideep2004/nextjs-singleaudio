@@ -81,14 +81,14 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: `SingleAudio Distribution account created for ${user.name}`,
+        subject: `Single Audio Distribution account created for ${user.name}`,
         title: 'Account Created',
         intro: `${user.name} was created by an admin.`,
         details: {
           User: user.name,
           Email: user.email,
           Role: user.role,
-          CreatedBy: 'SingleAudio Distribution',
+          'Created By': 'Single Audio Distribution',
         },
         actionLabel: 'Open Account',
         actionUrl: buildDashboardUrl(user.role === UserRole.ADMIN || user.role === UserRole.SUBADMIN ? '/admin/dashboard' : '/dashboard'),
@@ -303,14 +303,14 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<void>
     void sendUserAndAdminEmail(
       { name: user.name, email: user.email },
       {
-        subject: `SingleAudio Distribution profile updated for ${user.name}`,
+        subject: `Single Audio Distribution profile updated for ${user.name}`,
         title: 'User Profile Updated',
         intro: `${user.name} account details were updated by an admin.`,
         details: {
           User: user.name,
           Email: user.email,
           Role: user.role,
-          UpdatedBy: 'SingleAudio Distribution',
+          'Updated By': 'Single Audio Distribution',
         },
         actionLabel: 'Open User',
         actionUrl: buildDashboardUrl(`/admin/users/${user._id}`),
@@ -402,7 +402,7 @@ export const reviewUserVerification = async (req: AuthRequest, res: Response): P
           Email: user.email,
           Status: status,
           Reason: rejectionReason,
-          ReviewedBy: 'SingleAudio Distribution',
+          'Reviewed By': 'Single Audio Distribution',
         },
         actionLabel: status === 'rejected' ? 'Resubmit KYC' : 'Open Dashboard',
         actionUrl: buildDashboardUrl(status === 'rejected' ? '/dashboard' : '/dashboard'),

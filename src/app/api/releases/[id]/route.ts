@@ -8,6 +8,7 @@ import {
   releasesCollection,
   updateReleaseTracksSnapshot,
 } from '@/lib/repositories/releases';
+import { buildReleasePolicyProof } from '@/lib/releaseConsent';
 
 function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -99,6 +100,11 @@ export async function PATCH(
     const now = new Date();
 
     if (action === 'update_and_resubmit') {
+      const policyAcceptances = buildReleasePolicyProof(
+        body.stores,
+        body.policyAcceptances,
+        user
+      );
       const allowedFields = [
         'releaseType',
         'releaseTitle',
@@ -125,6 +131,7 @@ export async function PATCH(
         tracks,
         {
           ...releaseUpdate,
+          policyAcceptances,
           status: 'pending',
           updatedAt: now,
           resubmittedAt: now,
@@ -147,6 +154,7 @@ export async function PATCH(
               actorEmail: user.email || '',
               createdAt: now,
             },
+            policyAcceptanceEvents: policyAcceptances,
           },
         } as any,
       );

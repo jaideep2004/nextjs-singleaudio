@@ -15,13 +15,13 @@ export async function generateMetadata({ params }: HelpArticlePageProps): Promis
 
   if (!article) {
     return {
-      title: 'Help Article Not Found | SingleAudio Help Center',
+      title: 'Help Article Not Found | Single Audio Help Center',
       robots: { index: false, follow: true },
     };
   }
 
-  const title = article.seo?.title || `${article.title} | SingleAudio Help Center`;
-  const description = article.seo?.description || article.excerpt || 'SingleAudio help center guide.';
+  const title = article.seo?.title || `${article.title} | Single Audio Help Center`;
+  const description = article.seo?.description || article.excerpt || 'Single Audio help center guide.';
 
   return {
     title,

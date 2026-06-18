@@ -160,7 +160,7 @@ export default function NewUserPage() {
         </Breadcrumbs>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-          <Typography variant="h4" component="h1">
+          <Typography variant="h4" component="h1" color="text.primary" fontWeight={900}>
             Add New User
           </Typography>
           <Button

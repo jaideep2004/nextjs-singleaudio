@@ -18,7 +18,17 @@ const getRelatedId = (notification: NotificationRouteInput) => {
   const value = notification.relatedId;
   if (!value) return '';
   if (typeof value === 'string') return value;
-  return String(value);
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const nested = record._id || record.id || record.value;
+    if (typeof nested === 'string') return nested;
+    if (nested && typeof nested === 'object' && typeof (nested as any).toString === 'function') {
+      const serialized = (nested as any).toString();
+      return serialized === '[object Object]' ? '' : serialized;
+    }
+  }
+  const serialized = String(value);
+  return serialized === '[object Object]' ? '' : serialized;
 };
 
 export const getNotificationRoute = (

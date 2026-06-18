@@ -58,15 +58,22 @@ const getMaintenanceMode = catchAsync(async (_req: Request, res: Response) => {
 });
 
 const getUploadLimit = catchAsync(async (_req: Request, res: Response) => {
-  const setting = await SettingsModel.findOne({ key: 'maxUploadSize' });
-  const value = Number(setting?.value || 100);
+  const [sizeSetting, fileTypesSetting] = await Promise.all([
+    SettingsModel.findOne({ key: 'maxUploadSize' }),
+    SettingsModel.findOne({ key: 'allowedFileTypes' }),
+  ]);
+  const value = Number(sizeSetting?.value || 100);
   const maxUploadSize = Math.min(200, Math.max(1, Number.isFinite(value) ? value : 100));
+  const allowedFileTypes = Array.isArray(fileTypesSetting?.value)
+    ? fileTypesSetting.value
+    : ['mp3', 'wav', 'aac', 'flac'];
 
   res.status(httpStatus.OK).json({
     success: true,
     data: {
       key: 'maxUploadSize',
       value: maxUploadSize,
+      allowedFileTypes,
       description: 'Maximum user audio upload size in MB',
     },
   });
@@ -83,6 +90,23 @@ const normalizeSettingValue = (key: string, value: unknown) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Maximum upload size must be between 1 and 200 MB');
     }
     return size;
+  }
+
+  if (key === 'allowedFileTypes') {
+    if (!Array.isArray(value)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Allowed file types must be an array');
+    }
+    const types = Array.from(
+      new Set(
+        value
+          .map(item => String(item || '').trim().toLowerCase().replace(/^\./, ''))
+          .filter(item => /^[a-z0-9]+$/.test(item))
+      )
+    );
+    if (!types.length) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'At least one audio file type is required');
+    }
+    return types;
   }
 
   if (key === 'currency') {
@@ -136,6 +160,7 @@ const initializeDefaultSettings = async () => {
     },
     { key: 'maintenanceMode', value: false, description: 'Whether user dashboard maintenance mode is enabled' },
     { key: 'maxUploadSize', value: 100, description: 'Maximum user audio upload size in MB' },
+    { key: 'allowedFileTypes', value: ['mp3', 'wav', 'aac', 'flac'], description: 'Allowed user audio file extensions' },
     { key: 'currency', value: 'USD', description: 'Default payout currency' },
     { key: 'paymentGateway', value: 'paypal', description: 'Default payout method gateway' },
     { key: 'enableEmailNotifications', value: true, description: 'Whether email notifications are enabled' },

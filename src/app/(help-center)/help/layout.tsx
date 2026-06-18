@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'SingleAudio Help Center',
-  description: 'Operational guides and support for SingleAudio users.',
+  title: 'Single Audio Help Center',
+  description: 'Operational guides and support for Single Audio users.',
   robots: {
     index: true,
     follow: true,

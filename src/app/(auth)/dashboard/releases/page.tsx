@@ -4,20 +4,25 @@ import { useSearchParams } from 'next/navigation';
 import {
   Box,
   Typography,
-  CircularProgress,
   Alert,
   Avatar,
   Tooltip,
-  Chip,
   Skeleton,
   useTheme,
   Button,
+  IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
 } from '@mui/material';
 import {
   Album as AlbumIcon,
   CloudUpload,
   ArrowForward,
   EditNote,
+  DeleteOutline,
 } from '@mui/icons-material';
 import Link from 'next/link';
 import AuthGuard from '@/components/AuthGuard';
@@ -52,6 +57,25 @@ const hasDraftContent = (draft: any) =>
       (Array.isArray(draft?.audioUploadedUrls) && draft.audioUploadedUrls.some(Boolean))
   );
 
+const normalizeReleaseDateKey = (value?: string) => {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+};
+
+const getReleaseDedupKey = (release: any) => {
+  const title = String(release?.releaseTitle || release?.title || '').trim().toLowerCase();
+  const type = String(release?.releaseType || release?.type || '').trim().toLowerCase();
+  const date = normalizeReleaseDateKey(release?.releaseDate || release?.createdAt);
+  const trackCount = Number(
+    release?.trackCount ?? (Array.isArray(release?.tracks) ? release.tracks.length : 0)
+  );
+
+  if (!title || !date || trackCount <= 0) return '';
+  return [title, type, date, trackCount].join('|');
+};
+
 export default function ReleasesPage() {
   return (
     <AuthGuard>
@@ -70,6 +94,8 @@ function ReleasesContent() {
   const [draftReleases, setDraftReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [draftDeleteTarget, setDraftDeleteTarget] = useState<any | null>(null);
+  const [deletingDraft, setDeletingDraft] = useState(false);
 
   const currentStatus = searchParams.get('status') || '';
 
@@ -100,7 +126,8 @@ function ReleasesContent() {
         if (draft?.status !== 'draft' || !hasDraftContent(draft)) return [];
         return [{
           ...draft,
-          _id: key,
+          _id: draft.draftId || key,
+          draftId: draft.draftId || key,
           status: 'draft',
           isLocalDraft: true,
           primaryArtist: getDraftArtist(draft),
@@ -121,14 +148,24 @@ function ReleasesContent() {
       try {
         const response = await fetch('/api/releases/draft', { cache: 'no-store' });
         const payload = await response.json().catch(() => null);
-        if (response.ok && payload?.success && payload?.draft) {
-          nextDrafts.push(...buildDraftRow(payload.draft, 'server-release-draft'));
-          if (!cancelled) setDraftReleases(nextDrafts);
-          return;
+        if (response.ok && payload?.success && Array.isArray(payload?.drafts)) {
+          payload.drafts.forEach((draft: any) => {
+            nextDrafts.push(...buildDraftRow(draft, draft.draftId || 'server-release-draft'));
+          });
+          if (nextDrafts.length) {
+            if (!cancelled) setDraftReleases(nextDrafts);
+            return;
+          }
         }
       } catch {}
 
-      const keys = [`${RELEASE_DRAFT_PREFIX}${user.id}`, RELEASE_DRAFT_BACKUP_KEY, `${RELEASE_DRAFT_PREFIX}anonymous`];
+      const keys = Object.keys(localStorage).filter(
+        key =>
+          key.startsWith(`${RELEASE_DRAFT_PREFIX}${user.id}.`) ||
+          key === `${RELEASE_DRAFT_PREFIX}${user.id}` ||
+          key === RELEASE_DRAFT_BACKUP_KEY ||
+          key === `${RELEASE_DRAFT_PREFIX}anonymous`
+      );
       for (const key of keys) {
         const raw = localStorage.getItem(key);
         if (!raw || seenDrafts.has(raw)) continue;
@@ -136,7 +173,6 @@ function ReleasesContent() {
           const draft = JSON.parse(raw);
           seenDrafts.add(raw);
           nextDrafts.push(...buildDraftRow(draft, key));
-          if (nextDrafts.length) break;
         } catch {}
       }
 
@@ -149,10 +185,46 @@ function ReleasesContent() {
     };
   }, [user?.id]);
 
-  const catalogReleases = useMemo(
-    () => [...draftReleases, ...releases],
-    [draftReleases, releases]
-  );
+  const handleDeleteDraft = async () => {
+    const draftId = String(draftDeleteTarget?.draftId || '').trim();
+    if (!draftId) return;
+
+    setDeletingDraft(true);
+    setError('');
+    try {
+      const response = await fetch(`/api/releases/draft?id=${encodeURIComponent(draftId)}`, {
+        method: 'DELETE',
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to delete draft');
+      }
+
+      setDraftReleases(current => current.filter(draft => draft.draftId !== draftId));
+      Object.keys(localStorage)
+        .filter(key => key.endsWith(`.${draftId}`))
+        .forEach(key => localStorage.removeItem(key));
+      setDraftDeleteTarget(null);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete draft');
+    } finally {
+      setDeletingDraft(false);
+    }
+  };
+
+  const catalogReleases = useMemo(() => {
+    const submittedReleaseKeys = new Set(
+      releases
+        .filter(release => getNormalizedReleaseStatus(release.status) !== 'draft')
+        .map(getReleaseDedupKey)
+        .filter(Boolean)
+    );
+    const visibleDrafts = draftReleases.filter(draft => {
+      const key = getReleaseDedupKey(draft);
+      return !key || !submittedReleaseKeys.has(key);
+    });
+    return [...visibleDrafts, ...releases];
+  }, [draftReleases, releases]);
 
   const filteredReleases = currentStatus
     ? catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === currentStatus)
@@ -341,8 +413,6 @@ function ReleasesContent() {
           {filteredReleases.map((release, idx) => (
             <Box
               key={release._id || idx}
-              component={Link}
-              href={release.isLocalDraft ? '/dashboard/upload?draft=1' : `/dashboard/releases/${release._id}`}
               sx={{
                 display: { xs: 'flex', md: 'grid' },
                 gridTemplateColumns: { md: '2fr 1fr 0.7fr 1fr 0.8fr' },
@@ -351,19 +421,32 @@ function ReleasesContent() {
                 px: 2.5,
                 py: 2,
                 alignItems: { md: 'center' },
-                textDecoration: 'none',
                 color: 'inherit',
                 borderTop: idx > 0 ? '1px solid' : 'none',
                 borderColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.04)',
                 transition: 'background 150ms ease',
-                cursor: 'pointer',
                 '&:hover': {
                   bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.015)',
                 },
               }}
             >
               {/* Release Info */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+              <Box
+                component={Link}
+                href={
+                  release.isLocalDraft
+                    ? `/dashboard/upload?draft=${encodeURIComponent(release.draftId)}`
+                    : `/dashboard/releases/${release._id}`
+                }
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  minWidth: 0,
+                  color: 'inherit',
+                  textDecoration: 'none',
+                }}
+              >
                 <Avatar
                   variant="rounded"
                   src={release.artworkUrl}
@@ -417,7 +500,29 @@ function ReleasesContent() {
               {/* Status */}
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', md: 'flex-start' }, gap: 1 }}>
                 {getStatusChip(release.status)}
-                <ArrowForward sx={{ fontSize: 14, color: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(15,23,42,0.15)', display: { xs: 'none', md: 'block' } }} />
+                {release.isLocalDraft ? (
+                  <Tooltip title="Delete draft">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      aria-label={`Delete draft ${release.releaseTitle || 'Untitled Release'}`}
+                      onClick={() => setDraftDeleteTarget(release)}
+                      sx={{ width: 32, height: 32 }}
+                    >
+                      <DeleteOutline fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ) : (
+                  <IconButton
+                    component={Link}
+                    href={`/dashboard/releases/${release._id}`}
+                    size="small"
+                    aria-label={`Open ${release.releaseTitle || 'release'}`}
+                    sx={{ width: 32, height: 32 }}
+                  >
+                    <ArrowForward sx={{ fontSize: 14 }} />
+                  </IconButton>
+                )}
               </Box>
 
               {/* Mobile: extra info */}
@@ -430,6 +535,31 @@ function ReleasesContent() {
           ))}
         </Box>
       )}
+      <Dialog
+        open={Boolean(draftDeleteTarget)}
+        onClose={() => !deletingDraft && setDraftDeleteTarget(null)}
+        aria-labelledby="delete-draft-title"
+      >
+        <DialogTitle id="delete-draft-title">Delete draft?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This permanently deletes “{draftDeleteTarget?.releaseTitle || 'Untitled Release'}”.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDraftDeleteTarget(null)} disabled={deletingDraft}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDeleteDraft}
+            disabled={deletingDraft}
+          >
+            {deletingDraft ? 'Deleting…' : 'Delete draft'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

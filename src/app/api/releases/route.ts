@@ -8,6 +8,7 @@ import {
   getReleaseOwnerQuery,
   listReleasesWithTracks,
 } from '@/lib/repositories/releases';
+import { buildReleasePolicyProof } from '@/lib/releaseConsent';
 
 function getClientKey(req: NextRequest) {
   return (
@@ -35,8 +36,18 @@ export async function POST(req: NextRequest) {
     });
 
     const body = await req.json();
+    const policyAcceptances = buildReleasePolicyProof(
+      body.stores,
+      body.policyAcceptances,
+      user
+    );
+    const releasePayload = {
+      ...body,
+      policyAcceptances,
+      policyAcceptanceEvents: [policyAcceptances],
+    };
 
-    const result = await createRelease(db, body, user);
+    const result = await createRelease(db, releasePayload, user);
 
     void sendUserAndAdminEmail(
       db,
@@ -62,6 +73,7 @@ export async function POST(req: NextRequest) {
           status: 'pending review',
           tracks: Array.isArray(body.tracks) ? body.tracks : [],
           stores: Array.isArray(body.stores) ? body.stores : [],
+          policyAcceptances,
         },
         actionLabel: 'Review Releases',
         actionUrl: appUrl('/admin/releases?status=pending'),
