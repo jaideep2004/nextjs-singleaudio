@@ -15,6 +15,38 @@ const REQUIRED_CREATE_PRODUCT_FIELDS = [
   'sub_category',
 ] as const;
 
+const GS1_MASS_UNITS = new Set(['', 'g', 'kg', 'mg', 'lb']);
+const GS1_NET_CONTENT_UNITS = new Set(['g', 'kg', 'mg', 'lb', 'ml', 'l', 'each']);
+const GS1_UNIT_ALIASES: Record<string, string> = {
+  each: 'each',
+  ea: 'each',
+  piece: 'each',
+  pieces: 'each',
+  unit: 'each',
+  units: 'each',
+  gram: 'g',
+  grams: 'g',
+  gm: 'g',
+  gms: 'g',
+  kilogram: 'kg',
+  kilograms: 'kg',
+  kilo: 'kg',
+  kilos: 'kg',
+  milligram: 'mg',
+  milligrams: 'mg',
+  pound: 'lb',
+  pounds: 'lb',
+  lbs: 'lb',
+  litre: 'l',
+  liter: 'l',
+  litres: 'l',
+  liters: 'l',
+  millilitre: 'ml',
+  milliliter: 'ml',
+  millilitres: 'ml',
+  milliliters: 'ml',
+};
+
 type Gs1Config = {
   baseUrl: string;
   bearerToken: string;
@@ -261,6 +293,14 @@ function getRecordString(record: Record<string, unknown> | undefined, key: strin
   return record ? cleanString(record[key]) || undefined : undefined;
 }
 
+function normalizeGs1Unit(value: unknown) {
+  const raw = cleanString(value);
+  if (!raw) return '';
+
+  const key = raw.toLowerCase();
+  return GS1_UNIT_ALIASES[key] || key;
+}
+
 function normalizeGs1ContactCountry(value: unknown) {
   const normalized = cleanString(value);
   if (!normalized) return '';
@@ -421,6 +461,33 @@ function validateCreateProductPayload(payload: Record<string, unknown>) {
       { missingFields: missing }
     );
   }
+}
+
+function normalizeExtraCreateFieldUnits(payload: Record<string, unknown>, config: Gs1Config) {
+  const weights = getRecord(payload.weights_and_measures);
+  const measurementUnit = getRecord(weights?.measurement_unit);
+  if (!measurementUnit) return;
+
+  const massUnit = normalizeGs1Unit(measurementUnit.mass_msu_id);
+  if (massUnit && !GS1_MASS_UNITS.has(massUnit)) {
+    throw new Gs1DatakartError(
+      `GS1_DATAKART_EXTRA_CREATE_FIELDS weights_and_measures.measurement_unit.mass_msu_id must be one of: "", g, kg, mg, lb`,
+      500
+    );
+  }
+  measurementUnit.mass_msu_id = massUnit;
+
+  let netContentUnit = normalizeGs1Unit(measurementUnit.net_content);
+  if (!netContentUnit || /^\d+(\.\d+)?$/.test(netContentUnit)) {
+    netContentUnit = normalizeGs1Unit(config.netContentUnit) || 'each';
+  }
+  if (!GS1_NET_CONTENT_UNITS.has(netContentUnit)) {
+    throw new Gs1DatakartError(
+      'GS1_DATAKART_EXTRA_CREATE_FIELDS weights_and_measures.measurement_unit.net_content must be one of: g, kg, mg, lb, ml, l, each',
+      500
+    );
+  }
+  measurementUnit.net_content = netContentUnit;
 }
 
 function summarizeCreateProductPayload(payload: Record<string, unknown>) {
@@ -635,14 +702,12 @@ function buildCreateProductPayload(input: Gs1CreateProductInput) {
 
   if (config.includeOptionalCreateFields) {
     payload.packaging_type = config.productPackaging;
-    payload.product_channel = config.productChannel;
     payload.target_market = config.targetMarket;
     payload.sku_id = input.releaseId;
 
     if (config.includeUiFieldAliases) {
       Object.assign(payload, {
         country_of_origin: config.contactCountry,
-        channel: config.productChannel,
         sku_number: input.releaseId,
         count: config.netContent,
         net_content_uom: config.netContentUnit,
@@ -676,6 +741,7 @@ function buildCreateProductPayload(input: Gs1CreateProductInput) {
   }
 
   Object.assign(payload, config.extraCreateFields);
+  normalizeExtraCreateFieldUnits(payload, config);
 
   validateCreateProductPayload(payload);
 

@@ -17,7 +17,11 @@ export const registerProvider = async (req: AuthRequest, res: Response): Promise
     const provider = await dspDeliveryService.registerProvider(req.body);
     successResponse(res, provider, 'DSP provider registered');
   } catch (error) {
-    errorResponse(res, 'Failed to register DSP provider', error);
+    errorResponse(
+      res,
+      error instanceof Error ? error.message : 'Failed to register DSP provider',
+      error
+    );
   }
 };
 

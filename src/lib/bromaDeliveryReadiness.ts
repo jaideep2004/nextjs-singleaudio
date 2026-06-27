@@ -15,12 +15,48 @@ type BromaReadiness = {
   assetReadiness: Awaited<ReturnType<typeof validateReleaseAssetsForDelivery>>;
 };
 
+const STORE_ALIASES: Record<string, string[]> = {
+  'acr cloud': ['acr cloud'],
+  'acr-cloud': ['acr cloud'],
+  amazon: ['amazon music'],
+  apple: ['apple music itunes', 'itunes'],
+  boom: ['boomplay'],
+  facebook: ['facebook instagram oculus'], 
+  'facebook delivery': ['facebook instagram oculus'],
+  'facebook-delivery': ['facebook instagram oculus'],
+  'facebook rights management': ['facebook instagram oculus'],
+  'facebook-rights-management': ['facebook instagram oculus'],
+  flo: ['flo dsp'],
+  iheartradio: ['iheart radio'],
+  instagram: ['facebook instagram oculus'],
+  kugou: ['qq music kugou kuwo wesing'],
+  kuwo: ['qq music kugou kuwo wesing'],
+  netease: ['netease cloud music'],
+  pandora: ['pandora dsp'],
+  snap: ['canva roxi soundtrack your brand turntable snap coda music'],
+  snapchat: ['canva roxi soundtrack your brand turntable snap coda music'],
+  tencent: ['qq music kugou kuwo wesing'],
+  tidal: ['tidal music'],
+  tiktok: ['tiktok branded as dou yin in china'],
+  vk: ['vk music odnoklassniki music'],
+  yandex: ['yandex music'],
+  youtube: ['youtube youtube music'],
+  'youtube delivery': ['youtube youtube music'],
+  'youtube-delivery': ['youtube youtube music'],
+  'youtube music': ['youtube youtube music'],
+};
+
 const normalize = (value: unknown) =>
   String(value || '')
     .toLowerCase()
     .replace(/&/g, 'and')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+
+const candidateOutletKeys = (store: string) => {
+  const normalized = normalize(store);
+  return Array.from(new Set([normalized, ...(STORE_ALIASES[normalized] || []).map(normalize)])).filter(Boolean);
+};
 
 const firstString = (...values: unknown[]) =>
   values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
@@ -41,7 +77,11 @@ function getContributors(track: Record<string, any>) {
 function getContributorShare(contributor: Record<string, any>) {
   const raw = contributor.share ?? contributor.percentage ?? contributor.ownership ?? contributor.split;
   const value = Number(raw);
-  return Number.isFinite(value) ? value : 0;
+  return Number.isFinite(value) ? value : null;
+}
+
+function hasContributorShare(contributor: Record<string, any>) {
+  return ['share', 'percentage', 'ownership', 'split'].some((key) => contributor[key] !== undefined && contributor[key] !== null && contributor[key] !== '');
 }
 
 function hasRole(contributors: Array<Record<string, any>>, names: string[]) {
@@ -52,16 +92,16 @@ function hasRole(contributors: Array<Record<string, any>>, names: string[]) {
 }
 
 async function mapOutlets(db: Db, stores: string[]) {
-  const normalizedStores = stores.map(normalize).filter(Boolean);
-  if (!normalizedStores.length) return { mappings: [], missing: stores };
+  const candidateKeys = Array.from(new Set(stores.flatMap(candidateOutletKeys)));
+  if (!candidateKeys.length) return { mappings: [], missing: stores };
 
   const docs = await db
     .collection('bromaOutlets')
     .find({
       active: true,
       $or: [
-        { normalizedName: { $in: normalizedStores } },
-        { aliases: { $in: normalizedStores } },
+        { normalizedName: { $in: candidateKeys } },
+        { aliases: { $in: candidateKeys } },
       ],
     })
     .toArray();
@@ -73,7 +113,7 @@ async function mapOutlets(db: Db, stores: string[]) {
   });
 
   const mappings = stores.flatMap((store) => {
-    const doc = byKey.get(normalize(store));
+    const doc = candidateOutletKeys(store).map((key) => byKey.get(key)).find(Boolean);
     return doc ? [{ store, outletId: String(doc.outletId), name: String(doc.name || store) }] : [];
   });
   const mappedStores = new Set(mappings.map((mapping) => normalize(mapping.store)));
@@ -83,25 +123,29 @@ async function mapOutlets(db: Db, stores: string[]) {
 
 function validateTrackComposition(track: Record<string, any>, index: number) {
   const errors: string[] = [];
+  const warnings: string[] = [];
   const contributors = getContributors(track).filter(
     (contributor): contributor is Record<string, any> => contributor && typeof contributor === 'object'
   );
 
   if (!contributors.length) {
     errors.push(`Track ${index + 1}: composition/contributor data is required`);
-    return errors;
+    return { errors, warnings };
   }
 
   if (!hasRole(contributors, ['composer', 'author', 'writer', 'c/a', 'ca'])) {
     errors.push(`Track ${index + 1}: composer/author contributor is required`);
   }
 
-  const totalShare = contributors.reduce((sum, contributor) => sum + getContributorShare(contributor), 0);
-  if (Math.abs(totalShare - 100) > 0.01) {
+  const hasShares = contributors.some(hasContributorShare);
+  const totalShare = contributors.reduce((sum, contributor) => sum + (getContributorShare(contributor) || 0), 0);
+  if (hasShares && Math.abs(totalShare - 100) > 0.01) {
     errors.push(`Track ${index + 1}: contributor ownership shares must total 100%`);
+  } else if (!hasShares) {
+    warnings.push(`Track ${index + 1}: contributor ownership shares not provided`);
   }
 
-  return errors;
+  return { errors, warnings };
 }
 
 export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike): Promise<BromaReadiness> {
@@ -110,11 +154,12 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
   const assetReadiness = await validateReleaseAssetsForDelivery(release);
   const errors: string[] = [...assetReadiness.errors];
   const warnings: string[] = [...assetReadiness.warnings];
+  const releaseGenre = firstString(release.genre, release.metadata?.genre, tracks[0]?.genre, tracks[0]?.metadata?.genre);
 
   if (!firstString(release.releaseTitle, release.title)) errors.push('Release title is required');
   if (!firstString(release.primaryArtist, release.artist, release.artistName)) errors.push('Primary artist is required');
   if (!firstString(release.upc, release.ean)) errors.push('UPC/EAN is required');
-  if (!firstString(release.genre)) errors.push('Release genre is required');
+  if (!releaseGenre) errors.push('Release genre is required');
   if (!firstString(release.releaseDate, release.originalReleaseDate)) errors.push('Release date is required');
   if (!tracks.length) errors.push('At least one track is required');
 
@@ -130,20 +175,23 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
     }
     if (!firstString(track.isrc)) errors.push(`Track ${index + 1}: ISRC is required`);
     if (!firstString(track.audioFile, track.audioUrl, track.fileUrl)) errors.push(`Track ${index + 1}: audio is required`);
-    errors.push(...validateTrackComposition(track, index));
+    const compositionReadiness = validateTrackComposition(track, index);
+    errors.push(...compositionReadiness.errors);
+    warnings.push(...compositionReadiness.warnings);
   });
 
   const outletResult = await mapOutlets(db, stores);
   if (!stores.length) errors.push('At least one DSP outlet must be selected');
+  else if (!outletResult.mappings.length) errors.push('No selected DSP outlets are available in Broma');
   outletResult.missing.forEach((store) => {
-    errors.push(`Broma outlet mapping missing or inactive for "${store}"`);
+    warnings.push(`Broma outlet mapping missing or inactive for "${store}"`);
   });
 
   return {
     ok: errors.length === 0,
     errors,
     warnings,
-    outletIds: outletResult.mappings.map((mapping) => mapping.outletId),
+    outletIds: Array.from(new Set(outletResult.mappings.map((mapping) => mapping.outletId))),
     outletMappings: outletResult.mappings,
     assetReadiness,
   };

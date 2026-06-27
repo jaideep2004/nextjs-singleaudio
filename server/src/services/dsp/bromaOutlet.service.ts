@@ -19,7 +19,7 @@ function mapOutlet(raw: Record<string, any>) {
       [name, raw.title_ru, raw.title_en, raw.outlet, raw.code]
         .map(normalize)
         .filter(Boolean)
-    )
+    )  
   );
 
   return {

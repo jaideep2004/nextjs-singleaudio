@@ -38,15 +38,7 @@ function normalizeUploadPath(value?: string) {
   if (!value) return null;
 
   if (/^https?:\/\//i.test(value)) {
-    try {
-      const url = new URL(value);
-      const marker = '/uploads/';
-      const index = url.pathname.indexOf(marker);
-      if (index >= 0) return url.pathname.slice(index + marker.length);
-      return null;
-    } catch {
-      return null;
-    }
+    return null;
   }
 
   const cleaned = value.replace(/\\/g, '/').replace(/^\/+/, '');

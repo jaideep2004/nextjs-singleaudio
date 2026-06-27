@@ -28,7 +28,6 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ConstructionIcon from '@mui/icons-material/Construction';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -48,6 +47,10 @@ type Provider = {
   maintenanceMode?: boolean;
   integrationMode?: 'shell' | 'sandbox' | 'live';
   readiness?: string;
+  config?: {
+    baseUrl?: string;
+    accountId?: string | number;
+  };
   configuredCredentialKeys?: string[];
   missingCredentialKeys?: string[];
   readinessReport?: {
@@ -82,6 +85,7 @@ type DeliveryJob = {
     attemptNo: number;
     status: string;
     responseCode?: string;
+    responseBody?: unknown;
     errorMessage?: string;
     retryable: boolean;
     createdAt: string;
@@ -103,22 +107,47 @@ type DeliveryJob = {
   trackId?: { title?: string; artistName?: string; isrc?: string };
 };
 
+type BromaConfigForm = {
+  baseUrl: string;
+  accountId: string;
+  email: string;
+  password: string;
+  integrationMode: 'sandbox' | 'live';
+};
+
+const DEFAULT_BROMA_BASE_URL = 'https://api-rod.broma16.com/api';
+
+const formatAttemptResponse = (value: unknown) => {
+  if (!value) return '';
+  const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  return text.length > 900 ? `${text.slice(0, 900)}...` : text;
+};
+
 export default function AdminDspDeliveriesPage() {
   const { isAdmin } = useAdminAuth();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [jobs, setJobs] = useState<DeliveryJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [providerFilter, setProviderFilter] = useState('all');
+  const [providerFilter, setProviderFilter] = useState('broma');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [trackId, setTrackId] = useState('');
-  const [providerKey, setProviderKey] = useState('');
-  const [dispatching, setDispatching] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [processingDue, setProcessingDue] = useState(false);
   const [syncingOutlets, setSyncingOutlets] = useState(false);
+  const [savingBroma, setSavingBroma] = useState(false);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [bromaForm, setBromaForm] = useState<BromaConfigForm>({
+    baseUrl: DEFAULT_BROMA_BASE_URL,
+    accountId: '',
+    email: '',
+    password: '',
+    integrationMode: 'sandbox',
+  });
 
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
+  const bromaProvider = useMemo(() => providers.find((provider) => provider.key === 'broma'), [providers]);
+  const bromaCredentialKeys = bromaProvider?.configuredCredentialKeys || [];
+  const hasBromaEmail = bromaCredentialKeys.includes('email');
+  const hasBromaPassword = bromaCredentialKeys.includes('password');
   const readyProviders = useMemo(
     () => providers.filter((provider) => provider.readinessReport?.canDispatch).length,
     [providers]
@@ -145,9 +174,6 @@ export default function AdminDspDeliveriesPage() {
 
       setProviders(providerRes?.data || []);
       setJobs(jobsRes?.data?.data || []);
-      if (!providerKey && providerRes?.data?.[0]?.key) {
-        setProviderKey(providerRes.data[0].key);
-      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load DSP data');
     } finally {
@@ -173,26 +199,66 @@ export default function AdminDspDeliveriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, providerFilter, statusFilter]);
 
-  const handleDispatch = async () => {
-    if (!trackId.trim() || !providerKey) {
-      toast.error('Track ID and provider required');
+  useEffect(() => {
+    if (!bromaProvider) return;
+    setBromaForm((current) => ({
+      ...current,
+      baseUrl: String(bromaProvider.config?.baseUrl || current.baseUrl || DEFAULT_BROMA_BASE_URL),
+      accountId: bromaProvider.config?.accountId ? String(bromaProvider.config.accountId) : current.accountId,
+      integrationMode: bromaProvider.integrationMode === 'live' ? 'live' : 'sandbox',
+      password: '',
+    }));
+  }, [bromaProvider]);
+
+  const handleSaveBromaConfig = async () => {
+    const baseUrl = bromaForm.baseUrl.trim();
+    const accountId = bromaForm.accountId.trim();
+    const email = bromaForm.email.trim();
+    const password = bromaForm.password.trim();
+    const hasStoredCredentials = hasBromaEmail && hasBromaPassword;
+    const credentialsChanged = Boolean(email || password);
+
+    if (!/^https:\/\/|^http:\/\//i.test(baseUrl)) {
+      toast.error('Broma base URL must start with http:// or https://');
+      return;
+    }
+    if (!accountId) {
+      toast.error('Broma account ID required');
+      return;
+    }
+    if (!hasStoredCredentials && (!email || !password)) {
+      toast.error('Broma email and password required for first setup');
+      return;
+    }
+    if (credentialsChanged && (!email || !password)) {
+      toast.error('Enter both email and password to update Broma credentials');
       return;
     }
 
     try {
-      setDispatching(true);
-      await adminAPI.dispatchDspDelivery({
-        trackId: trackId.trim(),
-        providerKey,
-        operation: 'deliver',
-      });
-      toast.success('Delivery job queued');
-      setTrackId('');
+      setSavingBroma(true);
+      const payload: Parameters<typeof adminAPI.registerDspProvider>[0] = {
+        key: 'broma',
+        displayName: 'Broma',
+        enabled: true,
+        integrationMode: bromaForm.integrationMode,
+        config: {
+          baseUrl,
+          accountId,
+        },
+      };
+      if (credentialsChanged) {
+        payload.credentials = { email, password };
+      }
+
+      await adminAPI.registerDspProvider(payload);
+      setBromaForm((current) => ({ ...current, password: '' }));
+      toast.success('Broma provider saved');
       await load();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Dispatch failed');
+      toast.error(error instanceof Error ? error.message : 'Broma provider save failed');
     } finally {
-      setDispatching(false);
+      setSavingBroma(false);
     }
   };
 
@@ -293,6 +359,98 @@ export default function AdminDspDeliveriesPage() {
         </Stack>
       </Paper>
 
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ md: 'center' }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800}>
+                Configure Broma
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Credentials are encrypted on the backend and never returned to this screen.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip size="small" label={bromaProvider?.enabled ? 'enabled' : 'not enabled'} color={bromaProvider?.enabled ? 'success' : 'default'} />
+              <Chip size="small" label={hasBromaEmail ? 'email saved' : 'email missing'} color={hasBromaEmail ? 'success' : 'warning'} variant="outlined" />
+              <Chip size="small" label={hasBromaPassword ? 'password saved' : 'password missing'} color={hasBromaPassword ? 'success' : 'warning'} variant="outlined" />
+            </Stack>
+          </Stack>
+
+          <Alert severity="info">
+            Leave password blank to keep existing encrypted credentials. Enter email and password together to replace them.
+          </Alert>
+
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
+            <TextField
+              label="Base URL"
+              value={bromaForm.baseUrl}
+              onChange={(e) => setBromaForm((current) => ({ ...current, baseUrl: e.target.value }))}
+              fullWidth
+              name="bromaBaseUrl"
+              autoComplete="off"
+              inputProps={{ 'aria-label': 'Broma API base URL' }}
+            />
+            <TextField
+              label="Account ID"
+              value={bromaForm.accountId}
+              onChange={(e) => setBromaForm((current) => ({ ...current, accountId: e.target.value }))}
+              fullWidth
+              name="bromaAccountId"
+              autoComplete="off"
+              inputProps={{ 'aria-label': 'Broma account ID' }}
+            />
+            <FormControl fullWidth>
+              <InputLabel id="broma-mode-select">Mode</InputLabel>
+              <Select
+                labelId="broma-mode-select"
+                label="Mode"
+                value={bromaForm.integrationMode}
+                onChange={(e) =>
+                  setBromaForm((current) => ({ ...current, integrationMode: e.target.value as BromaConfigForm['integrationMode'] }))
+                }
+              >
+                <MenuItem value="sandbox">Sandbox</MenuItem>
+                <MenuItem value="live">Live</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <TextField
+              label="Broma Email"
+              value={bromaForm.email}
+              onChange={(e) => setBromaForm((current) => ({ ...current, email: e.target.value }))}
+              fullWidth
+              type="email"
+              name="bromaEmail"
+              autoComplete="off"
+              placeholder={hasBromaEmail ? 'Saved. Enter only to replace.' : ''}
+              inputProps={{ 'aria-label': 'Broma email' }}
+            />
+            <TextField
+              label="Broma Password"
+              value={bromaForm.password}
+              onChange={(e) => setBromaForm((current) => ({ ...current, password: e.target.value }))}
+              fullWidth
+              type="password"
+              name="bromaPassword"
+              autoComplete="new-password"
+              placeholder={hasBromaPassword ? 'Saved. Leave blank to keep.' : ''}
+              inputProps={{ 'aria-label': 'Broma password' }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSaveBromaConfig}
+              disabled={savingBroma}
+              sx={{ minWidth: { md: 180 } }}
+            >
+              {savingBroma ? 'Saving...' : 'Save Broma'}
+            </Button>
+          </Stack>
+        </Stack>
+      </Paper>
+
       <Paper sx={{ p: 2, mb: 3, overflow: 'hidden' }}>
         <Typography variant="subtitle2" fontWeight={800} mb={1}>
           Provider Shells
@@ -373,48 +531,15 @@ export default function AdminDspDeliveriesPage() {
       </Paper>
 
       <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
-            label="Track ID"
-            value={trackId}
-            onChange={(e) => setTrackId(e.target.value)}
-            fullWidth
-            placeholder="Mongo track id…"
-            name="trackId"
-            autoComplete="off"
-            inputProps={{ 'aria-label': 'Track ID' }}
-          />
-          <FormControl fullWidth>
-            <InputLabel id="provider-select">Provider</InputLabel>
-            <Select
-              labelId="provider-select"
-              label="Provider"
-              value={providerKey}
-              onChange={(e) => setProviderKey(e.target.value)}
-            >
-              {providers.map((provider) => (
-                <MenuItem key={provider.key} value={provider.key}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <DspLogo value={provider.key} alt={provider.displayName} size={24} padding={0.25} />
-                    <span>{provider.displayName}</span>
-                  </Stack>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <Button
-            variant="contained"
-            onClick={handleDispatch}
-            startIcon={<RocketLaunchIcon />}
-            disabled={dispatching}
-          >
-            Queue Delivery
-          </Button>
-        </Stack>
-      </Paper>
-
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle2" fontWeight={800}>
+              Delivery Jobs
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Broma release delivery jobs are shown by default. Legacy per-DSP track jobs stay hidden unless selected.
+            </Typography>
+          </Box>
           <FormControl fullWidth>
             <InputLabel id="provider-filter">Provider Filter</InputLabel>
             <Select
@@ -564,15 +689,37 @@ export default function AdminDspDeliveriesPage() {
                             <Box flex={1} minWidth={0}>
                               <Typography variant="subtitle2" fontWeight={800} mb={1}>Attempts</Typography>
                               <Stack spacing={1}>
-                                {(job.attempts || []).slice(-4).map((attempt) => (
-                                  <Stack key={`${job._id}-attempt-${attempt.attemptNo}`} direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                                    <Chip size="small" label={`#${attempt.attemptNo}`} variant="outlined" />
-                                    <Chip size="small" label={attempt.status} color={attempt.status === 'success' ? 'success' : 'error'} />
-                                    <Typography variant="caption" color="text.secondary">
-                                      {attempt.responseCode || attempt.errorMessage || '-'}
-                                    </Typography>
-                                  </Stack>
-                                ))}
+                                {(job.attempts || []).slice(-4).map((attempt) => {
+                                  const responseBody = formatAttemptResponse(attempt.responseBody);
+                                  return (
+                                    <Stack key={`${job._id}-attempt-${attempt.attemptNo}`} spacing={0.75}>
+                                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                                        <Chip size="small" label={`#${attempt.attemptNo}`} variant="outlined" />
+                                        <Chip size="small" label={attempt.status} color={attempt.status === 'success' ? 'success' : 'error'} />
+                                        <Typography variant="caption" color="text.secondary">
+                                          {attempt.responseCode || attempt.errorMessage || '-'}
+                                        </Typography>
+                                      </Stack>
+                                      {responseBody && (
+                                        <Typography
+                                          component="pre"
+                                          variant="caption"
+                                          sx={{
+                                            m: 0,
+                                            p: 1,
+                                            borderRadius: 1,
+                                            bgcolor: 'grey.100',
+                                            color: 'text.secondary',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                          }}
+                                        >
+                                          {responseBody}
+                                        </Typography>
+                                      )}
+                                    </Stack>
+                                  );
+                                })}
                                 {(!job.attempts || job.attempts.length === 0) && (
                                   <Typography variant="caption" color="text.secondary">No attempts yet.</Typography>
                                 )}

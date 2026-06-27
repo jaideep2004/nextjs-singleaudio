@@ -42,6 +42,11 @@ const ALLOWED_WEBHOOK_STATES: DspDeliveryState[] = [
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : 'Unknown delivery error';
 
+const getProviderErrorResponseBody = (error: unknown): unknown =>
+  error && typeof error === 'object' && 'responseBody' in error
+    ? (error as { responseBody?: unknown }).responseBody
+    : undefined;
+
 const hasOwn = (value: Record<string, unknown>, key: string) =>
   Object.prototype.hasOwnProperty.call(value, key);
 
@@ -642,6 +647,8 @@ class DspDeliveryService {
     } catch (error) {
       const message = getErrorMessage(error);
       const statusCode = typeof (error as any)?.statusCode === 'number' ? (error as any).statusCode : undefined;
+      const responseBody = getProviderErrorResponseBody(error);
+      const responseCode = statusCode ? `HTTP_${statusCode}` : undefined;
       const needsAttention = Boolean(statusCode && statusCode >= 400 && statusCode < 500 && statusCode !== 401 && statusCode !== 429);
       const retryCount = job.retryCount + 1;
       const shouldRetry = !needsAttention && retryCount <= job.maxRetries;
@@ -653,11 +660,17 @@ class DspDeliveryService {
         nextRetryAt,
         deadLettered: !needsAttention && !shouldRetry,
         errorMessage: message,
+        metadata: {
+          ...job.metadata,
+          lastProviderError: responseBody,
+        },
         $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
         $push: {
           attempts: {
             attemptNo: retryCount,
             status: 'failed',
+            responseCode,
+            responseBody,
             errorMessage: message,
             retryable: shouldRetry,
           },

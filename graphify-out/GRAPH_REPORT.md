@@ -1,12 +1,12 @@
-# Graph Report - nextjs-singleaudio  (2026-06-18)
+# Graph Report - nextjs-singleaudio  (2026-06-26)
 
 ## Corpus Check
-- 374 files · ~1,853,963 words
+- 381 files · ~1,930,108 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1693 nodes · 2776 edges · 62 communities detected
-- Extraction: 76% EXTRACTED · 24% INFERRED · 0% AMBIGUOUS · INFERRED: 662 edges (avg confidence: 0.8)
+- 1720 nodes · 2821 edges · 62 communities detected
+- Extraction: 76% EXTRACTED · 24% INFERRED · 0% AMBIGUOUS · INFERRED: 670 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -34,7 +34,7 @@
 - [[_COMMUNITY_Community 21|Community 21]]
 - [[_COMMUNITY_Community 22|Community 22]]
 - [[_COMMUNITY_Community 23|Community 23]]
-- [[_COMMUNITY_Community 24|Community 24]]
+- [[_COMMUNITY_Community 25|Community 25]]
 - [[_COMMUNITY_Community 26|Community 26]]
 - [[_COMMUNITY_Community 27|Community 27]]
 - [[_COMMUNITY_Community 28|Community 28]]
@@ -76,68 +76,68 @@
 ## God Nodes (most connected - your core abstractions)
 1. `errorResponse()` - 91 edges
 2. `successResponse()` - 87 edges
-3. `proxyBackend()` - 52 edges
+3. `proxyBackend()` - 59 edges
 4. `connectToDatabase()` - 33 edges
 5. `getCurrentBackendUser()` - 29 edges
 6. `PATCH()` - 26 edges
 7. `DspDeliveryService` - 25 edges
 8. `processCatalogExportJob()` - 22 edges
-9. `notFoundResponse()` - 18 edges
-10. `releasesCollection()` - 18 edges
+9. `BromaClient` - 20 edges
+10. `notFoundResponse()` - 18 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `startSignup()` --calls--> `generateOtp()`  [INFERRED]
+  server\src\controllers\auth.controller.ts → server\src\services\otp.service.ts
+- `startSignup()` --calls--> `getOtpExpiry()`  [INFERRED]
+  server\src\controllers\auth.controller.ts → server\src\services\otp.service.ts
+- `startSignup()` --calls--> `sendAmazeSmsOtp()`  [INFERRED]
+  server\src\controllers\auth.controller.ts → server\src\services\otp.service.ts
 - `getAdminKnowledgeBaseArticles()` --calls--> `listAdminArticles()`  [INFERRED]
   server\src\controllers\knowledgeBase.controller.ts → server\src\services\knowledgeBase.service.ts
-- `updateTrackAcrCloudById()` --calls--> `startTrackAcrCloudScan()`  [INFERRED]
-  server\src\repositories\track.repository.ts → server\src\services\acrCloud.service.ts
-- `asString()` --calls--> `getReleaseIdString()`  [INFERRED]
-  src\lib\musicPublishing.ts → src\lib\repositories\tracks.ts
-- `asString()` --calls--> `serializeAssetRef()`  [INFERRED]
-  src\lib\musicPublishing.ts → src\lib\repositories\tracks.ts
-- `asString()` --calls--> `serializeFingerprintRef()`  [INFERRED]
-  src\lib\musicPublishing.ts → src\lib\repositories\tracks.ts
+- `uploadTrack()` --calls--> `createStandaloneTrack()`  [INFERRED]
+  server\src\controllers\track.controller.ts → server\src\repositories\track.repository.ts
 
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.04
-Nodes (122): acrCloudCallbackHandler(), getAcrCloudScanResultHandler(), authPayload(), changePassword(), checkArtistName(), escapeRegex(), forgotPassword(), getMe() (+114 more)
+Cohesion: 0.02
+Nodes (82): PATCH(), POST(), POST(), GET(), getSecret(), POST(), runBromaOutletSync(), POST() (+74 more)
 
 ### Community 1 - "Community 1"
-Cohesion: 0.02
-Nodes (75): PATCH(), POST(), POST(), GET(), getSecret(), POST(), runBromaOutletSync(), GET() (+67 more)
+Cohesion: 0.04
+Nodes (112): acrCloudCallbackHandler(), authPayload(), changePassword(), checkArtistName(), escapeRegex(), forgotPassword(), getMe(), getUploadedFileUrl() (+104 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.04
-Nodes (77): canManageYoutube(), GET(), getClientKey(), normalizeRange(), GET(), getClientKey(), GET(), getClientKey() (+69 more)
+Nodes (79): canManageYoutube(), GET(), getClientKey(), normalizeRange(), GET(), getClientKey(), GET(), getClientKey() (+71 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.05
-Nodes (72): normalizeMusicPublishingTracks(), acquireUpcAssignmentLock(), assignReleaseUpcWithGs1(), buildGs1CreateInput(), cleanString(), clearUpcAssignmentLock(), getPrimaryArtist(), getReleaseDate() (+64 more)
+Cohesion: 0.04
+Nodes (52): deliver(), validateCredentials(), validateTrack(), useColorMode(), analyzeAudioHandler(), deleteTempFile(), getAcrCloudScanResultHandler(), identifyWithAcrCloudHandler() (+44 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.08
-Nodes (44): mapYoutubeAnalyticsRows(), queryYoutubeAnalyticsReport(), YoutubeAnalyticsApiError, fetchYoutubeVideosMetadata(), YoutubeDataApiError, addDays(), appendYoutubeAnalyticsSyncRun(), claimNextYoutubeAnalyticsSyncJob() (+36 more)
+Cohesion: 0.06
+Nodes (67): buildReleaseQuery(), createArchivePath(), createCatalogExportJob(), createMetadataZip(), createReleasePartZip(), createReleaseZipName(), createUsersParentZip(), createUserZip() (+59 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.06
-Nodes (31): deliver(), validateCredentials(), validateTrack(), useColorMode(), analyzeAudioHandler(), deleteTempFile(), identifyWithAcrCloudHandler(), scanWithAcrCloudHandler() (+23 more)
+Nodes (52): canReadRelease(), GET(), getReleaseOwnerId(), PATCH(), getAdminRecipients(), getGs1DatakartApprovalErrorMessage(), assignIsrcsToTracks(), ensureIsrcIndexes() (+44 more)
 
 ### Community 6 - "Community 6"
 Cohesion: 0.08
-Nodes (43): getYoutubeWorkflowLabel(), getYoutubeWorkflowStatus(), isYoutubeAnalyticsAccessStatus(), isYoutubeAnalyticsSyncStatus(), isYoutubeCmsStatus(), isYoutubeVerificationStatus(), consumeYoutubeOAuthState(), createYoutubeOAuthSession() (+35 more)
+Nodes (44): mapYoutubeAnalyticsRows(), queryYoutubeAnalyticsReport(), YoutubeAnalyticsApiError, fetchYoutubeVideosMetadata(), YoutubeDataApiError, addDays(), appendYoutubeAnalyticsSyncRun(), claimNextYoutubeAnalyticsSyncJob() (+36 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.08
-Nodes (14): asDate(), DspDeliveryService, getErrorMessage(), getHeadersRecord(), hashPayload(), hasOwn(), normalizeConfigAndCredentials(), sanitizeConfig() (+6 more)
+Nodes (43): getYoutubeWorkflowLabel(), getYoutubeWorkflowStatus(), isYoutubeAnalyticsAccessStatus(), isYoutubeAnalyticsSyncStatus(), isYoutubeCmsStatus(), isYoutubeVerificationStatus(), consumeYoutubeOAuthState(), createYoutubeOAuthSession() (+35 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.09
-Nodes (34): absoluteUrl(), appUrl(), buildNotificationMessage(), createEmailNotifications(), escapeHtml(), getAdminRecipients(), getFrontendUrl(), getHelpCenterUrl() (+26 more)
+Cohesion: 0.08
+Nodes (15): asDate(), DspDeliveryService, getErrorMessage(), getHeadersRecord(), getProviderErrorResponseBody(), hashPayload(), hasOwn(), normalizeConfigAndCredentials() (+7 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.12
-Nodes (38): buildReleaseQuery(), createArchivePath(), createCatalogExportJob(), createMetadataZip(), createReleasePartZip(), createReleaseZipName(), createUsersParentZip(), createUserZip() (+30 more)
+Cohesion: 0.13
+Nodes (37): buildCreateProductPayload(), buildCreateProductRequest(), buildMrpPayload(), cleanString(), collectFallbackGtins(), collectNamedGtins(), collectProductListItems(), collectValidationRecords() (+29 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.07
@@ -149,15 +149,15 @@ Nodes (17): handleLogout(), handleNotificationClick(), handleNotificationsClose(
 
 ### Community 12 - "Community 12"
 Cohesion: 0.13
-Nodes (35): buildCreateProductPayload(), buildCreateProductRequest(), buildMrpPayload(), cleanString(), collectFallbackGtins(), collectNamedGtins(), collectProductListItems(), collectValidationRecords() (+27 more)
-
-### Community 13 - "Community 13"
-Cohesion: 0.13
 Nodes (34): actorId(), assertCategory(), assertSection(), bulkDeleteArticles(), createArticle(), createCategory(), createRevision(), createSection() (+26 more)
 
-### Community 14 - "Community 14"
+### Community 13 - "Community 13"
 Cohesion: 0.14
 Nodes (31): createNotification(), notifyPayoutApproved(), notifyPayoutRejected(), notifyReleaseApproved(), notifyReleaseRejected(), addTicketMessage(), addUnreadMessageCounts(), appendMessage() (+23 more)
+
+### Community 14 - "Community 14"
+Cohesion: 0.13
+Nodes (6): handleSubmit(), BromaClient, collectBromaMessages(), filenameFromUrl(), getBromaErrorMessage(), sanitizeBromaResponse()
 
 ### Community 15 - "Community 15"
 Cohesion: 0.11
@@ -168,47 +168,47 @@ Cohesion: 0.08
 Nodes (5): fetchPayouts(), formatCurrency(), handleApprovePayout(), handleRejectPayout(), onPayoutSubmit()
 
 ### Community 17 - "Community 17"
-Cohesion: 0.16
-Nodes (19): assetOpsFromTrack(), asString(), backfillAssets(), backfillFingerprints(), backfillOrganizations(), backfillOwnership(), backfillTracks(), canonicalTrack() (+11 more)
+Cohesion: 0.13
+Nodes (19): assertBromaReleaseReady(), candidateOutletKeys(), evaluateBromaReleaseReadiness(), firstString(), getContributors(), hasRole(), mapOutlets(), normalize() (+11 more)
 
 ### Community 18 - "Community 18"
-Cohesion: 0.14
-Nodes (17): assertBromaReleaseReady(), evaluateBromaReleaseReadiness(), firstString(), getContributors(), hasRole(), mapOutlets(), validateTrackComposition(), checkLocalAsset() (+9 more)
+Cohesion: 0.16
+Nodes (19): assetOpsFromTrack(), asString(), backfillAssets(), backfillFingerprints(), backfillOrganizations(), backfillOwnership(), backfillTracks(), canonicalTrack() (+11 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.16
 Nodes (16): archiveArticle(), bulkArchiveArticles(), createBlankArticle(), createCategory(), createSection(), idOf(), load(), resetForm() (+8 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.18
-Nodes (18): startSignup(), escapeHtml(), generateOtp(), getFrontendUrl(), getHelpCenterUrl(), getLogoUrl(), getOtpExpiry(), hashOtp() (+10 more)
-
-### Community 21 - "Community 21"
 Cohesion: 0.17
 Nodes (15): clearUnread(), handleAssignToMe(), handleCloseTicket(), handleCreate(), handleNote(), handleReopen(), handleReply(), handleStatus() (+7 more)
 
-### Community 22 - "Community 22"
-Cohesion: 0.18
-Nodes (2): handleSubmit(), BromaClient
-
-### Community 23 - "Community 23"
+### Community 21 - "Community 21"
 Cohesion: 0.16
 Nodes (13): applyDraft(), buildKycDraft(), goNext(), isArtistOrLabel(), loadDraft(), persistBeforeExit(), persistKycDraftLocally(), persistWhenHidden() (+5 more)
 
-### Community 24 - "Community 24"
+### Community 22 - "Community 22"
+Cohesion: 0.22
+Nodes (17): absoluteUrl(), appUrl(), buildNotificationMessage(), createEmailNotifications(), escapeHtml(), getFrontendUrl(), getHelpCenterUrl(), getLogoUrl() (+9 more)
+
+### Community 23 - "Community 23"
 Cohesion: 0.15
 Nodes (10): buildDraftRow(), fetchReleases(), getDraftArtist(), getNormalizedReleaseStatus(), getReleaseDedupKey(), getStatusChip(), getTrackCount(), hasDraftContent() (+2 more)
 
-### Community 26 - "Community 26"
+### Community 25 - "Community 25"
 Cohesion: 0.18
 Nodes (8): applyDraft(), assertVercelUploadSize(), loadDraft(), persistBeforeExit(), persistWhenHidden(), resizeList(), uploadArtworkToServer(), uploadAudioToServer()
 
-### Community 27 - "Community 27"
+### Community 26 - "Community 26"
 Cohesion: 0.29
 Nodes (13): buildNotificationMessage(), createEmailNotifications(), escapeHtml(), getAdminEmailRecipients(), getFrontendUrl(), getHelpCenterUrl(), getLogoUrl(), renderDetails() (+5 more)
 
+### Community 27 - "Community 27"
+Cohesion: 0.3
+Nodes (13): escapeHtml(), generateOtp(), getFrontendUrl(), getHelpCenterUrl(), getLogoUrl(), getOtpExpiry(), readSmtpResponse(), renderBasicEmail() (+5 more)
+
 ### Community 28 - "Community 28"
-Cohesion: 0.24
+Cohesion: 0.25
 Nodes (5): BromaConnector, contentYear(), firstString(), getResponseId(), releaseTypeId()
 
 ### Community 29 - "Community 29"
@@ -256,20 +256,20 @@ Cohesion: 0.29
 Nodes (2): formatDate(), getReleaseTrackCount()
 
 ### Community 41 - "Community 41"
-Cohesion: 0.43
-Nodes (6): handleBootstrapPhase1(), handleDispatch(), handleProcessDue(), handleRetry(), handleSyncBromaOutlets(), load()
-
-### Community 42 - "Community 42"
 Cohesion: 0.33
 Nodes (1): ApiConnector
 
-### Community 43 - "Community 43"
+### Community 42 - "Community 42"
 Cohesion: 0.38
 Nodes (3): handleDrop(), handleInputChange(), validateAndSet()
 
-### Community 44 - "Community 44"
+### Community 43 - "Community 43"
 Cohesion: 0.38
 Nodes (3): canFetchNotifications(), hasAuthToken(), isPublicAuthPath()
+
+### Community 44 - "Community 44"
+Cohesion: 0.48
+Nodes (6): getDspDisplayName(), getDspInitials(), getDspMeta(), humanizeDspKey(), normalizeDspName(), sanitizeDspKeys()
 
 ### Community 47 - "Community 47"
 Cohesion: 0.47
@@ -348,8 +348,6 @@ Cohesion: 1.0
 Nodes (2): handleSync(), load()
 
 ## Knowledge Gaps
-- **Thin community `Community 22`** (20 nodes): `handleSubmit()`, `BromaClient`, `.addComposition()`, `.authHeaders()`, `.buildUploadForm()`, `.constructor()`, `.createRelease()`, `.getOutlets()`, `.getRelease()`, `.login()`, `.refresh()`, `.request()`, `.resolveUploadPath()`, `.sendModeration()`, `.updateDistribution()`, `.updateRecording()`, `.uploadCover()`, `.uploadRecording()`, `bromaClient.ts`, `page.tsx`
-  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 29`** (12 nodes): `constructor()`, `count()`, `create()`, `delete()`, `exists()`, `find()`, `findById()`, `findOne()`, `paginate()`, `softDelete()`, `update()`, `base.repository.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 33`** (10 nodes): `MockDspConnector`, `.constructor()`, `.deliver()`, `.getDeliveryStatus()`, `.takedown()`, `.update()`, `.validateCredentials()`, `.validateWebhookSignature()`, `payloadId()`, `mockDspConnector.ts`
@@ -358,7 +356,7 @@ Nodes (2): handleSync(), load()
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 40`** (8 nodes): `fetchDashboardData()`, `fetchData()`, `formatDate()`, `getReleaseTrackCount()`, `getStatusChip()`, `handlePlayPause()`, `page.tsx`, `page.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 42`** (7 nodes): `ApiConnector`, `.buildHeaders()`, `.constructor()`, `.deliver()`, `.validateCredentials()`, `.validateWebhookSignature()`, `apiConnector.ts`
+- **Thin community `Community 41`** (7 nodes): `ApiConnector`, `.buildHeaders()`, `.constructor()`, `.deliver()`, `.validateCredentials()`, `.validateWebhookSignature()`, `apiConnector.ts`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 50`** (6 nodes): `resizeSelectedMedia()`, `setImage()`, `setLink()`, `setYoutube()`, `uploadImage()`, `TiptapEditor.tsx`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -392,17 +390,17 @@ Nodes (2): handleSync(), load()
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PATCH()` connect `Community 8` to `Community 0`, `Community 1`, `Community 2`, `Community 3`, `Community 6`, `Community 18`?**
-  _High betweenness centrality (0.144) - this node is a cross-community bridge._
-- **Why does `Boolean()` connect `Community 5` to `Community 0`, `Community 32`, `Community 2`, `Community 3`, `Community 6`, `Community 7`, `Community 8`, `Community 16`, `Community 23`, `Community 24`, `Community 26`, `Community 28`?**
-  _High betweenness centrality (0.140) - this node is a cross-community bridge._
-- **Why does `sendUserAndAdminEmail()` connect `Community 0` to `Community 8`, `Community 2`?**
-  _High betweenness centrality (0.108) - this node is a cross-community bridge._
+- **Why does `Boolean()` connect `Community 3` to `Community 32`, `Community 5`, `Community 7`, `Community 8`, `Community 16`, `Community 21`, `Community 23`, `Community 25`, `Community 28`?**
+  _High betweenness centrality (0.164) - this node is a cross-community bridge._
+- **Why does `PATCH()` connect `Community 5` to `Community 0`, `Community 1`, `Community 2`, `Community 4`, `Community 7`, `Community 17`, `Community 22`?**
+  _High betweenness centrality (0.160) - this node is a cross-community bridge._
+- **Why does `sendUserAndAdminEmail()` connect `Community 1` to `Community 2`, `Community 5`, `Community 22`?**
+  _High betweenness centrality (0.121) - this node is a cross-community bridge._
 - **Are the 88 inferred relationships involving `errorResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`errorResponse()` has 88 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 86 inferred relationships involving `successResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`successResponse()` has 86 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 50 inferred relationships involving `proxyBackend()` (e.g. with `POST()` and `GET()`) actually correct?**
-  _`proxyBackend()` has 50 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 57 inferred relationships involving `proxyBackend()` (e.g. with `POST()` and `POST()`) actually correct?**
+  _`proxyBackend()` has 57 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 31 inferred relationships involving `connectToDatabase()` (e.g. with `GET()` and `POST()`) actually correct?**
   _`connectToDatabase()` has 31 INFERRED edges - model-reasoned connections that need verification._

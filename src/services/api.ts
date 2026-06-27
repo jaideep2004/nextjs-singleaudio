@@ -1051,7 +1051,23 @@ export const adminAPI = {
 
   listDspProviders: async () => {
     try {
-      const response = await api.get<ApiResponse<any>>('/admin/dsp/providers');
+      const response = await api.get<ApiResponse<any>>('/admin/dsp-providers');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  registerDspProvider: async (payload: {
+    key: string;
+    displayName: string;
+    enabled?: boolean;
+    integrationMode?: 'shell' | 'sandbox' | 'live';
+    credentials?: Record<string, string>;
+    config?: Record<string, string | number | boolean>;
+  }) => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/dsp-providers', payload);
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1060,7 +1076,7 @@ export const adminAPI = {
 
   bootstrapPhase1DspProviders: async () => {
     try {
-      const response = await api.post<ApiResponse<any>>('/admin/dsp/providers/bootstrap-phase1');
+      const response = await api.post<ApiResponse<any>>('/admin/dsp-providers-bootstrap');
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1069,7 +1085,7 @@ export const adminAPI = {
 
   listDspDeliveries: async (params: Record<string, string | number> = {}) => {
     try {
-      const response = await api.get<ApiResponse<any>>('/admin/dsp/deliveries', { params });
+      const response = await api.get<ApiResponse<any>>('/admin/dsp-delivery-jobs', { params });
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1078,7 +1094,7 @@ export const adminAPI = {
 
   dispatchDspDelivery: async (payload: { trackId: string; providerKey: string; operation?: 'deliver' | 'update' | 'takedown' }) => {
     try {
-      const response = await api.post<ApiResponse<any>>('/admin/dsp/deliveries/dispatch', payload);
+      const response = await api.post<ApiResponse<any>>('/admin/dsp-delivery-dispatch', payload);
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1087,7 +1103,7 @@ export const adminAPI = {
 
   retryDspDelivery: async (jobId: string) => {
     try {
-      const response = await api.post<ApiResponse<any>>(`/admin/dsp/deliveries/${jobId}/retry`);
+      const response = await api.post<ApiResponse<any>>(`/admin/dsp-delivery-jobs/${jobId}/retry`);
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1096,7 +1112,7 @@ export const adminAPI = {
 
   processDueDspDeliveries: async (payload: { maxJobs?: number; workerId?: string } = {}) => {
     try {
-      const response = await api.post<ApiResponse<any>>('/admin/dsp/deliveries/process-due', payload);
+      const response = await api.post<ApiResponse<any>>('/admin/dsp-delivery-process-due', payload);
       return response.data;
     } catch (error) {
       return handleApiError(error);
@@ -1105,7 +1121,7 @@ export const adminAPI = {
 
   syncBromaOutlets: async () => {
     try {
-      const response = await api.post<ApiResponse<any>>('/admin/dsp/broma/outlets/sync');
+      const response = await api.post<ApiResponse<any>>('/admin/broma-outlets-sync');
       return response.data;
     } catch (error) {
       return handleApiError(error);

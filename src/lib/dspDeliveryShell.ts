@@ -31,13 +31,14 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
   const assetChecks = release.deliveryAssetReadiness?.checks || [];
   const bromaReadiness = release.bromaReadiness || {};
+  const releaseGenre = release.genre || release.metadata?.genre || tracks[0]?.genre || tracks[0]?.metadata?.genre;
   const payload = {
     releaseId: release._id.toString(),
     releaseTitle: release.releaseTitle || release.title || 'Untitled release',
     upc: release.upc,
     primaryArtist: release.primaryArtist || release.artist || release.artistName,
     label: release.label,
-    genre: release.genre,
+    genre: releaseGenre,
     language: release.language,
     releaseDate: release.releaseDate,
     stores: Array.isArray(release.stores) ? release.stores : [],
@@ -47,9 +48,10 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
       artistName: track.artistName || track.primaryArtist || release.primaryArtist,
       isrc: track.isrc,
       upc: track.upc || release.upc,
+      genre: track.genre,
       explicit: track.explicit,
-      audioFile: track.audioFile || track.audioUrl || track.fileUrl,
-      artwork: track.artwork || release.artwork || release.coverArt,
+      audioFile: track.audioUrl || track.fileUrl || track.audioFile,
+      artwork: track.artworkUrl || track.artwork || release.artworkUrl || release.artwork || release.coverArt,
       duration: track.duration,
       contributors: track.contributors || track.rightsHolders || [],
       composers: track.composers || [],

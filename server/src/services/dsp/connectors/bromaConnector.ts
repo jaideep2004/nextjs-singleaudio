@@ -217,9 +217,16 @@ export class BromaConnector extends BaseDspConnector {
 
   private buildReleasePayload(payload: DspReleasePayload, config: Record<string, unknown>) {
     const year = contentYear(payload.releaseDate);
+    const catalogNumber = firstString(
+      payload.metadata?.catalogNumber,
+      payload.metadata?.catalog_number,
+      payload.upc,
+      payload.releaseId
+    );
     return {
       title: payload.releaseTitle,
       release_type_id: releaseTypeId(payload, config),
+      catalog_number: catalogNumber,
       performers: [payload.primaryArtist].filter(Boolean),
       genres: [payload.genre].filter(Boolean),
       ean: payload.upc,
