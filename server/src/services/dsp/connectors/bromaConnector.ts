@@ -1,6 +1,6 @@
 import { BaseDspConnector } from './baseConnector';
 import { BromaClient } from './bromaClient';
-import { DspCapability, DspConnectorContext, DspDeliveryPayload, DspDeliveryResult, DspReleasePayload } from '../../../types/dsp';
+import { DspCapability, DspConnectorContext, DspDeliveryPayload, DspDeliveryResult, DspReleasePayload, DspTrackPayload } from '../../../types/dsp';
 import DeliveryJob from '../../../models/deliveryJob.model';
 
 type BromaStep =
@@ -360,6 +360,68 @@ const contentYear = (date?: string) => {
 const toFiniteNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const parseSnippetSeconds = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return Number.isFinite(value) && value >= 0 ? value : undefined;
+  const raw = firstString(value);
+  if (!raw) return undefined;
+  const text = raw.trim();
+  const numeric = Number(text);
+  if (Number.isFinite(numeric) && numeric >= 0) return numeric;
+
+  const parts = text.split(':').map((part) => part.trim());
+  if (parts.length === 2) {
+    const minutes = Number(parts[0]);
+    const seconds = Number(parts[1]);
+    return Number.isFinite(minutes) && Number.isFinite(seconds) && minutes >= 0 && seconds >= 0
+      ? minutes * 60 + seconds
+      : undefined;
+  }
+  if (parts.length === 3) {
+    const first = Number(parts[0]);
+    const second = Number(parts[1]);
+    const third = Number(parts[2]);
+    if (!Number.isFinite(first) || !Number.isFinite(second) || !Number.isFinite(third)) return undefined;
+    if (/^\d{3}$/.test(parts[2]) && second >= 0 && second < 60) {
+      return first * 60 + second + third / 1000;
+    }
+    return first * 3600 + second * 60 + third;
+  }
+  return undefined;
+};
+
+const formatSnippetTime = (seconds: number) => {
+  const totalMs = Math.max(0, Math.floor(seconds * 1000));
+  const minutes = Math.floor(totalMs / 60000);
+  const wholeSeconds = Math.floor((totalMs % 60000) / 1000);
+  const milliseconds = totalMs % 1000;
+  return `${String(minutes).padStart(2, '0')}:${String(wholeSeconds).padStart(2, '0')}:${String(milliseconds).padStart(3, '0')}`;
+};
+
+const trackDurationSeconds = (track: DspTrackPayload) =>
+  parseSnippetSeconds((track as any).duration ?? track.metadata?.duration ?? track.metadata?.durationSeconds ?? track.metadata?.duration_seconds);
+
+const bromaSnippetRange = (track: DspTrackPayload, payload: DspReleasePayload, config: Record<string, unknown>) => {
+  const duration = trackDurationSeconds(track);
+  const fallbackStart = duration && duration <= 40 ? 0 : 10;
+  const fallbackEnd = duration ? Math.min(fallbackStart + 30, Math.max(0.001, duration - 0.001)) : fallbackStart + 30;
+  let start = parseSnippetSeconds(track.metadata?.snippetStart ?? payload.metadata?.snippetStart ?? config.defaultSnippetStart) ?? fallbackStart;
+  let end = parseSnippetSeconds(track.metadata?.snippetEnd ?? payload.metadata?.snippetEnd ?? config.defaultSnippetEnd) ?? fallbackEnd;
+
+  if (duration) {
+    start = Math.min(start, Math.max(0, duration - 0.001));
+    end = Math.min(end, Math.max(0.001, duration - 0.001));
+  }
+  if (end <= start) {
+    start = fallbackStart;
+    end = fallbackEnd;
+  }
+
+  return {
+    snippet_start: formatSnippetTime(start),
+    snippet_end: formatSnippetTime(end),
+  };
 };
 
 const toOwnership = (value: number) => value.toFixed(2);
@@ -751,6 +813,7 @@ export class BromaConnector extends BaseDspConnector {
       if (additionalReleaseIds[track.trackId]) continue;
       const recordingId = metadata.bromaRecordingIds?.[track.trackId];
       if (!recordingId) throw new Error(`Missing Broma recording id for additional release: ${track.title}`);
+      const snippetRange = bromaSnippetRange(track, payload, config);
       const response = await client.createAdditionalRelease({
         parent_release: requireBromaInteger(metadata.bromaReleaseId, 'Broma parent release id'),
         parent_recording: requireBromaInteger(recordingId, 'Broma parent recording id'),
@@ -759,8 +822,7 @@ export class BromaConnector extends BaseDspConnector {
         generate_ean: 1,
         generate_catalog_number: 1,
         account_id: requireBromaInteger(config.accountId, 'Broma account_id'),
-        snippet_start: firstString(track.metadata?.snippetStart, payload.metadata?.snippetStart, config.defaultSnippetStart, '00:00:00'),
-        snippet_end: firstString(track.metadata?.snippetEnd, payload.metadata?.snippetEnd, config.defaultSnippetEnd, '00:00:30'),
+        ...snippetRange,
       });
       additionalReleaseIds[track.trackId] = getResponseId(response) || true;
       metadata.bromaAdditionalReleaseIds = additionalReleaseIds;

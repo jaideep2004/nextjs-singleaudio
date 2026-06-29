@@ -151,7 +151,7 @@ If you need help generating a connection string or creating an Atlas cluster, us
 
 ## Storage and Uploads .
 
-- Local uploads are stored in `server/uploads/`
+- Local uploads are stored in `server/uploads/`          
 - Static upload access is exposed through `/uploads`
 - This is suitable for development
 - For production, remote object storage is recommended
