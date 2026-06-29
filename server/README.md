@@ -138,7 +138,7 @@ http://localhost:5000/api
 To create or reset the admin account:
 
 ```bash
-npm run seed:admin
+npm run seed:admin  
 ```
 
 The seed values currently come from `src/scripts/seedAdmin.ts`.
@@ -149,7 +149,7 @@ If you need help generating a connection string or creating an Atlas cluster, us
 
 - [MONGODB_SETUP.md](MONGODB_SETUP.md)
 
-## Storage and Uploads
+## Storage and Uploads .
 
 - Local uploads are stored in `server/uploads/`
 - Static upload access is exposed through `/uploads`

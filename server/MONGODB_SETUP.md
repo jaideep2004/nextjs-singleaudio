@@ -6,7 +6,7 @@ This guide will help you set up a MongoDB Atlas cluster for your project.
 
 1. Go to [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) and sign up for a free account or log in.
 
-## Creating a Cluster  .
+## Creating a Cluster  ...
 
 1. Click on "Build a Cluster" and select the free tier option "Shared".
 2. Choose a cloud provider (AWS, Google Cloud, or Azure) and a region close to your application's users.
