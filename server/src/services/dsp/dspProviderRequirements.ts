@@ -40,7 +40,7 @@ const REQUIREMENTS: Record<string, DspProviderRequirement> = {
     docsUrl: 'https://broma16.com/partner-api/partner-api.en.html',
     payloadStandard: 'platform_api',
     requiredCredentialKeys: ['email', 'password'],
-    requiredConfigKeys: ['baseUrl', 'accountId'],
+    requiredConfigKeys: ['baseUrl', 'accountId', 'createdCountryId'],
     readinessChecks: ['credentials', 'account_id', 'outlet_mapping'],
     notes: 'Broma is the live mediator for release delivery to DSP outlets.',
   }),
@@ -147,6 +147,12 @@ const hasValue = (value: unknown) => {
   return value !== undefined && value !== null && value !== false;
 };
 
+const isIntegerLike = (value: unknown) => {
+  if (!hasValue(value)) return false;
+  if (Number.isInteger(Number(value))) return true;
+  return String(value).trim().toUpperCase() === 'IN';
+};
+
 export function evaluateDspReadiness(provider: ProviderInput): DspReadinessReport {
   const requirement = getDspRequirement(provider);
   const config = provider.config || {};
@@ -179,6 +185,10 @@ export function evaluateDspReadiness(provider: ProviderInput): DspReadinessRepor
 
   if (missing.length > 0) {
     return { state: 'missing_credentials', missing, warnings: [], canDispatch: false };
+  }
+
+  if (provider.key === 'broma' && !isIntegerLike(config.createdCountryId)) {
+    return { state: 'missing_credentials', missing: ['createdCountryId'], warnings: [], canDispatch: false };
   }
 
   return {

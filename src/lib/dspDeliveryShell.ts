@@ -30,6 +30,18 @@ const sha256 = (value: unknown) =>
 const firstString = (...values: unknown[]) =>
   values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
 
+const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
+  IN: 32,
+};
+
+const bromaDictionaryId = (value: unknown, codeMap: Record<string, number>) => {
+  const text = firstString(value);
+  if (!text) return undefined;
+  const numeric = Number(text);
+  if (Number.isInteger(numeric)) return numeric;
+  return codeMap[text.toUpperCase()];
+};
+
 function releaseRightsholder(release: Record<string, any>) {
   return firstString(
     release.label,
@@ -66,19 +78,25 @@ function producerRightsholder(track: Record<string, any>, release: Record<string
   );
 }
 
-function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: string) {
+function buildSnapshot(
+  release: ReleaseDoc,
+  providerKeys: string[],
+  createdBy?: string,
+  options: { defaultCreatedCountryId?: unknown } = {}
+) {
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
   const assetChecks = release.deliveryAssetReadiness?.checks || [];
   const bromaReadiness = release.bromaReadiness || {};
   const releaseGenre = release.genre || release.metadata?.genre || tracks[0]?.genre || tracks[0]?.metadata?.genre;
   const rightsholder = releaseRightsholder(release);
-  const createdCountryId =
+  const createdCountryValue =
     release.createdCountryId ||
     release.created_country_id ||
     release.creationCountryId ||
     release.metadata?.createdCountryId ||
     release.metadata?.created_country_id ||
-    'IN';
+    options.defaultCreatedCountryId;
+  const createdCountryId = bromaDictionaryId(createdCountryValue, BROMA_COUNTRY_CODE_IDS) ?? createdCountryValue;
   const catalogNumber = release.catalogNumber || release.catalog_number || release.upc || release._id.toString();
   const payload = {
     releaseId: release._id.toString(),
@@ -169,7 +187,7 @@ function evaluateNativeProviderReadiness(provider: any) {
   const requiredConfig = provider.key === 'mock_dsp'
     ? ['webhookSecret']
     : provider.key === 'broma'
-      ? ['baseUrl', 'accountId']
+      ? ['baseUrl', 'accountId', 'createdCountryId']
       : ['baseUrl', 'webhookSecret'];
   const requiredCredentials = provider.key === 'broma' ? ['email', 'password'] : [];
   const missing = [
@@ -181,6 +199,9 @@ function evaluateNativeProviderReadiness(provider: any) {
   ];
   if (missing.length > 0) {
     return { state: 'missing_credentials', canDispatch: false, missing };
+  }
+  if (provider.key === 'broma' && bromaDictionaryId(config.createdCountryId, BROMA_COUNTRY_CODE_IDS) === undefined) {
+    return { state: 'missing_credentials', canDispatch: false, missing: ['createdCountryId'] };
   }
 
   return {
@@ -198,9 +219,11 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
     return { snapshotId: null, jobsCreated: 0, providerKeys: [], blocked: true };
   }
   const providerKeys = ['broma'];
+  const bromaProvider = await db.collection('dspproviders').findOne({ key: 'broma' });
+  const defaultCreatedCountryId = bromaProvider?.config?.createdCountryId;
 
   const assetReadiness = await validateReleaseAssetsForDelivery(release);
-  const bromaReadiness = await evaluateBromaReleaseReadiness(db, release);
+  const bromaReadiness = await evaluateBromaReleaseReadiness(db, release, { defaultCreatedCountryId });
   await releasesCollection(db).updateOne(
     { _id: release._id },
     {
@@ -225,12 +248,9 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
 
   release.deliveryAssetReadiness = assetReadiness;
   release.bromaReadiness = bromaReadiness;
-  const snapshot = buildSnapshot(release, providerKeys, createdBy);
+  const snapshot = buildSnapshot(release, providerKeys, createdBy, { defaultCreatedCountryId });
   const snapshotResult = await db.collection('releaseDeliverySnapshots').insertOne(snapshot);
-  const providers = await db
-    .collection('dspproviders')
-    .find({ key: { $in: providerKeys } })
-    .toArray();
+  const providers = bromaProvider ? [bromaProvider] : [];
   const providerMap = new Map(providers.map((provider) => [provider.key, provider]));
   const now = new Date();
 

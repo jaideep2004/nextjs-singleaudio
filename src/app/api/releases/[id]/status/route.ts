@@ -88,11 +88,15 @@ export async function PATCH(
         recordStatus: assignment.recordStatus,
         isComplete: assignment.isComplete,
       };
+      const bromaProvider = await db.collection('dspproviders').findOne(
+        { key: 'broma' },
+        { projection: { 'config.createdCountryId': 1 } }
+      );
       await assertBromaReleaseReady(db, {
         ...existing,
         ...update,
         tracks: assignedTracks,
-      });
+      }, { defaultCreatedCountryId: bromaProvider?.config?.createdCountryId });
       await replaceReleaseCanonicalTracks(db, existing, assignedTracks);
       await markIsrcsAssigned(
         db,

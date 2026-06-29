@@ -15,6 +15,10 @@ type BromaReadiness = {
   assetReadiness: Awaited<ReturnType<typeof validateReleaseAssetsForDelivery>>;
 };
 
+type BromaReadinessOptions = {
+  defaultCreatedCountryId?: unknown;
+};
+
 const STORE_ALIASES: Record<string, string[]> = {
   'acr cloud': ['acr cloud'],
   'acr-cloud': ['acr cloud'],
@@ -60,6 +64,24 @@ const candidateOutletKeys = (store: string) => {
 
 const firstString = (...values: unknown[]) =>
   values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+
+const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
+  IN: 32,
+};
+
+const bromaDictionaryId = (value: unknown, codeMap: Record<string, number>) => {
+  const text = firstString(value);
+  if (!text) return undefined;
+  const numeric = Number(text);
+  if (Number.isInteger(numeric)) return numeric;
+  return codeMap[text.toUpperCase()];
+};
+
+const hasBromaDictionaryId = (value: unknown, codeMap: Record<string, number>) =>
+  bromaDictionaryId(value, codeMap) !== undefined;
+
+const sameBromaTitle = (left: unknown, right: unknown) =>
+  normalize(left).replace(/\s+/g, ' ') === normalize(right).replace(/\s+/g, ' ');
 
 function getContributors(track: Record<string, any>) {
   const values = [
@@ -189,7 +211,11 @@ function validateTrackComposition(track: Record<string, any>, index: number) {
   return { errors, warnings };
 }
 
-export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike): Promise<BromaReadiness> {
+export async function evaluateBromaReleaseReadiness(
+  db: Db,
+  release: ReleaseLike,
+  options: BromaReadinessOptions = {}
+): Promise<BromaReadiness> {
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
   const stores = Array.isArray(release.stores) ? release.stores.filter(Boolean) : [];
   const assetReadiness = await validateReleaseAssetsForDelivery(release);
@@ -203,7 +229,7 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
     release.creationCountryId,
     release.metadata?.createdCountryId,
     release.metadata?.created_country_id,
-    'IN'
+    options.defaultCreatedCountryId
   );
   const catalogNumber = firstString(release.catalogNumber, release.catalog_number, release.upc, release.ean, release._id);
 
@@ -213,6 +239,7 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
   if (!releaseGenre) errors.push('Release genre is required');
   if (!firstString(release.releaseDate, release.originalReleaseDate)) errors.push('Release date is required');
   if (!createdCountryId) errors.push('Broma creation country is required');
+  else if (!hasBromaDictionaryId(createdCountryId, BROMA_COUNTRY_CODE_IDS)) errors.push('Broma creation country must be a numeric dictionary id');
   if (!catalogNumber) errors.push('Broma catalog number or automatic catalog generation is required');
   if (!releaseRightsholderName) errors.push('Release label/rightsholder is required');
   if (!tracks.length) errors.push('At least one track is required');
@@ -221,6 +248,9 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
     errors.push('Album release type requires at least two tracks');
   }
   if (tracks.length > 40) errors.push('Broma album/compilation releases support at most 40 tracks');
+  if (tracks.length === 1 && !sameBromaTitle(firstString(release.releaseTitle, release.title), firstString(tracks[0]?.title, tracks[0]?.name))) {
+    errors.push('Broma single release title must match the recording title');
+  }
 
   tracks.forEach((track, index) => {
     if (!firstString(track.title, track.name)) errors.push(`Track ${index + 1}: title is required`);
@@ -232,6 +262,8 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
     if (!firstString(track.audioFile, track.audioUrl, track.fileUrl)) errors.push(`Track ${index + 1}: audio is required`);
     if (!firstString(track.createdCountryId, track.created_country_id, createdCountryId)) {
       errors.push(`Track ${index + 1}: Broma creation country is required`);
+    } else if (!hasBromaDictionaryId(firstString(track.createdCountryId, track.created_country_id, createdCountryId), BROMA_COUNTRY_CODE_IDS)) {
+      errors.push(`Track ${index + 1}: Broma creation country must be a numeric dictionary id`);
     }
     if (!firstString(track.catalogNumber, track.catalog_number, release.catalogNumber, release.catalog_number, release.upc, release._id)) {
       errors.push(`Track ${index + 1}: Broma catalog number or automatic catalog generation is required`);
@@ -261,8 +293,8 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
   };
 }
 
-export async function assertBromaReleaseReady(db: Db, release: ReleaseLike) {
-  const readiness = await evaluateBromaReleaseReadiness(db, release);
+export async function assertBromaReleaseReady(db: Db, release: ReleaseLike, options: BromaReadinessOptions = {}) {
+  const readiness = await evaluateBromaReleaseReadiness(db, release, options);
   if (!readiness.ok) {
     const error = new Error(`Broma readiness failed: ${readiness.errors.join('; ')}`);
     (error as any).statusCode = 422;

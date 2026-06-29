@@ -38,6 +38,13 @@ const splitListText = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const comparableTitle = (value: unknown) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+
 const bromaStringList = (...values: unknown[]) =>
   Array.from(
     new Set(
@@ -61,6 +68,57 @@ const bromaStringList = (...values: unknown[]) =>
 const bromaArtists = (...values: unknown[]) => bromaStringList(...values);
 
 const bromaGenres = (...values: unknown[]) => bromaStringList(...values).slice(0, 3);
+
+const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
+  IN: 32,
+};
+
+const BROMA_LANGUAGE_CODE_IDS: Record<string, number> = {
+  EN: 40,
+  HI: 59,
+};
+
+const toDateOnly = (value: unknown) => {
+  const text = firstString(value);
+  if (!text) return undefined;
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString().slice(0, 10);
+};
+
+const todayDateOnly = () => new Date().toISOString().slice(0, 10);
+
+const nonFutureDateOnly = (...values: unknown[]) => {
+  const today = todayDateOnly();
+  const date = values.map(toDateOnly).find((entry): entry is string => Boolean(entry));
+  if (!date) return today;
+  return date <= today ? date : today;
+};
+
+const bromaInteger = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : undefined;
+};
+
+const bromaDictionaryId = (value: unknown, codeMap: Record<string, number>) => {
+  const numeric = bromaInteger(value);
+  if (numeric !== undefined) return numeric;
+  const code = firstString(value)?.toUpperCase();
+  if (!code) return undefined;
+  return codeMap[code];
+};
+
+const requireBromaInteger = (value: unknown, label: string) => {
+  const parsed = bromaInteger(value);
+  if (parsed === undefined) throw new Error(`${label} must be a numeric Broma dictionary id`);
+  return parsed;
+};
+
+const requireBromaDictionaryId = (value: unknown, label: string, codeMap: Record<string, number>) => {
+  const parsed = bromaDictionaryId(value, codeMap);
+  if (parsed === undefined) throw new Error(`${label} must be a numeric Broma dictionary id`);
+  return parsed;
+};
 
 const payloadRightsholder = (payload: DspReleasePayload) =>
   firstString(
@@ -92,16 +150,35 @@ const trackProducerRightsholder = (
   );
 
 const createdCountryId = (payload: DspReleasePayload, config: Record<string, unknown>, track?: DspReleasePayload['tracks'][number]) =>
-  firstString(
-    track?.metadata?.createdCountryId,
-    track?.metadata?.created_country_id,
-    payload.metadata?.createdCountryId,
-    payload.metadata?.created_country_id,
-    payload.metadata?.creationCountryId,
-    config.createdCountryId,
-    config.defaultCreatedCountryId,
-    config.defaultCountryCode,
-    'IN'
+  requireBromaDictionaryId(
+    firstString(
+      track?.metadata?.createdCountryId,
+      track?.metadata?.created_country_id,
+      payload.metadata?.createdCountryId,
+      payload.metadata?.created_country_id,
+      payload.metadata?.creationCountryId,
+      config.createdCountryId,
+      config.defaultCreatedCountryId
+    ),
+    'Broma created_country_id',
+    BROMA_COUNTRY_CODE_IDS
+  );
+
+const languageId = (payload: DspReleasePayload, config: Record<string, unknown>, track: DspReleasePayload['tracks'][number]) =>
+  requireBromaDictionaryId(
+    firstString(
+      track.metadata?.languageId,
+      track.metadata?.language_id,
+      track.language,
+      payload.metadata?.languageId,
+      payload.metadata?.language_id,
+      payload.language,
+      config.defaultLanguageId,
+      config.defaultLanguageCode,
+      'EN'
+    ),
+    'Broma language',
+    BROMA_LANGUAGE_CODE_IDS
   );
 
 const catalogNumber = (payload: DspReleasePayload, track?: DspReleasePayload['tracks'][number]) =>
@@ -146,6 +223,9 @@ export class BromaConnector extends BaseDspConnector {
     if (!('releaseId' in payload)) errors.push('Broma delivery requires release payload');
     if ('releaseId' in payload) {
       if (!payload.upc) errors.push('Missing release UPC/EAN');
+      if (payload.tracks.length === 1 && comparableTitle(payload.releaseTitle) !== comparableTitle(payload.tracks[0]?.title)) {
+        errors.push('Broma single release title must match the recording title');
+      }
       payload.tracks.forEach((track, index) => {
         if (!track.isrc) errors.push(`Track ${index + 1}: missing ISRC`);
         if (!track.audioFile) errors.push(`Track ${index + 1}: missing audio file`);
@@ -235,7 +315,7 @@ export class BromaConnector extends BaseDspConnector {
       for (const track of payload.tracks) {
         const recordingId = next.bromaRecordingIds?.[track.trackId];
         if (!recordingId) throw new Error(`Missing Broma recording id for ${track.title}`);
-        await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track, config));
+        await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track, config, recordingId));
       }
       step = next.bromaStep = 'add_compositions';
       await this.persistProgress(jobId, next);
@@ -302,6 +382,12 @@ export class BromaConnector extends BaseDspConnector {
     const year = contentYear(payload.releaseDate);
     const releaseCatalogNumber = catalogNumber(payload);
     const rightsholder = payloadRightsholder(payload);
+    const createdDate = nonFutureDateOnly(
+      payload.metadata?.createdDate,
+      payload.metadata?.created_date,
+      payload.metadata?.originalReleaseDate,
+      payload.releaseDate
+    );
     return {
       title: payload.releaseTitle,
       release_type_id: releaseTypeId(payload, config),
@@ -317,31 +403,50 @@ export class BromaConnector extends BaseDspConnector {
       c_line: String(payload.metadata?.cline || rightsholder || payload.primaryArtist || payload.releaseTitle),
       date_p_line: year,
       date_c_line: year,
-      created_date: payload.releaseDate,
+      created_date: createdDate,
       generate_ean: !payload.upc,
       various_artists: Boolean(payload.metadata?.variousArtists),
     };
   }
 
-  private buildRecordingPayload(payload: DspReleasePayload, track: DspReleasePayload['tracks'][number], config?: Record<string, unknown>) {
+  private buildRecordingPayload(
+    payload: DspReleasePayload,
+    track: DspReleasePayload['tracks'][number],
+    config: Record<string, unknown> = {},
+    recordingId?: unknown
+  ) {
     const trackCatalogNumber = catalogNumber(payload, track);
     const primaryArtist = firstString(track.artistName, payload.primaryArtist);
     const featuredArtist = firstString(track.metadata?.featuredArtist, track.metadata?.featuring, payload.metadata?.featuredArtist, payload.metadata?.featuring);
     const rightsholder = payloadRightsholder(payload);
+    const partyId = requireBromaInteger(firstString(config.partyId, config.accountId), 'Broma party_id');
+    const createdDate = nonFutureDateOnly(
+      track.metadata?.createdDate,
+      track.metadata?.created_date,
+      track.metadata?.recordingDate,
+      payload.metadata?.createdDate,
+      payload.metadata?.created_date,
+      payload.metadata?.originalReleaseDate,
+      track.releaseDate,
+      payload.releaseDate
+    );
     return {
+      id: requireBromaInteger(recordingId, 'Broma recording id'),
       title: track.title,
       subtitle: firstString(track.version, track.metadata?.subtitle, track.metadata?.version),
       performers: bromaArtists(primaryArtist),
       main_performer: bromaArtists(primaryArtist),
-      featured_artists: bromaArtists(featuredArtist),
+      featured_artist: bromaArtists(featuredArtist),
       isrc: track.isrc,
       generate_isrc: !track.isrc,
+      is_instrumental: Boolean(track.metadata?.instrumental || track.metadata?.isInstrumental),
       catalog_number: trackCatalogNumber,
       generate_catalog_number: !trackCatalogNumber,
       genres: bromaGenres(track.genre, track.metadata?.genre, payload.genre, payload.metadata?.genre),
-      created_country_id: createdCountryId(payload, config || {}, track),
-      created_date: firstString(track.releaseDate, payload.releaseDate),
-      language: track.language || payload.language,
+      created_country_id: createdCountryId(payload, config, track),
+      created_date: createdDate,
+      language: languageId(payload, config, track),
+      party_id: partyId,
       parental_warning_type: track.explicit ? 'explicit' : 'not_explicit',
       label: rightsholder,
       producer: trackProducerRightsholder(payload, track),

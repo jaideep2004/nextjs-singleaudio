@@ -116,7 +116,7 @@ type BromaConfigForm = {
 };
 
 const DEFAULT_BROMA_BASE_URL = 'https://api-rod.broma16.com/api';
-const DEFAULT_BROMA_COUNTRY_ID = 'IN';
+const DEFAULT_BROMA_COUNTRY_ID = '32';
 
 const formatAttemptResponse = (value: unknown) => {
   if (!value) return '';
@@ -215,7 +215,7 @@ export default function AdminDspDeliveriesPage() {
   const handleSaveBromaConfig = async () => {
     const baseUrl = bromaForm.baseUrl.trim();
     const accountId = bromaForm.accountId.trim();
-    const createdCountryId = bromaForm.createdCountryId.trim() || DEFAULT_BROMA_COUNTRY_ID;
+    const createdCountryId = bromaForm.createdCountryId.trim();
     const email = bromaForm.email.trim();
     const password = bromaForm.password.trim();
     const hasStoredCredentials = hasBromaEmail && hasBromaPassword;
@@ -227,6 +227,10 @@ export default function AdminDspDeliveriesPage() {
     }
     if (!accountId) {
       toast.error('Broma account ID required');
+      return;
+    }
+    if (!createdCountryId || !Number.isInteger(Number(createdCountryId))) {
+      toast.error('Broma created country ID must be a numeric dictionary id');
       return;
     }
     if (!hasStoredCredentials && (!email || !password)) {
@@ -387,7 +391,7 @@ export default function AdminDspDeliveriesPage() {
               fullWidth
               name="bromaCreatedCountryId"
               autoComplete="off"
-              helperText="Default IN. Use Broma dictionary value if your account requires a numeric country id."
+              helperText="Use the numeric country id from Broma dictionaries. India is 32."
               inputProps={{ 'aria-label': 'Broma created country ID' }}
             />
             <FormControl fullWidth>
