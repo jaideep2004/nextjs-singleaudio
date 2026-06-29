@@ -91,6 +91,47 @@ function hasRole(contributors: Array<Record<string, any>>, names: string[]) {
   });
 }
 
+function releaseRightsholder(release: Record<string, any>) {
+  return firstString(
+    release.label,
+    release.metadata?.label,
+    release.recordLabel,
+    release.metadata?.recordLabel,
+    release.rightsholder,
+    release.rightsHolder,
+    release.rightsHolders,
+    release.metadata?.rightsholder,
+    release.metadata?.rightsHolder,
+    release.ownerLabel,
+    release.labelName,
+    release.ownerName,
+    release.primaryArtist,
+    release.artist,
+    release.artistName
+  );
+}
+
+function trackProducerRightsholder(
+  track: Record<string, any>,
+  release: Record<string, any>,
+  fallbackRightsholder?: string
+) {
+  return firstString(
+    track.producer,
+    track.producers,
+    track.metadata?.producer,
+    track.metadata?.producers,
+    track.rightsholder,
+    track.rightsHolder,
+    track.label,
+    release.producer,
+    release.producers,
+    release.metadata?.producer,
+    release.metadata?.producers,
+    fallbackRightsholder
+  );
+}
+
 async function mapOutlets(db: Db, stores: string[]) {
   const candidateKeys = Array.from(new Set(stores.flatMap(candidateOutletKeys)));
   if (!candidateKeys.length) return { mappings: [], missing: stores };
@@ -155,12 +196,25 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
   const errors: string[] = [...assetReadiness.errors];
   const warnings: string[] = [...assetReadiness.warnings];
   const releaseGenre = firstString(release.genre, release.metadata?.genre, tracks[0]?.genre, tracks[0]?.metadata?.genre);
+  const releaseRightsholderName = releaseRightsholder(release);
+  const createdCountryId = firstString(
+    release.createdCountryId,
+    release.created_country_id,
+    release.creationCountryId,
+    release.metadata?.createdCountryId,
+    release.metadata?.created_country_id,
+    'IN'
+  );
+  const catalogNumber = firstString(release.catalogNumber, release.catalog_number, release.upc, release.ean, release._id);
 
   if (!firstString(release.releaseTitle, release.title)) errors.push('Release title is required');
   if (!firstString(release.primaryArtist, release.artist, release.artistName)) errors.push('Primary artist is required');
   if (!firstString(release.upc, release.ean)) errors.push('UPC/EAN is required');
   if (!releaseGenre) errors.push('Release genre is required');
   if (!firstString(release.releaseDate, release.originalReleaseDate)) errors.push('Release date is required');
+  if (!createdCountryId) errors.push('Broma creation country is required');
+  if (!catalogNumber) errors.push('Broma catalog number or automatic catalog generation is required');
+  if (!releaseRightsholderName) errors.push('Release label/rightsholder is required');
   if (!tracks.length) errors.push('At least one track is required');
 
   if (tracks.length === 1 && String(release.releaseType || '').toLowerCase().includes('album')) {
@@ -173,8 +227,18 @@ export async function evaluateBromaReleaseReadiness(db: Db, release: ReleaseLike
     if (!firstString(track.artistName, track.primaryArtist, release.primaryArtist)) {
       errors.push(`Track ${index + 1}: artist is required`);
     }
+    if (!firstString(track.genre, releaseGenre)) errors.push(`Track ${index + 1}: genre is required`);
     if (!firstString(track.isrc)) errors.push(`Track ${index + 1}: ISRC is required`);
     if (!firstString(track.audioFile, track.audioUrl, track.fileUrl)) errors.push(`Track ${index + 1}: audio is required`);
+    if (!firstString(track.createdCountryId, track.created_country_id, createdCountryId)) {
+      errors.push(`Track ${index + 1}: Broma creation country is required`);
+    }
+    if (!firstString(track.catalogNumber, track.catalog_number, release.catalogNumber, release.catalog_number, release.upc, release._id)) {
+      errors.push(`Track ${index + 1}: Broma catalog number or automatic catalog generation is required`);
+    }
+    if (!trackProducerRightsholder(track, release, releaseRightsholderName)) {
+      errors.push(`Track ${index + 1}: producer/rightsholder is required`);
+    }
     const compositionReadiness = validateTrackComposition(track, index);
     errors.push(...compositionReadiness.errors);
     warnings.push(...compositionReadiness.warnings);

@@ -274,7 +274,12 @@ export const deleteFile = (filePath: string): void => {
 
 // Get file URL (in a real app, this would be a CDN or S3 URL)
 export const getFileUrl = (filename: string, type: 'audio' | 'image' | 'support' | 'knowledge-base'): string => {
-  const baseUrl = process.env.API_URL || 'http://localhost:5000';
+  const configuredBaseUrl = process.env.API_URL || process.env.BACKEND_URL || process.env.PUBLIC_API_URL || '';
+  const baseUrl = configuredBaseUrl
+    ? configuredBaseUrl.replace(/\/api\/?$/, '').replace(/\/+$/, '')
+    : process.env.NODE_ENV === 'production'
+      ? ''
+      : `http://${'localhost'}:${process.env.PORT || 5000}`;
   const directory = type === 'audio'
     ? 'tracks'
     : type === 'image'

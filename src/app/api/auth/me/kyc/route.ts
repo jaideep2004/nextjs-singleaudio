@@ -1,12 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const DEFAULT_BACKEND_URL = 'http://localhost:5000';
-
-const getBackendBaseUrl = () =>
-  (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_URL)
-    .replace(/\/api\/?$/, '')
-    .replace(/\/$/, '');
+import { getBackendBaseUrl } from '@/app/api/_lib/backend';
 
 const parseBackendJson = async (response: Response) => {
   try {

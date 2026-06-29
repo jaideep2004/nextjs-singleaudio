@@ -91,8 +91,9 @@ const startServer = async (): Promise<void> => {
     await connectDB();
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      console.log(`API base URL: http://localhost:${PORT}${API_PREFIX}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
+      const localOrigin = `http://${'localhost'}:${PORT}`;
+      console.log(`API base URL: ${(process.env.API_URL || `${localOrigin}${API_PREFIX}`).replace(/\/$/, '')}`);
+      console.log(`Health check: ${localOrigin}/health`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

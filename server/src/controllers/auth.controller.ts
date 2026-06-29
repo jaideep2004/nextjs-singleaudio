@@ -18,6 +18,7 @@ import {
 } from '../services/otp.service';
 import { buildDashboardUrl, sendUserAndAdminEmail } from '../services/emailNotification.service';
 import { getFileUrl } from '../utils/fileUpload';
+import { getFrontendUrl } from '../utils/frontendUrl';
 
 // Escape special regex characters in a string
 const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -459,7 +460,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
       await user.save();
 
-      const origin = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const origin = getFrontendUrl();
       const resetUrl = `${origin.replace(/\/$/, '')}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
       await sendEmailMessage(
         email,

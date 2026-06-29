@@ -52,7 +52,8 @@ export async function PATCH(
     const { db } = await connectToDatabase();
     dbForFailure = db;
 
-    const update: any = { status, updatedAt: new Date() };
+    const nextReleaseStatus = status === 'approved' ? 'uploading_to_broma' : status;
+    const update: any = { status: nextReleaseStatus, updatedAt: new Date() };
     const unset: Record<string, ''> = {};
     if (status === 'rejected') update.rejectReason = reason || '';
     if (status !== 'rejected') unset.rejectReason = '';
@@ -165,20 +166,21 @@ export async function PATCH(
     }
 
     if (status === 'approved' || status === 'rejected') {
+      const approvedAction = status === 'approved';
       void sendUserAndAdminEmail(
         db,
         { name: existing.ownerName || existing.primaryArtist || existing.artist, email: existing.ownerEmail },
         {
-          subject: `Release ${status === 'approved' ? 'approved' : 'needs correction'}: ${existing.releaseTitle || existing.title || 'Untitled release'}`,
-          title: `Release ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-          intro: status === 'approved'
-            ? 'Your release has been approved for distribution.'
+          subject: `Release ${approvedAction ? 'in process' : 'needs correction'}: ${existing.releaseTitle || existing.title || 'Untitled release'}`,
+          title: `Release ${approvedAction ? 'In Process' : 'Rejected'}`,
+          intro: approvedAction
+            ? 'Your release passed admin review and is now being delivered to Broma for moderation.'
             : 'Your release needs correction before distribution.',
           details: {
             Release: existing.releaseTitle || existing.title || 'Untitled release',
-            Status: status,
-            UPC: status === 'approved' ? String(res.value.upc || '') : undefined,
-            UPCProvider: status === 'approved' ? String(res.value.upcProvider || '') : undefined,
+            Status: approvedAction ? 'in_process' : status,
+            UPC: approvedAction ? String(res.value.upc || '') : undefined,
+            UPCProvider: approvedAction ? String(res.value.upcProvider || '') : undefined,
             Reason: reason,
             'Reviewed By': 'Single Audio Distribution',
           },
@@ -190,13 +192,13 @@ export async function PATCH(
             genre: existing.genre,
             releaseDate: existing.releaseDate,
             upc: String(res.value.upc || existing.upc || ''),
-            status,
+            status: approvedAction ? 'uploading_to_broma' : status,
             tracks: Array.isArray(res.value.tracks) ? res.value.tracks : Array.isArray(existing.tracks) ? existing.tracks : [],
             stores: Array.isArray(existing.stores) ? existing.stores : [],
             policyAcceptances: existing.policyAcceptances,
           },
-          actionLabel: status === 'approved' ? 'Open Releases' : 'Review Release',
-          actionUrl: appUrl(status === 'approved' ? '/dashboard/releases' : `/dashboard/releases/${id}`),
+          actionLabel: approvedAction ? 'Open Releases' : 'Review Release',
+          actionUrl: appUrl(approvedAction ? '/dashboard/releases?status=in_process' : `/dashboard/releases/${id}`),
         }
       ).catch((error) => console.warn('Release status email skipped:', error));
     }

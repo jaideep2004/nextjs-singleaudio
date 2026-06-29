@@ -1,5 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Alert, Checkbox, Chip, Stack } from '@mui/material';
+import { DeleteForever } from '@mui/icons-material';
+import { releaseAPI } from '@/services/api';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -57,6 +60,13 @@ export default function AdminSettingsPage() {
   const theme = useTheme();
 
   const [tabValue, setTabValue] = useState(0);
+  const [deleteReleaseSearch, setDeleteReleaseSearch] = useState('');
+  const [deleteReleaseId, setDeleteReleaseId] = useState('');
+  const [selectedDeleteReleaseIds, setSelectedDeleteReleaseIds] = useState<string[]>([]);
+  const [deleteReleaseConfirm, setDeleteReleaseConfirm] = useState('');
+  const [deleteReleases, setDeleteReleases] = useState<any[]>([]);
+  const [deleteReleasesLoading, setDeleteReleasesLoading] = useState(false);
+  const [deletingRelease, setDeletingRelease] = useState(false);
   const [settings, setSettings] = useState({
     siteName: '',
     siteDescription: '',
@@ -116,8 +126,127 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const selectedDeleteRelease = useMemo(
+    () => deleteReleases.find((release) => String(release._id) === deleteReleaseId),
+    [deleteReleases, deleteReleaseId]
+  );
+
+  const selectedDeleteReleases = useMemo(
+    () => deleteReleases.filter((release) => selectedDeleteReleaseIds.includes(String(release._id))),
+    [deleteReleases, selectedDeleteReleaseIds]
+  );
+
+  const filteredDeleteReleases = useMemo(() => {
+    const query = deleteReleaseSearch.trim().toLowerCase();
+    const list = !query
+      ? deleteReleases
+      : deleteReleases.filter((release) => {
+          const haystack = [
+            release.releaseTitle,
+            release.title,
+            release.primaryArtist,
+            release.artist,
+            release.label,
+            release.upc,
+            release.ownerEmail,
+            release.userEmail,
+            release._id,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(query);
+        });
+    return list.slice(0, 50);
+  }, [deleteReleases, deleteReleaseSearch]);
+
+  const filteredDeleteReleaseIds = useMemo(
+    () => filteredDeleteReleases.map((release) => String(release._id)),
+    [filteredDeleteReleases]
+  );
+
+  const allFilteredDeleteReleasesSelected =
+    filteredDeleteReleaseIds.length > 0 &&
+    filteredDeleteReleaseIds.every((id) => selectedDeleteReleaseIds.includes(id));
+
+  const toggleDeleteReleaseSelection = (id: string) => {
+    setSelectedDeleteReleaseIds((current) =>
+      current.includes(id) ? current.filter((releaseId) => releaseId !== id) : [...current, id]
+    );
+    setDeleteReleaseId('');
+    setDeleteReleaseConfirm('');
+  };
+
+  const toggleAllFilteredDeleteReleases = () => {
+    setSelectedDeleteReleaseIds((current) => {
+      if (allFilteredDeleteReleasesSelected) {
+        return current.filter((id) => !filteredDeleteReleaseIds.includes(id));
+      }
+      return Array.from(new Set([...current, ...filteredDeleteReleaseIds]));
+    });
+    setDeleteReleaseConfirm('');
+  };
+
+  const fetchDeleteReleases = async () => {
+    setDeleteReleasesLoading(true);
+    try {
+      const response = await releaseAPI.getReleases({ summary: '1' });
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to load releases');
+      }
+      setDeleteReleases(Array.isArray(response.data) ? response.data : []);
+      setSelectedDeleteReleaseIds([]);
+      setDeleteReleaseId('');
+      setDeleteReleaseConfirm('');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to load releases');
+    } finally {
+      setDeleteReleasesLoading(false);
+    }
+  };
+
+  const handleDeleteRelease = async () => {
+    if (selectedDeleteReleaseIds.length === 0 || deleteReleaseConfirm.trim() !== 'DELETE') {
+      toast.error('Select releases and type DELETE to confirm');
+      return;
+    }
+
+    setDeletingRelease(true);
+    try {
+      const results = await Promise.all(
+        selectedDeleteReleaseIds.map(async (id) => {
+          const response = await fetch(`/api/admin/releases/${id}`, {
+            method: 'DELETE',
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.success) {
+            throw new Error(payload.error || payload.message || `Failed to delete release ${id}`);
+          }
+          return id;
+        })
+      );
+
+      const deletedCount = results.length;
+      toast.success(`${deletedCount} release${deletedCount === 1 ? '' : 's'} deleted from database`);
+      setDeleteReleases((current) => current.filter((release) => !selectedDeleteReleaseIds.includes(String(release._id))));
+      setSelectedDeleteReleaseIds([]);
+      setDeleteReleaseId('');
+      setDeleteReleaseConfirm('');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete selected releases');
+      if (selectedDeleteReleaseIds.length > 0) {
+        await fetchDeleteReleases();
+      }
+    } finally {
+      setDeletingRelease(false);
+    }
+  };
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+    if (newValue === 4 && deleteReleases.length === 0 && !deleteReleasesLoading) {
+      void fetchDeleteReleases();
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -235,10 +364,11 @@ export default function AdminSettingsPage() {
           }}
         >
           <Tab icon={<Person />} label="General" {...a11yProps(0)} />
-          <Tab icon={<Security />} label="Security" {...a11yProps(1)} />
-          <Tab icon={<Notifications />} label="Notifications" {...a11yProps(2)} />
-          <Tab icon={<Payment />} label="Payments" {...a11yProps(3)} />
-        </Tabs>
+            <Tab icon={<Security />} label="Security" {...a11yProps(1)} />
+            <Tab icon={<Notifications />} label="Notifications" {...a11yProps(2)} />
+            <Tab icon={<Payment />} label="Payments" {...a11yProps(3)} />
+            <Tab icon={<DeleteForever />} label="Delete Releases" {...a11yProps(4)} />
+          </Tabs>
 
         <form onSubmit={handleSubmit}>
           <TabPanel value={tabValue} index={0}>
@@ -355,8 +485,8 @@ export default function AdminSettingsPage() {
 
           <TabPanel value={tabValue} index={3}>
             <Typography variant="h6" gutterBottom>
-              Payment Settings
-            </Typography>
+            Payment Settings
+          </Typography>
             <Box sx={{ mb: 3 }}>
               <TextField
                 fullWidth
@@ -404,9 +534,11 @@ export default function AdminSettingsPage() {
             </Box>
           </TabPanel>
 
-          <Divider />
+          {tabValue !== 4 && (
+            <>
+              <Divider />
 
-          <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+              <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
             <Button variant="outlined" onClick={() => fetchSettings()} disabled={saving}>
               Reset
             </Button>
@@ -419,8 +551,174 @@ export default function AdminSettingsPage() {
             >
               {saving ? 'Saving…' : 'Save Changes'}
             </Button>
-          </Box>
-        </form>
+              </Box>
+            </>
+          )}
+        <TabPanel value={tabValue} index={4}>
+          <Typography variant="h5" fontWeight="bold" mb={3}>
+            Delete Releases
+          </Typography>
+
+          <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+            This permanently deletes the release record from the database. Delivery history and audit logs stay saved. Embedded release tracks are soft-deleted.
+          </Alert>
+
+          <Stack spacing={3}>
+            <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '1fr auto' } }}>
+              <TextField
+                fullWidth
+                label="Search by title, artist, UPC, email, or ID"
+                value={deleteReleaseSearch}
+                onChange={(event) => setDeleteReleaseSearch(event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outlined"
+                onClick={fetchDeleteReleases}
+                disabled={deleteReleasesLoading}
+                sx={{ minWidth: 140 }}
+              >
+                {deleteReleasesLoading ? <CircularProgress size={20} /> : 'Refresh'}
+              </Button>
+            </Box>
+
+            <Paper variant="outlined" sx={{ overflow: 'hidden', bgcolor: 'background.default', borderRadius: 2 }}>
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2,
+                  borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.12)'}`,
+                }}
+              >
+                <Box>
+                  <Typography fontWeight={700}>Select releases</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Showing {filteredDeleteReleases.length} of {deleteReleases.length}. Selected {selectedDeleteReleaseIds.length}.
+                  </Typography>
+                </Box>
+                <Button
+                  type="button"
+                  size="small"
+                  variant="outlined"
+                  onClick={toggleAllFilteredDeleteReleases}
+                  disabled={filteredDeleteReleases.length === 0 || deleteReleasesLoading}
+                >
+                  {allFilteredDeleteReleasesSelected ? 'Clear shown' : 'Select shown'}
+                </Button>
+              </Box>
+
+              <Box sx={{ maxHeight: 420, overflowY: 'auto' }}>
+                {deleteReleasesLoading ? (
+                  <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : filteredDeleteReleases.length === 0 ? (
+                  <Box sx={{ p: 3 }}>
+                    <Typography color="text.secondary">No releases found.</Typography>
+                  </Box>
+                ) : (
+                  filteredDeleteReleases.map((release) => {
+                    const id = String(release._id);
+                    const title = release.releaseTitle || release.title || 'Untitled release';
+                    const artist = release.primaryArtist || release.artist || 'Unknown artist';
+                    const selected = selectedDeleteReleaseIds.includes(id);
+                    return (
+                      <Box
+                        key={id}
+                        onClick={() => toggleDeleteReleaseSelection(id)}
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          display: 'grid',
+                          gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+                          gap: 1.5,
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          borderBottom: `1px solid ${mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)'}`,
+                          bgcolor: selected
+                            ? mode === 'dark'
+                              ? 'rgba(244,63,94,0.14)'
+                              : 'rgba(220,38,38,0.08)'
+                            : 'transparent',
+                          '&:hover': {
+                            bgcolor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.04)',
+                          },
+                        }}
+                      >
+                        <Checkbox
+                          checked={selected}
+                          color="error"
+                          onChange={() => toggleDeleteReleaseSelection(id)}
+                          onClick={(event) => event.stopPropagation()}
+                          inputProps={{ 'aria-label': `Select ${title}` }}
+                        />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography fontWeight={700} noWrap title={title}>
+                            {title}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" noWrap title={`${artist} | ${id}`}>
+                            {artist} | ID {id}
+                          </Typography>
+                        </Box>
+                        <Stack direction="row" gap={1} flexWrap="wrap" justifyContent="flex-end">
+                          <Chip label={release.status || 'unknown'} size="small" />
+                          {release.upc && <Chip label={`UPC ${release.upc}`} size="small" />}
+                        </Stack>
+                      </Box>
+                    );
+                  })
+                )}
+              </Box>
+            </Paper>
+
+            {selectedDeleteReleases.length > 0 && (
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
+                <Typography fontWeight={700} mb={1}>
+                  {selectedDeleteReleases.length} release{selectedDeleteReleases.length === 1 ? '' : 's'} selected for deletion
+                </Typography>
+                <Stack direction="row" gap={1} flexWrap="wrap">
+                  {selectedDeleteReleases.slice(0, 8).map((release) => (
+                    <Chip
+                      key={String(release._id)}
+                      label={release.releaseTitle || release.title || String(release._id)}
+                      onDelete={() => toggleDeleteReleaseSelection(String(release._id))}
+                      size="small"
+                    />
+                  ))}
+                  {selectedDeleteReleases.length > 8 && (
+                    <Chip label={`+${selectedDeleteReleases.length - 8} more`} size="small" />
+                  )}
+                </Stack>
+              </Paper>
+            )}
+
+            <TextField
+              fullWidth
+              label="Type DELETE to confirm"
+              value={deleteReleaseConfirm}
+              onChange={(event) => setDeleteReleaseConfirm(event.target.value)}
+              disabled={selectedDeleteReleaseIds.length === 0 || deletingRelease}
+            />
+
+            <Box>
+              <Button
+                type="button"
+                variant="contained"
+                color="error"
+                startIcon={deletingRelease ? <CircularProgress size={18} color="inherit" /> : <DeleteForever />}
+                disabled={selectedDeleteReleaseIds.length === 0 || deleteReleaseConfirm.trim() !== 'DELETE' || deletingRelease}
+                onClick={handleDeleteRelease}
+              >
+                Delete {selectedDeleteReleaseIds.length || ''} Release{selectedDeleteReleaseIds.length === 1 ? '' : 's'} From Database
+              </Button>
+            </Box>
+          </Stack>
+        </TabPanel>
+      </form>
       </Paper>
     </Box>
   );

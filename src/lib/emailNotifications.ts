@@ -32,8 +32,15 @@ type ReleaseEmailSummary = {
   policyAcceptances?: ReleasePolicyAcceptances;
 };
 
-const getFrontendUrl = () =>
-  (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+const getFrontendUrl = () => {
+  const host = process.env.NEXT_PUBLIC_APP_HOST || process.env.APP_HOST || '';
+  const configured =
+    process.env.FRONTEND_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (host ? `https://${host.replace(/^https?:\/\//, '')}` : '');
+
+  return (configured || `http://${'localhost'}:${process.env.FRONTEND_PORT || 3000}`).replace(/\/$/, '');
+};
 const getLogoUrl = () => `${getFrontendUrl()}/images/singleaudio-b1.png`;
 const getHelpCenterUrl = () => `${getFrontendUrl()}/help`;
 const absoluteUrl = (value?: string) => {

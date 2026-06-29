@@ -32,6 +32,89 @@ const firstString = (...values: unknown[]) =>
 const getResponseId = (response: any) =>
   String(response?.data?.id || response?.data?.release_id || response?.id || response?.release_id || '');
 
+const splitListText = (value: string) =>
+  value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const bromaStringList = (...values: unknown[]) =>
+  Array.from(
+    new Set(
+      values.flatMap((value): string[] => {
+        if (Array.isArray(value)) return value.flatMap((item) => bromaStringList(item));
+        if (value && typeof value === 'object') {
+          const named = firstString(
+            (value as any).name,
+            (value as any).title,
+            (value as any).value,
+            (value as any).label
+          );
+          return named ? splitListText(named) : [];
+        }
+        const text = firstString(value);
+        return text ? splitListText(text) : [];
+      })
+    )
+  );
+
+const bromaArtists = (...values: unknown[]) => bromaStringList(...values);
+
+const bromaGenres = (...values: unknown[]) => bromaStringList(...values).slice(0, 3);
+
+const payloadRightsholder = (payload: DspReleasePayload) =>
+  firstString(
+    payload.label,
+    payload.metadata?.label,
+    payload.metadata?.recordLabel,
+    payload.metadata?.rightsholder,
+    payload.metadata?.rightsHolder,
+    payload.metadata?.producer,
+    payload.primaryArtist,
+    payload.releaseTitle
+  );
+
+const trackProducerRightsholder = (
+  payload: DspReleasePayload,
+  track: DspReleasePayload['tracks'][number]
+) =>
+  firstString(
+    track.metadata?.producer,
+    track.metadata?.producers,
+    track.metadata?.rightsholder,
+    track.metadata?.rightsHolder,
+    track.metadata?.label,
+    payload.metadata?.producer,
+    payload.metadata?.producers,
+    payloadRightsholder(payload),
+    track.artistName,
+    payload.primaryArtist
+  );
+
+const createdCountryId = (payload: DspReleasePayload, config: Record<string, unknown>, track?: DspReleasePayload['tracks'][number]) =>
+  firstString(
+    track?.metadata?.createdCountryId,
+    track?.metadata?.created_country_id,
+    payload.metadata?.createdCountryId,
+    payload.metadata?.created_country_id,
+    payload.metadata?.creationCountryId,
+    config.createdCountryId,
+    config.defaultCreatedCountryId,
+    config.defaultCountryCode,
+    'IN'
+  );
+
+const catalogNumber = (payload: DspReleasePayload, track?: DspReleasePayload['tracks'][number]) =>
+  firstString(
+    track?.metadata?.catalogNumber,
+    track?.metadata?.catalog_number,
+    payload.metadata?.catalogNumber,
+    payload.metadata?.catalog_number,
+    track?.upc,
+    payload.upc,
+    payload.releaseId
+  );
+
 const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
   const tracks = payload.tracks.length;
   const configured = config.releaseTypeIds as Record<string, unknown> | undefined;
@@ -152,7 +235,7 @@ export class BromaConnector extends BaseDspConnector {
       for (const track of payload.tracks) {
         const recordingId = next.bromaRecordingIds?.[track.trackId];
         if (!recordingId) throw new Error(`Missing Broma recording id for ${track.title}`);
-        await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track));
+        await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track, config));
       }
       step = next.bromaStep = 'add_compositions';
       await this.persistProgress(jobId, next);
@@ -217,23 +300,21 @@ export class BromaConnector extends BaseDspConnector {
 
   private buildReleasePayload(payload: DspReleasePayload, config: Record<string, unknown>) {
     const year = contentYear(payload.releaseDate);
-    const catalogNumber = firstString(
-      payload.metadata?.catalogNumber,
-      payload.metadata?.catalog_number,
-      payload.upc,
-      payload.releaseId
-    );
+    const releaseCatalogNumber = catalogNumber(payload);
+    const rightsholder = payloadRightsholder(payload);
     return {
       title: payload.releaseTitle,
       release_type_id: releaseTypeId(payload, config),
-      catalog_number: catalogNumber,
-      performers: [payload.primaryArtist].filter(Boolean),
-      genres: [payload.genre].filter(Boolean),
+      catalog_number: releaseCatalogNumber,
+      generate_catalog_number: !releaseCatalogNumber,
+      performers: bromaArtists(payload.primaryArtist),
+      genres: bromaGenres(payload.genre, payload.metadata?.genre),
+      created_country_id: createdCountryId(payload, config),
       ean: payload.upc,
       parental_warning_type: payload.tracks.some((track) => track.explicit) ? 1 : 0,
       account_id: Number(config.accountId),
-      p_line: String(payload.metadata?.pline || payload.label || payload.primaryArtist || payload.releaseTitle),
-      c_line: String(payload.metadata?.cline || payload.label || payload.primaryArtist || payload.releaseTitle),
+      p_line: String(payload.metadata?.pline || rightsholder || payload.primaryArtist || payload.releaseTitle),
+      c_line: String(payload.metadata?.cline || rightsholder || payload.primaryArtist || payload.releaseTitle),
       date_p_line: year,
       date_c_line: year,
       created_date: payload.releaseDate,
@@ -242,15 +323,28 @@ export class BromaConnector extends BaseDspConnector {
     };
   }
 
-  private buildRecordingPayload(payload: DspReleasePayload, track: DspReleasePayload['tracks'][number]) {
+  private buildRecordingPayload(payload: DspReleasePayload, track: DspReleasePayload['tracks'][number], config?: Record<string, unknown>) {
+    const trackCatalogNumber = catalogNumber(payload, track);
+    const primaryArtist = firstString(track.artistName, payload.primaryArtist);
+    const featuredArtist = firstString(track.metadata?.featuredArtist, track.metadata?.featuring, payload.metadata?.featuredArtist, payload.metadata?.featuring);
+    const rightsholder = payloadRightsholder(payload);
     return {
       title: track.title,
-      performers: [track.artistName].filter(Boolean),
-      main_performer: [track.artistName].filter(Boolean),
+      subtitle: firstString(track.version, track.metadata?.subtitle, track.metadata?.version),
+      performers: bromaArtists(primaryArtist),
+      main_performer: bromaArtists(primaryArtist),
+      featured_artists: bromaArtists(featuredArtist),
       isrc: track.isrc,
-      genres: [payload.genre || track.genre].filter(Boolean),
+      generate_isrc: !track.isrc,
+      catalog_number: trackCatalogNumber,
+      generate_catalog_number: !trackCatalogNumber,
+      genres: bromaGenres(track.genre, track.metadata?.genre, payload.genre, payload.metadata?.genre),
+      created_country_id: createdCountryId(payload, config || {}, track),
+      created_date: firstString(track.releaseDate, payload.releaseDate),
       language: track.language || payload.language,
-      parental_warning_type: track.explicit ? 1 : 0,
+      parental_warning_type: track.explicit ? 'explicit' : 'not_explicit',
+      label: rightsholder,
+      producer: trackProducerRightsholder(payload, track),
     };
   }
 

@@ -35,6 +35,7 @@ import {
   Cancel,
   MusicNote,
   Search,
+  Sync,
   UploadFile,
 } from '@mui/icons-material';
 import Link from 'next/link';
@@ -44,6 +45,10 @@ import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSur
 import { useRouter } from 'next/navigation';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
+
+const IN_PROCESS_RELEASE_STATUSES = new Set(['uploading_to_broma', 'broma_moderation', 'dsp_processing']);
+const getReleaseDisplayStatus = (status?: string) =>
+  IN_PROCESS_RELEASE_STATUSES.has(String(status || '')) ? 'in_process' : status || 'pending';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -102,10 +107,12 @@ export default function AdminReleasesPage() {
   useEffect(() => {
     if (statusFilter === 'pending') {
       setTabValue(1);
-    } else if (statusFilter === 'approved') {
+    } else if (statusFilter === 'in_process') {
       setTabValue(2);
-    } else if (statusFilter === 'rejected') {
+    } else if (statusFilter === 'approved') {
       setTabValue(3);
+    } else if (statusFilter === 'rejected') {
+      setTabValue(4);
     } else {
       setTabValue(0);
     }
@@ -134,13 +141,13 @@ export default function AdminReleasesPage() {
   }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    if (newValue === 4) {
+    if (newValue === 5) {
       router.push('/admin/export');
       return;
     }
     setTabValue(newValue);
     setPage(0);
-    const nextStatus = ['', 'pending', 'approved', 'rejected'][newValue];
+    const nextStatus = ['', 'pending', 'in_process', 'approved', 'rejected'][newValue];
     setStatusFilter(nextStatus || null);
     router.push(nextStatus ? `/admin/releases?status=${nextStatus}` : '/admin/releases');
   };
@@ -157,18 +164,21 @@ export default function AdminReleasesPage() {
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
   const getReleaseArtwork = (release: any) =>
     release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
-  const pendingCount = releases.filter(r => r.status === 'pending').length;
-  const approvedCount = releases.filter(r => r.status === 'approved').length;
-  const rejectedCount = releases.filter(r => r.status === 'rejected').length;
+  const pendingCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'pending').length;
+  const inProcessCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'in_process').length;
+  const approvedCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'approved').length;
+  const rejectedCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'rejected').length;
 
   const statusFilteredReleases = useMemo(() => {
     switch (tabValue) {
       case 1: // Pending
-        return releases.filter(r => r.status === 'pending');
-      case 2: // Approved
-        return releases.filter(r => r.status === 'approved');
-      case 3: // Rejected
-        return releases.filter(r => r.status === 'rejected');
+        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'pending');
+      case 2: // In Process
+        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'in_process');
+      case 3: // Approved
+        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'approved');
+      case 4: // Rejected
+        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'rejected');
       default: // All
         return releases;
     }
@@ -236,6 +246,7 @@ export default function AdminReleasesPage() {
   const tabItems = [
     { label: 'All', count: releases.length, icon: <Album fontSize="small" />, color: '#5b5ff7' },
     { label: 'Pending', count: pendingCount, icon: <Pending fontSize="small" />, color: '#f59e0b' },
+    { label: 'In Process', count: inProcessCount, icon: <Sync fontSize="small" />, color: '#0ea5e9' },
     { label: 'Approved', count: approvedCount, icon: <CheckCircle fontSize="small" />, color: '#10b981' },
     { label: 'Rejected', count: rejectedCount, icon: <Cancel fontSize="small" />, color: '#ef4444' },
     { label: 'Export Catalog', count: null, icon: <UploadFile fontSize="small" />, color: '#0ea5e9' },
@@ -245,11 +256,13 @@ export default function AdminReleasesPage() {
   const getStatusChip = (status: string) => {
     const statusConfig = {
       pending: { label: 'Pending', color: 'warning', icon: <Pending /> },
+      in_process: { label: 'In Process', color: 'info', icon: <Sync /> },
       approved: { label: 'Approved', color: 'success', icon: <CheckCircle /> },
       rejected: { label: 'Rejected', color: 'error', icon: <Cancel /> },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || {
+    const displayStatus = getReleaseDisplayStatus(status);
+    const config = statusConfig[displayStatus as keyof typeof statusConfig] || {
       label: status,
       color: 'default',
       icon: null,
@@ -460,6 +473,9 @@ export default function AdminReleasesPage() {
           {renderReleasesTable()}
         </TabPanel>
         <TabPanel value={tabValue} index={3}>
+          {renderReleasesTable()}
+        </TabPanel>
+        <TabPanel value={tabValue} index={4}>
           {renderReleasesTable()}
         </TabPanel>
       </Paper>

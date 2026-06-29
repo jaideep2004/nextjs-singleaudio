@@ -27,17 +27,65 @@ const stableStringify = (value: unknown): string => {
 const sha256 = (value: unknown) =>
   crypto.createHash('sha256').update(stableStringify(value)).digest('hex');
 
+const firstString = (...values: unknown[]) =>
+  values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+
+function releaseRightsholder(release: Record<string, any>) {
+  return firstString(
+    release.label,
+    release.metadata?.label,
+    release.recordLabel,
+    release.metadata?.recordLabel,
+    release.rightsholder,
+    release.rightsHolder,
+    release.metadata?.rightsholder,
+    release.metadata?.rightsHolder,
+    release.ownerLabel,
+    release.labelName,
+    release.ownerName,
+    release.primaryArtist,
+    release.artist,
+    release.artistName
+  );
+}
+
+function producerRightsholder(track: Record<string, any>, release: Record<string, any>, fallback?: string) {
+  return firstString(
+    track.producer,
+    track.producers,
+    track.metadata?.producer,
+    track.metadata?.producers,
+    track.rightsholder,
+    track.rightsHolder,
+    track.label,
+    release.producer,
+    release.producers,
+    release.metadata?.producer,
+    release.metadata?.producers,
+    fallback
+  );
+}
+
 function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: string) {
   const tracks = Array.isArray(release.tracks) ? release.tracks : [];
   const assetChecks = release.deliveryAssetReadiness?.checks || [];
   const bromaReadiness = release.bromaReadiness || {};
   const releaseGenre = release.genre || release.metadata?.genre || tracks[0]?.genre || tracks[0]?.metadata?.genre;
+  const rightsholder = releaseRightsholder(release);
+  const createdCountryId =
+    release.createdCountryId ||
+    release.created_country_id ||
+    release.creationCountryId ||
+    release.metadata?.createdCountryId ||
+    release.metadata?.created_country_id ||
+    'IN';
+  const catalogNumber = release.catalogNumber || release.catalog_number || release.upc || release._id.toString();
   const payload = {
     releaseId: release._id.toString(),
     releaseTitle: release.releaseTitle || release.title || 'Untitled release',
     upc: release.upc,
     primaryArtist: release.primaryArtist || release.artist || release.artistName,
-    label: release.label,
+    label: rightsholder,
     genre: releaseGenre,
     language: release.language,
     releaseDate: release.releaseDate,
@@ -46,6 +94,7 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
       id: String(track._id || track.id || track.isrc || track.title || ''),
       title: track.title,
       artistName: track.artistName || track.primaryArtist || release.primaryArtist,
+      version: track.version || track.subtitle || track.metadata?.version || track.metadata?.subtitle,
       isrc: track.isrc,
       upc: track.upc || release.upc,
       genre: track.genre,
@@ -57,6 +106,15 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
       composers: track.composers || [],
       lyricists: track.lyricists || [],
       publishers: track.publishers || [],
+      metadata: {
+        subtitle: track.subtitle || track.metadata?.subtitle,
+        version: track.version || track.metadata?.version,
+        catalogNumber: track.catalogNumber || track.catalog_number || catalogNumber,
+        createdCountryId: track.createdCountryId || track.created_country_id || createdCountryId,
+        producer: producerRightsholder(track, release, rightsholder),
+        featuredArtist: track.featuredArtist || track.featuring || track.metadata?.featuredArtist || track.metadata?.featuring,
+        label: rightsholder,
+      },
     })),
     territories: release.territories || ['WORLD'],
     assetChecks: assetChecks.map((check: any) => ({
@@ -69,6 +127,10 @@ function buildSnapshot(release: ReleaseDoc, providerKeys: string[], createdBy?: 
     metadata: {
       artwork: release.artworkUrl || release.artwork || release.coverArt,
       releaseType: release.releaseType,
+      catalogNumber,
+      createdCountryId,
+      producer: release.producer || release.producers || release.metadata?.producer || release.metadata?.producers || rightsholder,
+      featuring: release.featuring || release.metadata?.featuring,
       pline: release.pline || release.pLine,
       cline: release.cline || release.cLine,
       bromaOutletIds: bromaReadiness.outletIds || [],

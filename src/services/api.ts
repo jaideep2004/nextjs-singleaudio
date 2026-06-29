@@ -1,5 +1,6 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { getConfiguredApiBaseUrl } from '@/lib/urlConfig';
 
 // Check if we're in the browser
 const isBrowser = typeof window !== 'undefined';
@@ -8,7 +9,7 @@ const isBrowser = typeof window !== 'undefined';
 // For client-side requests, use relative URLs to avoid CORS issues
 const API_BASE_URL = isBrowser 
   ? '/api'  // This will be handled by Next.js API routes
-  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  : getConfiguredApiBaseUrl();
 
 // Create axios instance
 const api = axios.create({
@@ -66,7 +67,7 @@ const handleApiError = (error: any) => {
     // The request was made and the server responded with a status code
     // that falls out of the range of 2xx
     console.error('API Error Response:', error.response.data);
-    throw new Error(error.response.data.message || 'An error occurred');
+    throw new Error(error.response.data.message || error.response.data.error || 'An error occurred');
   } else if (error.request) {
     // The request was made but no response was received
     console.error('API Error Request:', error.request);

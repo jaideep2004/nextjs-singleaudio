@@ -1,4 +1,5 @@
 import Cookies from 'js-cookie';
+import { getConfiguredApiBaseUrl } from '@/lib/urlConfig';
 
 export type AcrCloudState = 'not_configured' | 'pending' | 'ready' | 'no_results' | 'error';
 
@@ -98,12 +99,7 @@ export function getAcrCloudRightsClaims(raw: unknown) {
 }
 
 const getApiBase = () => {
-  const configuredBase =
-    typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-      ? process.env.NEXT_PUBLIC_API_URL!
-      : 'http://localhost:5000/api';
-
-  return configuredBase.replace(/\/+$/, '').replace(/\/api$/, '') + '/api';
+  return getConfiguredApiBaseUrl().replace(/\/+$/, '').replace(/\/api$/, '') + '/api';
 };
 
 export const getAcrCloudState = (acrCloud?: AcrCloudStatusLike | null): AcrCloudState | undefined =>

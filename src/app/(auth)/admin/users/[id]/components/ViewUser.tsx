@@ -24,18 +24,12 @@ import {
 } from '@mui/icons-material';
 import { adminAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
+import { resolveMediaUrl } from '@/lib/urlConfig';
 import Link from 'next/link';
 import AdminKycFileDialog from './AdminKycFileDialog';
 
-const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
-  .replace(/\/api\/?$/, '')
-  .replace(/\/$/, '');
-
 const toAssetUrl = (value?: string) => {
-  if (!value) return '';
-  if (/^(https?:|data:|blob:)/.test(value)) return value;
-  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
-  return value;
+  return resolveMediaUrl(value);
 };
 
 export default function ViewUser({ user, onUserUpdate, onEdit }: { user: any; onUserUpdate: () => void; onEdit?: () => void }) {

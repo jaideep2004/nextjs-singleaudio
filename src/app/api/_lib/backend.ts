@@ -1,7 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const DEFAULT_BACKEND_URL = 'http://localhost:5000';
+import { getConfiguredBackendOrigin } from '@/lib/urlConfig';
 
 type ProxyOptions = {
   requireAuth?: boolean;
@@ -11,9 +10,7 @@ type ProxyOptions = {
 type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
 export const getBackendBaseUrl = () =>
-  (process.env.NEXT_PUBLIC_API_URL || DEFAULT_BACKEND_URL)
-    .replace(/\/api\/?$/, '')
-    .replace(/\/$/, '');
+  getConfiguredBackendOrigin();
 
 export const getAuthToken = async () => {
   const cookieStore = await cookies();

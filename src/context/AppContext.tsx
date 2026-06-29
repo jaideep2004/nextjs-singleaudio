@@ -5,6 +5,7 @@ import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import { getFirstAllowedAdminPath } from '@/lib/adminAccess';
 import { getAuthTokenCookie, removeAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
+import { getConfiguredApiBaseUrl } from '@/lib/urlConfig';
 
 interface User {
   id: string;
@@ -148,7 +149,7 @@ const AppContext = createContext<AuthContextType | undefined>(undefined);
 const API_URL =
   typeof window !== 'undefined'
     ? '/api'
-    : 'http://localhost:5000/api';
+    : getConfiguredApiBaseUrl();
 
 const RELEASE_DRAFT_BACKUP_KEY = 'singleaudio.releaseDraft.v1.latest';
 const KYC_DRAFT_BACKUP_KEY = 'singleaudio.kycDraft.v1.latest';

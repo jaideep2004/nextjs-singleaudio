@@ -4,11 +4,9 @@ import { join } from 'path';
 import { mkdir, unlink } from 'fs/promises';
 import { createWriteStream } from 'fs';
 import { Readable } from 'stream';
-import { promisify } from 'util';
+import { getBackendBaseUrl } from '@/app/api/_lib/backend';
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')
-  .replace(/\/+$/, '')
-  .replace(/\/api$/, '');
+const API_URL = getBackendBaseUrl();
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
 async function saveFileToDisk(file: File) {   

@@ -36,6 +36,7 @@ import {
   PlaylistAddCheck,
   Delete,
   Replay,
+  Sync,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -53,6 +54,7 @@ import {
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
 import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
+import { resolveMediaUrl } from '@/lib/urlConfig';
 
 const formatAcrProbability = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
@@ -85,6 +87,12 @@ const formatTrackDuration = (value?: string | number) => {
   const minutes = Math.floor(value / 60);
   const seconds = Math.round(value % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
+const IN_PROCESS_RELEASE_STATUSES = new Set(['uploading_to_broma', 'broma_moderation', 'dsp_processing']);
+const getReleaseDisplayStatus = (status?: string) => {
+  if (IN_PROCESS_RELEASE_STATUSES.has(String(status || ''))) return 'in_process';
+  return status || 'pending';
 };
 
 export default function AdminReleaseDetailPage() {
@@ -128,10 +136,13 @@ export default function AdminReleaseDetailPage() {
 
   const statusColor = useMemo(() => {
     if (!release?.status) return "default" as const;
-    return release.status === "approved"
+    const displayStatus = getReleaseDisplayStatus(release.status);
+    return displayStatus === "approved"
       ? ("success" as const)
-      : release.status === "pending"
+      : displayStatus === "pending"
       ? ("warning" as const)
+      : displayStatus === "in_process"
+      ? ("info" as const)
       : ("error" as const);
   }, [release?.status]);
 
@@ -217,7 +228,8 @@ export default function AdminReleaseDetailPage() {
       setSaving(true);
       const resp = await releaseAPI.updateReleaseStatus(releaseId, "approved");
       if (resp?.success) {
-        setRelease((r: any) => (r ? { ...r, status: "approved", rejectReason: undefined, rejectionReason: undefined } : r));
+        const nextStatus = resp.release?.status || resp.data?.status || "uploading_to_broma";
+        setRelease((r: any) => (r ? { ...r, status: nextStatus, rejectReason: undefined, rejectionReason: undefined } : r));
         const list = await releaseAPI.getReleases({ summary: '1' });
         const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => item.status === 'pending');
         router.push(hasPending ? '/admin/releases?status=pending' : '/admin/releases');
@@ -362,13 +374,22 @@ export default function AdminReleaseDetailPage() {
     : Array.isArray(release?.tracks?.data)
       ? release.tracks.data
       : [];
+  const releaseArtworkUrl = resolveMediaUrl(
+    release?.artworkUrl ||
+      release?.artwork ||
+      release?.coverArt ||
+      release?.coverUrl ||
+      release?.imageUrl ||
+      firstTrack?.artworkUrl ||
+      firstTrack?.artwork
+  );
   const playableTracks = releaseTracks
     .map((track: any, sourceIndex: number) => ({
       id: String(track._id || track.id || sourceIndex),
       title: track.title || track.name || `Track ${sourceIndex + 1}`,
       artist: release?.primaryArtist || release?.artist || release?.ownerName,
-      audioUrl: track.audioUrl || track.audioFile || track.audio || '',
-      artworkUrl: track.artworkUrl || release?.artworkUrl,
+      audioUrl: resolveMediaUrl(track.audioUrl || track.audioFile || track.audio || ''),
+      artworkUrl: resolveMediaUrl(track.artworkUrl || track.artwork || releaseArtworkUrl),
       sourceIndex,
     }))
     .filter((track: any) => Boolean(track.audioUrl));
@@ -765,11 +786,12 @@ export default function AdminReleaseDetailPage() {
           <Stack spacing={1.5} sx={{ p: { xs: 1.25, md: 2 } }}>
             {tracks.map((track: any, index: number) => {
               // Try different possible field names for audio URL
-              const audioUrl = track.audioUrl || track.audioFile || track.audio || null;
+              const audioUrl = resolveMediaUrl(track.audioUrl || track.audioFile || track.audio || null);
               const trackId = track._id || track.id || index.toString();
               const title = track.title || track.name || `Track ${index + 1}`;
               const isrc = track.isrc || track.ISRC || 'No ISRC';
               const duration = track.duration || track.length || 0;
+              const trackArtworkUrl = resolveMediaUrl(track.artworkUrl || track.artwork || releaseArtworkUrl);
               const isActivePlayerCard = playerVisible && playableTracks[playerIndex]?.sourceIndex === index;
               
               return (
@@ -789,6 +811,8 @@ export default function AdminReleaseDetailPage() {
                 >
                   <Box sx={{ display: 'flex', gap: 1.5, flex: '1 1 360px', minWidth: { xs: 0, sm: 320 } }}>
                     <Avatar
+                      src={trackArtworkUrl || undefined}
+                      variant="rounded"
                       sx={{
                         width: 44,
                         height: 44,
@@ -978,11 +1002,12 @@ export default function AdminReleaseDetailPage() {
         
         <Chip
           icon={
-            release.status === "approved" ? <CheckCircle /> :
-            release.status === "pending" ? <Pending /> :
+            getReleaseDisplayStatus(release.status) === "approved" ? <CheckCircle /> :
+            getReleaseDisplayStatus(release.status) === "pending" ? <Pending /> :
+            getReleaseDisplayStatus(release.status) === "in_process" ? <Sync /> :
             <Cancel />
           }
-          label={release.status?.charAt(0).toUpperCase() + release.status?.slice(1)}
+          label={getReleaseDisplayStatus(release.status).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
           color={statusColor}
           size="medium"
           sx={{ fontWeight: 600 }}
@@ -1004,7 +1029,7 @@ export default function AdminReleaseDetailPage() {
           {/* Cover Image */}
           <Box
             component="img"
-            src={release.artworkUrl || release.artwork || '/placeholder-artwork.jpg'}
+            src={releaseArtworkUrl || '/placeholder-artwork.jpg'}
             alt={`${release.releaseTitle || 'Release'} Cover`}
             sx={{
               width: { xs: '100%', md: 200 },
@@ -1075,7 +1100,7 @@ export default function AdminReleaseDetailPage() {
               </Card>
             )}
             
-            {release.status !== "approved" && (
+            {!["approved", "in_process"].includes(getReleaseDisplayStatus(release.status)) && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
                 <Button
                   variant="contained"
@@ -1101,7 +1126,7 @@ export default function AdminReleaseDetailPage() {
                 )}
               </Box>
             )}
-            {release.status === "approved" && (
+            {getReleaseDisplayStatus(release.status) === "approved" && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
                 <Button
                   variant="outlined"

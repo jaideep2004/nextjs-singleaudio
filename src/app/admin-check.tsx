@@ -58,8 +58,7 @@ export default function AdminCheck() {
     setApiResponse(null);
 
     try {
-      // Make direct API call to login
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post('/api/auth/login', {
         email,
         password,
       });
@@ -107,8 +106,7 @@ export default function AdminCheck() {
         }
       } : {};
 
-      // Make request to auth/me endpoint to check role
-      const response = await axios.get('http://localhost:5000/api/auth/me', config);
+      const response = await axios.get('/api/auth/me', config);
       
       console.log('API response:', response.data);
       setApiResponse(response.data);

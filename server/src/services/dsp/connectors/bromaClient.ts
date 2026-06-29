@@ -61,6 +61,15 @@ function getBromaErrorMessage(status: number, data: unknown) {
   return messages.length ? `Broma HTTP ${status}: ${messages.join('; ')}` : `Broma HTTP ${status}`;
 }
 
+function scalarParams(payload: Record<string, unknown>) {
+  return Object.entries(payload).reduce<Record<string, string | number | boolean>>((acc, [key, value]) => {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+}
+
 function isPrivateAddress(address: string) {
   if (net.isIPv6(address)) {
     return address === '::1' || address.toLowerCase().startsWith('fc') || address.toLowerCase().startsWith('fd') || address.toLowerCase().startsWith('fe80:');
@@ -183,6 +192,7 @@ export class BromaClient {
     return this.request<any>({
       method: 'PUT',
       url: `/repertoire/release/${releaseId}/recording/${recordingId}`,
+      params: scalarParams(payload),
       data: payload,
     });
   }

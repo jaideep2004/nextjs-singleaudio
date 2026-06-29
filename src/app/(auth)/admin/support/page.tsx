@@ -37,6 +37,7 @@ import {
 import { useAuth } from '@/context/AppContext';
 import { AttachmentPreview } from '@/components/support/AttachmentPreview';
 import { SupportPriorityChip, SupportStatusChip } from '@/components/support/SupportLabels';
+import { resolveMediaUrl } from '@/lib/urlConfig';
 
 const statuses: Array<{ value: SupportTicketStatus | ''; label: string }> = [
   { value: '', label: 'All Statuses' },
@@ -58,15 +59,8 @@ const sortOptions: Array<{ value: SupportTicketSort; label: string }> = [
   { value: 'status', label: 'Status' },
 ];
 
-const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
-  .replace(/\/api\/?$/, '')
-  .replace(/\/$/, '');
-
 const toAssetUrl = (value?: string) => {
-  if (!value) return '';
-  if (/^(https?:|data:|blob:)/.test(value)) return value;
-  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
-  return value;
+  return resolveMediaUrl(value);
 };
 
 const supportMessageBody = (message: any) =>

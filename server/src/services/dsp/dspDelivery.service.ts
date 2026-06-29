@@ -204,6 +204,7 @@ class DspDeliveryService {
         trackId: String(track.id || `${payload.releaseId || snapshot.releaseId || 'release'}:${index + 1}`),
         title: track.title,
         artistName: track.artistName || payload.primaryArtist,
+        version: track.version,
         isrc: track.isrc,
         upc: track.upc || payload.upc,
         explicit: track.explicit,
@@ -215,6 +216,7 @@ class DspDeliveryService {
         contentRating: track.explicit ? 'explicit' : 'clean',
         ddexProfile: 'ERN-4',
         metadata: {
+          ...(track.metadata || {}),
           source: 'releaseDeliverySnapshot',
           releaseId: String(payload.releaseId || snapshot.releaseId || ''),
           contributors: track.contributors || [],
@@ -498,16 +500,16 @@ class DspDeliveryService {
     let releaseStatus: string | null = null;
     const step = String(metadata.bromaStep || '');
     const moderationStatus = String(metadata.bromaModerationStatus || '').toLowerCase();
-    if (state === 'delivered') releaseStatus = 'live';
+    if (state === 'delivered') releaseStatus = 'approved';
     else if (step === 'send_moderation') releaseStatus = 'broma_moderation';
     else if (step === 'poll_status') {
       releaseStatus = ['accepted', 'approved', 'processing', 'distributed', 'in_distribution'].includes(moderationStatus)
         ? 'dsp_processing'
         : 'broma_moderation';
     }
-    else if (step === 'done') releaseStatus = 'live';
+    else if (step === 'done') releaseStatus = 'approved';
     else if (state === 'processing') releaseStatus = 'uploading_to_broma';
-    else if (state === 'needs_attention') releaseStatus = 'approved';
+    else if (state === 'needs_attention') releaseStatus = 'uploading_to_broma';
 
     if (!releaseStatus) return;
     await mongoose.connection.collection('releases').updateOne(
@@ -645,6 +647,8 @@ class DspDeliveryService {
       });
       return DeliveryJob.findById(jobId);
     } catch (error) {
+      const latestJob = await DeliveryJob.findById(jobId).select('metadata');
+      const latestMetadata = (latestJob?.metadata || job.metadata || {}) as Record<string, any>;
       const message = getErrorMessage(error);
       const statusCode = typeof (error as any)?.statusCode === 'number' ? (error as any).statusCode : undefined;
       const responseBody = getProviderErrorResponseBody(error);
@@ -661,7 +665,7 @@ class DspDeliveryService {
         deadLettered: !needsAttention && !shouldRetry,
         errorMessage: message,
         metadata: {
-          ...job.metadata,
+          ...latestMetadata,
           lastProviderError: responseBody,
         },
         $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
@@ -683,7 +687,7 @@ class DspDeliveryService {
       });
 
       if (needsAttention) {
-        await this.updateReleaseLifecycle(job, 'needs_attention', job.metadata || {});
+        await this.updateReleaseLifecycle(job, 'needs_attention', latestMetadata);
       }
 
       return DeliveryJob.findById(jobId);

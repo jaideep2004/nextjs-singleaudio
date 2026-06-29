@@ -83,13 +83,11 @@ import {
   requiresFacebookRightsPolicy,
   requiresYoutubePolicy,
 } from '@/lib/releaseConsent';
+import { getConfiguredApiBaseUrl } from '@/lib/urlConfig';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
 const API_BASE =
-  (typeof window !== 'undefined' && (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-    ? process.env.NEXT_PUBLIC_API_URL!
-    : 'http://localhost:5000/api'
-  )
+  getConfiguredApiBaseUrl()
     .replace(/\/+$/, '')
     .replace(/\/api$/, '') + '/api';
 const VERCEL_FUNCTION_UPLOAD_LIMIT_BYTES = 4.5 * 1024 * 1024;

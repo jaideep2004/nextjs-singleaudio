@@ -2,6 +2,7 @@ import User from '../repositories/user.repository';
 import { NotificationType, UserRole } from '../config/constants';
 import { sendEmailMessage } from './otp.service';
 import { createNotification } from './notification.service';
+import { getFrontendUrl } from '../utils/frontendUrl';
 
 type MailRecipient = {
   email?: string;
@@ -25,7 +26,6 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-const getFrontendUrl = () => (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const getLogoUrl = () => `${getFrontendUrl()}/images/singleaudio-b1.png`;
 const getHelpCenterUrl = () => `${getFrontendUrl()}/help`;
 

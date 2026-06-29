@@ -46,6 +46,7 @@ import { useAuth } from '@/context/AppContext';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { isFullAdmin } from '@/lib/adminAccess';
+import { resolveMediaUrl } from '@/lib/urlConfig';
 import { toast } from 'sonner';
 
 interface AdminUser {
@@ -63,15 +64,8 @@ interface AdminUser {
   };
 }
 
-const backendBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api')
-  .replace(/\/api\/?$/, '')
-  .replace(/\/$/, '');
-
 const toAssetUrl = (value?: string) => {
-  if (!value) return '';
-  if (/^(https?:|data:|blob:)/.test(value)) return value;
-  if (value.startsWith('/uploads')) return `${backendBaseUrl}${value}`;
-  return value;
+  return resolveMediaUrl(value);
 };
 
 interface AdminUsersResponseData {

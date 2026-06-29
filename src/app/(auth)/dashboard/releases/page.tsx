@@ -37,6 +37,9 @@ const RELEASE_DRAFT_BACKUP_KEY = `${RELEASE_DRAFT_PREFIX}latest`;
 
 const getNormalizedReleaseStatus = (status?: string) => {
   if (status === 'pending_review') return 'pending';
+  if (['uploading_to_broma', 'broma_moderation', 'dsp_processing'].includes(String(status || ''))) {
+    return 'in_process';
+  }
   return status || 'pending';
 };
 
@@ -236,6 +239,7 @@ function ReleasesContent() {
     const map: Record<string, { color: string; bg: string; label: string }> = {
       draft: { color: '#94a3b8', bg: isDark ? 'rgba(148,163,184,0.14)' : 'rgba(100,116,139,0.10)', label: 'Draft' },
       approved: { color: '#10b981', bg: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)', label: 'Approved' },
+      in_process: { color: '#0ea5e9', bg: isDark ? 'rgba(14,165,233,0.14)' : 'rgba(14,165,233,0.09)', label: 'In Process' },
       pending: { color: '#f59e0b', bg: isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', label: 'Pending' },
       rejected: { color: '#ef4444', bg: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', label: 'Rejected' },
     };
@@ -293,6 +297,7 @@ function ReleasesContent() {
   const tabCounts = {
     '': catalogReleases.length,
     pending: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending').length,
+    in_process: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process').length,
     approved: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved').length,
     rejected: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected').length,
     draft: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'draft').length,
@@ -323,6 +328,7 @@ function ReleasesContent() {
         items={[
           { label: `All (${tabCounts['']})`, href: '/dashboard/releases' },
           { label: `Pending (${tabCounts.pending})`, href: '/dashboard/releases?status=pending' },
+          { label: `In Process (${tabCounts.in_process})`, href: '/dashboard/releases?status=in_process' },
           { label: `Approved (${tabCounts.approved})`, href: '/dashboard/releases?status=approved' },
           { label: `Rejected (${tabCounts.rejected})`, href: '/dashboard/releases?status=rejected' },
           { label: `Drafts (${tabCounts.draft})`, href: '/dashboard/releases?status=draft' },

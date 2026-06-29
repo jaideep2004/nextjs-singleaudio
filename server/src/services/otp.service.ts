@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import tls from 'tls';
+import { getFrontendUrl } from '../utils/frontendUrl';
 
 const OTP_TTL_MINUTES = Number(process.env.OTP_TTL_MINUTES || 10);
 const AMAZE_SMS_TIMEOUT_MS = Number(process.env.AMAZE_SMS_TIMEOUT_MS || 45000);
@@ -85,8 +86,6 @@ const escapeHtml = (value: unknown) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 
-const getFrontendUrl = () =>
-  (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const getLogoUrl = () => `${getFrontendUrl()}/images/singleaudio-b1.png`;
 const getHelpCenterUrl = () => `${getFrontendUrl()}/help`;
 
