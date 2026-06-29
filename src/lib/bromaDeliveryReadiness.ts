@@ -80,9 +80,6 @@ const bromaDictionaryId = (value: unknown, codeMap: Record<string, number>) => {
 const hasBromaDictionaryId = (value: unknown, codeMap: Record<string, number>) =>
   bromaDictionaryId(value, codeMap) !== undefined;
 
-const sameBromaTitle = (left: unknown, right: unknown) =>
-  normalize(left).replace(/\s+/g, ' ') === normalize(right).replace(/\s+/g, ' ');
-
 function getContributors(track: Record<string, any>) {
   const values = [
     track.contributors,
@@ -248,9 +245,6 @@ export async function evaluateBromaReleaseReadiness(
     errors.push('Album release type requires at least two tracks');
   }
   if (tracks.length > 40) errors.push('Broma album/compilation releases support at most 40 tracks');
-  if (tracks.length === 1 && !sameBromaTitle(firstString(release.releaseTitle, release.title), firstString(tracks[0]?.title, tracks[0]?.name))) {
-    errors.push('Broma single release title must match the recording title');
-  }
 
   tracks.forEach((track, index) => {
     if (!firstString(track.title, track.name)) errors.push(`Track ${index + 1}: title is required`);

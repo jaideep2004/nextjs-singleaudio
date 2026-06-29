@@ -38,13 +38,6 @@ const splitListText = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const comparableTitle = (value: unknown) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-
 const bromaStringList = (...values: unknown[]) =>
   Array.from(
     new Set(
@@ -68,6 +61,9 @@ const bromaStringList = (...values: unknown[]) =>
 const bromaArtists = (...values: unknown[]) => bromaStringList(...values);
 
 const bromaGenres = (...values: unknown[]) => bromaStringList(...values).slice(0, 3);
+
+const bromaRecordingTitle = (payload: DspReleasePayload, track: DspReleasePayload['tracks'][number]) =>
+  payload.tracks.length === 1 ? payload.releaseTitle : track.title;
 
 const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
   IN: 32,
@@ -223,9 +219,6 @@ export class BromaConnector extends BaseDspConnector {
     if (!('releaseId' in payload)) errors.push('Broma delivery requires release payload');
     if ('releaseId' in payload) {
       if (!payload.upc) errors.push('Missing release UPC/EAN');
-      if (payload.tracks.length === 1 && comparableTitle(payload.releaseTitle) !== comparableTitle(payload.tracks[0]?.title)) {
-        errors.push('Broma single release title must match the recording title');
-      }
       payload.tracks.forEach((track, index) => {
         if (!track.isrc) errors.push(`Track ${index + 1}: missing ISRC`);
         if (!track.audioFile) errors.push(`Track ${index + 1}: missing audio file`);
@@ -432,7 +425,7 @@ export class BromaConnector extends BaseDspConnector {
     );
     return {
       id: requireBromaInteger(recordingId, 'Broma recording id'),
-      title: track.title,
+      title: bromaRecordingTitle(payload, track),
       subtitle: firstString(track.version, track.metadata?.subtitle, track.metadata?.version),
       performers: bromaArtists(primaryArtist),
       main_performer: bromaArtists(primaryArtist),
