@@ -24,7 +24,7 @@ import {
   getConfiguredCredentialKeys,
   isPlainCredentialMap,
 } from './dspCredentialVault';
-import { syncBromaOutlets } from './bromaOutlet.service';
+import { listBromaOutlets, syncBromaOutlets } from './bromaOutlet.service';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const WORKER_LOCK_MS = 5 * 60_000;
@@ -426,6 +426,10 @@ class DspDeliveryService {
       credentials: providerRecord.credentials,
       config: providerRecord.provider.config || {},
     });
+  }
+
+  async listBromaOutlets() {
+    return listBromaOutlets();
   }
 
   async dispatchDelivery(trackId: string, providerKey: string, operation: DspDeliveryOperation, createdBy?: string) {
@@ -857,6 +861,94 @@ class DspDeliveryService {
       $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '', errorMessage: '' },
       $push: { events: { state: 'queued', message: 'Manual retry requested', source: 'user' } },
     });
+    return DeliveryJob.findById(jobId);
+  }
+
+  async refreshJobStatus(jobId: string) {
+    const job = await DeliveryJob.findById(jobId);
+    if (!job) throw new Error('Delivery job not found');
+    if (job.providerKey !== 'broma') throw new Error('Fresh status is only supported for Broma deliveries');
+
+    const metadata = (job.metadata || {}) as Record<string, any>;
+    const externalId = String(job.externalId || metadata.bromaReleaseId || '');
+    if (!externalId) throw new Error('Broma release id missing for status refresh');
+
+    const providerRecord = await this.getProviderWithDecryptedCredentials(job.providerKey);
+    if (!providerRecord || !providerRecord.provider.enabled || providerRecord.provider.maintenanceMode) {
+      return this.markJobNeedsAttention(jobId, job, 'Provider inactive or in maintenance mode');
+    }
+
+    const connector = dspRegistry.get(job.providerKey);
+    if (!connector.getDeliveryStatus) throw new Error(`Connector ${job.providerKey} does not support status refresh`);
+
+    const result = await connector.getDeliveryStatus(externalId, {
+      providerKey: providerRecord.provider.key,
+      credentials: providerRecord.credentials,
+      region: providerRecord.provider.region,
+      config: providerRecord.provider.config,
+      operation: job.operation,
+      jobId,
+      jobMetadata: job.metadata || {},
+    });
+
+    const nextMetadata = {
+      ...metadata,
+      ...(result.metadata || {}),
+      connectorMetadata: {
+        ...(metadata.connectorMetadata || {}),
+        ...(result.metadata || {}),
+      },
+    };
+    const successLike = ['processing', 'delivered'].includes(result.state);
+    const update: Record<string, any> = {
+      state: result.state,
+      externalId: result.externalId || externalId,
+      metadata: nextMetadata,
+      $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
+      $push: {
+        events: {
+          state: result.state,
+          message: result.message || 'Fresh Broma status fetched',
+          source: 'connector',
+        },
+      },
+    };
+    if (successLike) update.$unset.errorMessage = '';
+    else update.errorMessage = result.message;
+
+    await DeliveryJob.findByIdAndUpdate(jobId, update);
+    await this.updateReleaseLifecycle(job, result.state, nextMetadata);
+    return DeliveryJob.findById(jobId);
+  }
+
+  async clearJobLogs(jobId: string, actorId?: string) {
+    const job = await DeliveryJob.findById(jobId);
+    if (!job) throw new Error('Delivery job not found');
+    const clearedAt = new Date();
+    const attemptsCleared = job.attempts?.length || 0;
+    const eventsCleared = job.events?.length || 0;
+
+    await DeliveryJob.findByIdAndUpdate(jobId, {
+      attempts: [],
+      events: [
+        {
+          state: job.state,
+          message: `Admin cleared ${attemptsCleared} attempts and ${eventsCleared} events`,
+          source: 'user',
+          createdAt: clearedAt,
+        },
+      ],
+      metadata: {
+        ...(job.metadata || {}),
+        lastLogClear: {
+          at: clearedAt.toISOString(),
+          by: actorId,
+          attemptsCleared,
+          eventsCleared,
+        },
+      },
+    });
+
     return DeliveryJob.findById(jobId);
   }
 

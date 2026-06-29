@@ -1093,6 +1093,15 @@ export const adminAPI = {
     }
   },
 
+  listBromaOutlets: async () => {
+    try {
+      const response = await api.get<ApiResponse<any>>('/admin/broma-outlets');
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
   dispatchDspDelivery: async (payload: { trackId: string; providerKey: string; operation?: 'deliver' | 'update' | 'takedown' }) => {
     try {
       const response = await api.post<ApiResponse<any>>('/admin/dsp-delivery-dispatch', payload);
@@ -1105,6 +1114,24 @@ export const adminAPI = {
   retryDspDelivery: async (jobId: string) => {
     try {
       const response = await api.post<ApiResponse<any>>(`/admin/dsp-delivery-jobs/${jobId}/retry`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  refreshDspDeliveryStatus: async (jobId: string) => {
+    try {
+      const response = await api.post<ApiResponse<any>>(`/admin/dsp-delivery-jobs/${jobId}/refresh-status`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
+  clearDspDeliveryLogs: async (jobId: string) => {
+    try {
+      const response = await api.delete<ApiResponse<any>>(`/admin/dsp-delivery-jobs/${jobId}/logs`);
       return response.data;
     } catch (error) {
       return handleApiError(error);

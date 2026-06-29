@@ -105,6 +105,19 @@ const nonFutureDateOnly = (...values: unknown[]) => {
   return date <= today ? date : today;
 };
 
+const addDaysDateOnly = (date: Date, days: number) => {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
+};
+
+const minFutureDateOnly = (minDaysFromToday: number, ...values: unknown[]) => {
+  const minDate = addDaysDateOnly(new Date(), minDaysFromToday);
+  const date = values.map(toDateOnly).find((entry): entry is string => Boolean(entry));
+  if (!date) return minDate;
+  return date >= minDate ? date : minDate;
+};
+
 const bromaInteger = (value: unknown) => {
   const parsed = Number(value);
   return Number.isInteger(parsed) ? parsed : undefined;
@@ -426,6 +439,35 @@ export class BromaConnector extends BaseDspConnector {
     };
   }
 
+  async getDeliveryStatus(externalId: string, context: DspConnectorContext): Promise<DspDeliveryResult> {
+    const client = new BromaClient({ credentials: context.credentials, config: context.config || {} });
+    const response = await client.getRelease(externalId);
+    const data = response?.data || response || {};
+    const status = String(
+      data?.moderation_status ||
+      data?.moderationStatus ||
+      data?.release_status ||
+      data?.status ||
+      data?.state ||
+      ''
+    ).toLowerCase().trim();
+    const normalized = status.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const delivered = ['live', 'published', 'delivered', 'processed', 'done', 'accepted', 'active', 'success', 'moderated', 'approved'].includes(normalized);
+    const rejected = ['rejected', 'declined', 'failed', 'error', 'cancelled'].includes(normalized);
+
+    return {
+      state: delivered ? 'delivered' : rejected ? 'needs_attention' : 'processing',
+      externalId,
+      message: status ? `Broma status: ${status}` : 'Broma status refreshed',
+      metadata: {
+        bromaReleaseId: externalId,
+        bromaStep: delivered ? 'done' : 'poll_status',
+        bromaModerationStatus: normalized || 'processing',
+        bromaLastStatusAt: new Date().toISOString(),
+      },
+    };
+  }
+
   private async runUntilNextBoundary(
     client: BromaClient,
     payload: DspReleasePayload,
@@ -497,9 +539,17 @@ export class BromaConnector extends BaseDspConnector {
     if (step === 'update_distribution') {
       const outletIds = Array.isArray(next.bromaOutletIds) ? next.bromaOutletIds : [];
       if (!outletIds.length) throw new Error('Missing Broma outlet ids');
+      const distributionType = firstString(payload.metadata?.bromaDistributionType, config.bromaDistributionType, config.distributionType, 'asap') || 'asap';
+      const saleStartDate = minFutureDateOnly(
+        distributionType === 'transfer' ? 0 : 2,
+        payload.metadata?.saleStartDate,
+        payload.metadata?.sale_start_date,
+        payload.releaseDate
+      );
       await client.updateDistribution(String(next.bromaReleaseId), {
-        distribution_outlets: outletIds.map((id) => ({ outlet_id: id })),
-        delivery_start_time: payload.releaseDate,
+        outlets: outletIds.map((id) => requireBromaInteger(id, 'Broma outlet id')),
+        type: ['asap', 'regular', 'transfer'].includes(distributionType) ? distributionType : 'asap',
+        sale_start_date: saleStartDate,
       });
       step = next.bromaStep = 'send_moderation';
       await this.persistProgress(jobId, next);

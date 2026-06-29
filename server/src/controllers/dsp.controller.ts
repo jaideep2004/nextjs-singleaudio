@@ -43,6 +43,15 @@ export const syncBromaOutlets = async (_req: AuthRequest, res: Response): Promis
   }
 };
 
+export const listBromaOutlets = async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await dspDeliveryService.listBromaOutlets();
+    successResponse(res, result, 'Broma outlets fetched');
+  } catch (error) {
+    errorResponse(res, 'Failed to fetch Broma outlets', error);
+  }
+};
+
 export const dispatchDelivery = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { trackId, providerKey, operation = 'deliver' } = req.body;
@@ -86,6 +95,24 @@ export const retryDelivery = async (req: AuthRequest, res: Response): Promise<vo
     successResponse(res, job, 'Delivery retry queued');
   } catch (error) {
     errorResponse(res, 'Failed to retry delivery job', error);
+  }
+};
+
+export const refreshDeliveryStatus = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const job = await dspDeliveryService.refreshJobStatus(req.params.jobId);
+    successResponse(res, job, 'Delivery status refreshed');
+  } catch (error) {
+    errorResponse(res, 'Failed to refresh delivery status', error);
+  }
+};
+
+export const clearDeliveryLogs = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const job = await dspDeliveryService.clearJobLogs(req.params.jobId, req.user?._id?.toString());
+    successResponse(res, job, 'Delivery logs cleared');
+  } catch (error) {
+    errorResponse(res, 'Failed to clear delivery logs', error);
   }
 };
 

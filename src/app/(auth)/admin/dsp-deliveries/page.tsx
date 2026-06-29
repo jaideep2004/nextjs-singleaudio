@@ -29,6 +29,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ReplayIcon from '@mui/icons-material/Replay';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SyncIcon from '@mui/icons-material/Sync';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { DspLogo } from '@/components/dsp/DspLogo';
@@ -98,6 +99,15 @@ type DeliveryJob = {
   metadata?: {
     releaseTitle?: string;
     payloadHash?: string;
+    bromaStep?: string;
+    bromaModerationStatus?: string;
+    bromaLastStatusAt?: string;
+    bromaOutletIds?: string[];
+    bromaOutletMappings?: Array<{
+      store?: string;
+      outletId?: string;
+      name?: string;
+    }>;
     deliverySnapshot?: {
       upc?: string;
       trackCount?: number;
@@ -115,6 +125,15 @@ type BromaConfigForm = {
   integrationMode: 'sandbox' | 'live';
 };
 
+type BromaOutlet = {
+  outletId: string;
+  name: string;
+  aliases?: string[];
+  releaseTypes?: string[];
+  active?: boolean;
+  syncedAt?: string;
+};
+
 const DEFAULT_BROMA_BASE_URL = 'https://api-rod.broma16.com/api';
 const DEFAULT_BROMA_COUNTRY_ID = '32';
 
@@ -128,12 +147,15 @@ export default function AdminDspDeliveriesPage() {
   const { isAdmin } = useAdminAuth();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [jobs, setJobs] = useState<DeliveryJob[]>([]);
+  const [bromaOutlets, setBromaOutlets] = useState<BromaOutlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [providerFilter, setProviderFilter] = useState('broma');
   const [statusFilter, setStatusFilter] = useState('all');
   const [processingDue, setProcessingDue] = useState(false);
   const [syncingOutlets, setSyncingOutlets] = useState(false);
   const [savingBroma, setSavingBroma] = useState(false);
+  const [refreshingStatusId, setRefreshingStatusId] = useState<string | null>(null);
+  const [clearingLogsId, setClearingLogsId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [bromaForm, setBromaForm] = useState<BromaConfigForm>({
     baseUrl: DEFAULT_BROMA_BASE_URL,
@@ -174,7 +196,7 @@ export default function AdminDspDeliveriesPage() {
   const load = async () => {
     try {
       setLoading(true);
-      const [providerRes, jobsRes] = await Promise.all([
+      const [providerRes, jobsRes, outletRes] = await Promise.all([
         adminAPI.listDspProviders(),
         adminAPI.listDspDeliveries({
           providerKey: providerFilter !== 'all' ? providerFilter : '',
@@ -182,11 +204,13 @@ export default function AdminDspDeliveriesPage() {
           limit: 50,
           page: 1,
         }),
+        adminAPI.listBromaOutlets(),
       ]);
 
       const nextJobs = jobsRes?.data?.data || [];
       setProviders(providerRes?.data || []);
       setJobs(nextJobs);
+      setBromaOutlets(outletRes?.data || []);
       notifyBromaJobErrors(nextJobs);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load DSP data');
@@ -280,6 +304,35 @@ export default function AdminDspDeliveriesPage() {
     }
   };
 
+  const handleRefreshStatus = async (jobId: string) => {
+    try {
+      setRefreshingStatusId(jobId);
+      const response = await adminAPI.refreshDspDeliveryStatus(jobId);
+      const state = response?.data?.state || 'updated';
+      const bromaStatus = response?.data?.metadata?.bromaModerationStatus;
+      toast.success(`Broma status refreshed: ${bromaStatus || state}`);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Status refresh failed');
+    } finally {
+      setRefreshingStatusId(null);
+    }
+  };
+
+  const handleClearLogs = async (jobId: string) => {
+    if (!window.confirm('Clear attempts and events for this delivery job?')) return;
+    try {
+      setClearingLogsId(jobId);
+      await adminAPI.clearDspDeliveryLogs(jobId);
+      toast.success('Delivery logs cleared');
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Log clear failed');
+    } finally {
+      setClearingLogsId(null);
+    }
+  };
+
   const handleProcessDue = async () => {
     try {
       setProcessingDue(true);
@@ -301,6 +354,7 @@ export default function AdminDspDeliveriesPage() {
     try {
       setSyncingOutlets(true);
       const response = await adminAPI.syncBromaOutlets();
+      setBromaOutlets(response?.data?.outlets || []);
       toast.success(`Synced ${response?.data?.synced || 0} Broma outlet${response?.data?.synced === 1 ? '' : 's'}`);
       await load();
     } catch (error) {
@@ -446,6 +500,59 @@ export default function AdminDspDeliveriesPage() {
       </Paper>
 
       <Paper sx={{ p: 2, mb: 3 }}>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} justifyContent="space-between" alignItems={{ md: 'center' }}>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={800}>
+                Synced Broma Outlets
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Active Broma outlet dictionary used when mapping selected stores into one release delivery.
+              </Typography>
+            </Box>
+            <Chip size="small" color="primary" variant="outlined" label={`${bromaOutlets.length} active outlets`} />
+          </Stack>
+          {bromaOutlets.length === 0 ? (
+            <Typography variant="caption" color="text.secondary">
+              No synced outlets yet. Click Sync Outlets.
+            </Typography>
+          ) : (
+            <Box sx={{ maxHeight: 260, overflow: 'auto' }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Outlet ID</TableCell>
+                    <TableCell>Release Types</TableCell>
+                    <TableCell>Synced</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {bromaOutlets.map((outlet) => (
+                    <TableRow key={outlet.outletId}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight={600}>
+                          {outlet.name}
+                        </Typography>
+                        {!!outlet.aliases?.length && (
+                          <Typography variant="caption" color="text.secondary">
+                            {outlet.aliases.join(', ')}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>{outlet.outletId}</TableCell>
+                      <TableCell>{outlet.releaseTypes?.join(', ') || '-'}</TableCell>
+                      <TableCell>{outlet.syncedAt ? new Date(outlet.syncedAt).toLocaleString() : '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+        </Stack>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle2" fontWeight={800}>
@@ -565,16 +672,43 @@ export default function AdminDspDeliveriesPage() {
                     </TableCell>
                     <TableCell>{new Date(job.createdAt).toLocaleString()}</TableCell>
                     <TableCell align="right">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={!['failed', 'needs_attention'].includes(job.state)}
-                        onClick={() => handleRetry(job._id)}
-                        startIcon={<ReplayIcon />}
-                        aria-label={`Retry delivery job ${job._id}`}
-                      >
-                        Retry
-                      </Button>
+                      <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
+                        <Tooltip title="Fetch fresh Broma status">
+                          <span>
+                            <IconButton
+                              size="small"
+                              disabled={job.providerKey !== 'broma' || refreshingStatusId === job._id}
+                              onClick={() => handleRefreshStatus(job._id)}
+                              aria-label={`Refresh Broma status for delivery job ${job._id}`}
+                            >
+                              {refreshingStatusId === job._id ? <CircularProgress size={18} /> : <RefreshIcon fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title="Clear attempts and events">
+                          <span>
+                            <IconButton
+                              size="small"
+                              color="warning"
+                              disabled={clearingLogsId === job._id}
+                              onClick={() => handleClearLogs(job._id)}
+                              aria-label={`Clear delivery logs for job ${job._id}`}
+                            >
+                              {clearingLogsId === job._id ? <CircularProgress size={18} /> : <DeleteSweepIcon fontSize="small" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={!['failed', 'needs_attention'].includes(job.state)}
+                          onClick={() => handleRetry(job._id)}
+                          startIcon={<ReplayIcon />}
+                          aria-label={`Retry delivery job ${job._id}`}
+                        >
+                          Retry
+                        </Button>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -598,7 +732,41 @@ export default function AdminDspDeliveriesPage() {
                               <Typography variant="overline" color="text.secondary">Payload Hash</Typography>
                               <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>{job.metadata?.payloadHash || '-'}</Typography>
                             </Box>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">Broma Step</Typography>
+                              <Typography variant="body2">{job.metadata?.bromaStep || '-'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">Broma Status</Typography>
+                              <Typography variant="body2">{job.metadata?.bromaModerationStatus || '-'}</Typography>
+                            </Box>
+                            <Box>
+                              <Typography variant="overline" color="text.secondary">Last Status At</Typography>
+                              <Typography variant="body2">
+                                {job.metadata?.bromaLastStatusAt ? new Date(job.metadata.bromaLastStatusAt).toLocaleString() : '-'}
+                              </Typography>
+                            </Box>
                           </Stack>
+                          <Box mb={2}>
+                            <Typography variant="overline" color="text.secondary">
+                              Selected Broma Outlets
+                            </Typography>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap mt={0.5}>
+                              {(job.metadata?.bromaOutletMappings || []).map((mapping, index) => (
+                                <Chip
+                                  key={`${job._id}-outlet-${mapping.store || index}-${mapping.outletId || index}`}
+                                  size="small"
+                                  variant="outlined"
+                                  label={`${mapping.store || 'store'} -> ${mapping.name || mapping.outletId || 'outlet'}`}
+                                />
+                              ))}
+                              {(!job.metadata?.bromaOutletMappings || job.metadata.bromaOutletMappings.length === 0) && (
+                                <Typography variant="caption" color="text.secondary">
+                                  No outlet mappings stored.
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Box>
                           <Divider sx={{ mb: 2 }} />
                           <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
                             <Box flex={1} minWidth={0}>

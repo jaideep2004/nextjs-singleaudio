@@ -76,6 +76,29 @@ export async function syncBromaOutlets(input: {
 
   return {
     synced: mapped.length,
+    outlets: mapped.map((outlet) => ({
+      outletId: outlet.outletId,
+      name: outlet.name,
+      releaseTypes: outlet.releaseTypes,
+      active: outlet.active,
+      syncedAt: outlet.syncedAt,
+    })),
     syncedAt: new Date(),
   };
+}
+
+export async function listBromaOutlets() {
+  const outlets = await BromaOutlet.find({ active: true })
+    .sort({ name: 1 })
+    .select('outletId name aliases releaseTypes active syncedAt')
+    .lean();
+
+  return outlets.map((outlet) => ({
+    outletId: outlet.outletId,
+    name: outlet.name,
+    aliases: outlet.aliases || [],
+    releaseTypes: outlet.releaseTypes || [],
+    active: outlet.active,
+    syncedAt: outlet.syncedAt,
+  }));
 }
