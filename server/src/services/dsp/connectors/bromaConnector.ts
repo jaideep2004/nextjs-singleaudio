@@ -316,7 +316,7 @@ const releaseTypeScore = (option: BromaReleaseTypeOption, key: string, tracks: n
 const shouldRecreateSingleDraftForMultiTrack = (metadata: Record<string, any>, payload: DspReleasePayload, step: BromaStep) =>
   payload.tracks.length > 1 &&
   metadata.bromaReleaseId &&
-  bromaInteger(metadata.bromaReleaseTypeId) === DEFAULT_BROMA_RELEASE_TYPE_ID &&
+  (metadata.bromaReleaseTypeId === undefined || bromaInteger(metadata.bromaReleaseTypeId) === DEFAULT_BROMA_RELEASE_TYPE_ID) &&
   ['upload_recordings', 'update_recordings', 'add_compositions', 'upload_cover', 'update_distribution', 'send_moderation'].includes(step);
 
 const contentYear = (date?: string) => {
