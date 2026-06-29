@@ -78,6 +78,13 @@ type BromaCompositionContributor = {
   contributor_author_id?: string;
 };
 
+type BromaReleaseTypeOption = {
+  id: number;
+  title: string;
+  min?: number;
+  max?: number;
+};
+
 const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
   IN: 32,
 };
@@ -226,6 +233,9 @@ const catalogNumber = (payload: DspReleasePayload, track?: DspReleasePayload['tr
     payload.releaseId
   );
 
+const normalizeDictionaryText = (value: unknown) =>
+  firstString(value)?.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || '';
+
 const releaseTypeKey = (payload: DspReleasePayload) => {
   const explicit = firstString(payload.metadata?.bromaReleaseType, payload.metadata?.releaseType)?.toLowerCase();
   if (explicit?.includes('album')) return 'album';
@@ -236,7 +246,7 @@ const releaseTypeKey = (payload: DspReleasePayload) => {
   return 'album';
 };
 
-const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
+const configuredReleaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
   const key = releaseTypeKey(payload);
   const configured = config.releaseTypeIds as Record<string, unknown> | undefined;
   const releaseMetadata = payload.metadata || {};
@@ -249,11 +259,65 @@ const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknow
     key === 'ep' ? config.defaultEpReleaseTypeId : undefined,
     key === 'album' ? config.defaultAlbumReleaseTypeId : undefined,
     config.defaultReleaseTypeId,
-    DEFAULT_BROMA_RELEASE_TYPE_ID,
   ];
-  const resolved = candidates.map(bromaInteger).find((value): value is number => value !== undefined);
-  return resolved || DEFAULT_BROMA_RELEASE_TYPE_ID;
+  return candidates.map(bromaInteger).find((value): value is number => value !== undefined);
 };
+
+const collectDictionaryEntries = (response: unknown): any[] => {
+  if (Array.isArray(response)) return response;
+  if (!response || typeof response !== 'object') return [];
+  const value = response as Record<string, any>;
+  const candidates = [value.data, value.items, value.results, value.release_types, value.releaseTypes];
+  for (const candidate of candidates) {
+    const entries = collectDictionaryEntries(candidate);
+    if (entries.length) return entries;
+  }
+  return [];
+};
+
+const releaseTypeOption = (entry: any): BromaReleaseTypeOption | null => {
+  const id = bromaInteger(entry?.id ?? entry?.value ?? entry?.release_type_id ?? entry?.releaseTypeId);
+  const title = firstString(entry?.title, entry?.name, entry?.label, entry?.value_text, entry?.valueText);
+  if (id === undefined || !title) return null;
+  return {
+    id,
+    title,
+    min: bromaInteger(entry?.min ?? entry?.min_audio ?? entry?.minAudio ?? entry?.audio_min ?? entry?.audioMin),
+    max: bromaInteger(entry?.max ?? entry?.max_audio ?? entry?.maxAudio ?? entry?.audio_max ?? entry?.audioMax),
+  };
+};
+
+const releaseTypeAllowsTrackCount = (option: BromaReleaseTypeOption, tracks: number) => {
+  if (option.min !== undefined && tracks < option.min) return false;
+  if (option.max !== undefined && tracks > option.max) return false;
+  return true;
+};
+
+const releaseTypeScore = (option: BromaReleaseTypeOption, key: string, tracks: number) => {
+  const title = normalizeDictionaryText(option.title);
+  if (!releaseTypeAllowsTrackCount(option, tracks)) return -1;
+  if (key === 'single') {
+    if (title === 'single') return 100;
+    if (title.includes('single')) return 80;
+    return tracks === 1 && option.max === 1 ? 20 : -1;
+  }
+  if (key === 'ep') {
+    if (title === 'ep') return 100;
+    if (title.includes('extended play')) return 90;
+    if (title.includes('album') || title.includes('compilation')) return 20;
+    return option.min !== undefined && option.min <= tracks && option.max !== undefined && option.max >= tracks ? 10 : -1;
+  }
+  if (title === 'album') return 100;
+  if (title.includes('album')) return 90;
+  if (title.includes('compilation')) return 30;
+  return option.min !== undefined && option.min <= tracks && option.max !== undefined && option.max >= tracks ? 10 : -1;
+};
+
+const shouldRecreateSingleDraftForMultiTrack = (metadata: Record<string, any>, payload: DspReleasePayload, step: BromaStep) =>
+  payload.tracks.length > 1 &&
+  metadata.bromaReleaseId &&
+  bromaInteger(metadata.bromaReleaseTypeId) === DEFAULT_BROMA_RELEASE_TYPE_ID &&
+  ['upload_recordings', 'update_recordings', 'add_compositions', 'upload_cover', 'update_distribution', 'send_moderation'].includes(step);
 
 const contentYear = (date?: string) => {
   const parsed = date ? new Date(date) : new Date();
@@ -502,9 +566,20 @@ export class BromaConnector extends BaseDspConnector {
     const next = { ...metadata };
     let step = startStep;
 
+    if (shouldRecreateSingleDraftForMultiTrack(next, payload, step)) {
+      delete next.bromaReleaseId;
+      delete next.bromaRecordingIds;
+      delete next.bromaCoverUploaded;
+      delete next.bromaModerationSentAt;
+      step = next.bromaStep = 'create_release';
+      await this.persistProgress(jobId, next);
+    }
+
     if (step === 'create_release') {
       if (!next.bromaReleaseId) {
-        const response = await client.createRelease(this.buildReleasePayload(payload, config));
+        const releasePayload = await this.buildReleasePayload(client, payload, config);
+        next.bromaReleaseTypeId = releasePayload.release_type_id;
+        const response = await client.createRelease(releasePayload);
         next.bromaReleaseId = getResponseId(response);
         if (!next.bromaReleaseId) throw new Error('Broma create release response missing release id');
       }
@@ -604,7 +679,29 @@ export class BromaConnector extends BaseDspConnector {
     });
   }
 
-  private buildReleasePayload(payload: DspReleasePayload, config: Record<string, unknown>) {
+  private async resolveReleaseTypeId(client: BromaClient, payload: DspReleasePayload, config: Record<string, unknown>) {
+    const explicit = configuredReleaseTypeId(payload, config);
+    if (explicit !== undefined) return explicit;
+
+    const key = releaseTypeKey(payload);
+    if (key === 'single') return DEFAULT_BROMA_RELEASE_TYPE_ID;
+
+    const response = await client.getReleaseTypes();
+    const options = collectDictionaryEntries(response)
+      .map(releaseTypeOption)
+      .filter((option): option is BromaReleaseTypeOption => Boolean(option));
+    const ranked = options
+      .map((option) => ({ option, score: releaseTypeScore(option, key, payload.tracks.length) }))
+      .filter((entry) => entry.score >= 0)
+      .sort((left, right) => right.score - left.score);
+
+    const selected = ranked[0]?.option;
+    if (selected) return selected.id;
+
+    throw new Error(`Broma release_type_id not resolved for ${key} with ${payload.tracks.length} tracks`);
+  }
+
+  private async buildReleasePayload(client: BromaClient, payload: DspReleasePayload, config: Record<string, unknown>) {
     const year = contentYear(payload.releaseDate);
     const releaseCatalogNumber = catalogNumber(payload);
     const rightsholder = payloadRightsholder(payload);
@@ -617,7 +714,7 @@ export class BromaConnector extends BaseDspConnector {
     );
     return {
       title: payload.releaseTitle,
-      release_type_id: releaseTypeId(payload, config),
+      release_type_id: await this.resolveReleaseTypeId(client, payload, config),
       catalog_number: releaseCatalogNumber,
       generate_catalog_number: !releaseCatalogNumber,
       performers: bromaArtists(payload.primaryArtist),

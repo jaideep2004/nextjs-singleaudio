@@ -166,6 +166,14 @@ export class BromaClient {
     return this.request<any>({ method: 'GET', url: '/dictionaries/outlets' });
   }
 
+  async getReleaseTypes() {
+    return this.request<any>({
+      method: 'GET',
+      url: '/dictionaries/release-types',
+      params: { category: 'audio', language: this.language },
+    });
+  }
+
   async createRelease(payload: Record<string, unknown>) {
     return this.request<any>({ method: 'POST', url: '/repertoire/release/', data: payload });
   }
