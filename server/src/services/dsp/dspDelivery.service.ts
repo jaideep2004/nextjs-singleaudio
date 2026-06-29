@@ -234,6 +234,56 @@ class DspDeliveryService {
     };
   }
 
+  private withBromaLegacyDateFallbacks(snapshot: Record<string, any>, release: Record<string, any> | null) {
+    if (!release) return snapshot;
+
+    const payload = snapshot.payload || {};
+    const payloadTracks = Array.isArray(payload.tracks) ? payload.tracks : [];
+    const releaseTracks = Array.isArray(release.tracks) ? release.tracks : [];
+    const dateFallback = release.originalReleaseDate || release.original_release_date || release.createdDate || release.created_date;
+
+    return {
+      ...snapshot,
+      payload: {
+        ...payload,
+        metadata: {
+          ...(payload.metadata || {}),
+          originalReleaseDate: payload.metadata?.originalReleaseDate || payload.metadata?.original_release_date || dateFallback,
+          createdDate: payload.metadata?.createdDate || payload.metadata?.created_date || release.createdDate || release.created_date,
+        },
+        tracks: payloadTracks.map((track: Record<string, any>, index: number) => {
+          const releaseTrack = releaseTracks.find((candidate: Record<string, any>) => {
+            const candidateId = String(candidate._id || candidate.id || '');
+            return (
+              candidateId === String(track.id || track.trackId || '') ||
+              (candidate.isrc && candidate.isrc === track.isrc) ||
+              (candidate.title && candidate.title === track.title)
+            );
+          }) || releaseTracks[index] || {};
+
+          return {
+            ...track,
+            releaseDate: track.releaseDate || releaseTrack.releaseDate || release.releaseDate,
+            metadata: {
+              ...(track.metadata || {}),
+              originalReleaseDate:
+                track.metadata?.originalReleaseDate ||
+                track.metadata?.original_release_date ||
+                releaseTrack.originalReleaseDate ||
+                releaseTrack.original_release_date ||
+                dateFallback,
+              createdDate:
+                track.metadata?.createdDate ||
+                track.metadata?.created_date ||
+                releaseTrack.createdDate ||
+                releaseTrack.created_date,
+            },
+          };
+        }),
+      },
+    };
+  }
+
   private generateIdempotencyKey(
     trackId: string,
     providerKey: string,
@@ -455,6 +505,24 @@ class DspDeliveryService {
         .collection('releaseDeliverySnapshots')
         .findOne({ _id: job.snapshotId });
       if (!snapshot) return { errors: ['Release delivery snapshot not found'], warnings: [] };
+      if (job.providerKey === 'broma' && job.releaseId) {
+        const release = await mongoose.connection
+          .collection('releases')
+          .findOne(
+            { _id: job.releaseId },
+            {
+              projection: {
+                originalReleaseDate: 1,
+                original_release_date: 1,
+                createdDate: 1,
+                created_date: 1,
+                releaseDate: 1,
+                tracks: 1,
+              },
+            }
+          );
+        return { payload: this.buildReleasePayload(this.withBromaLegacyDateFallbacks(snapshot, release)), errors: [], warnings: [] };
+      }
       return { payload: this.buildReleasePayload(snapshot), errors: [], warnings: [] };
     }
 

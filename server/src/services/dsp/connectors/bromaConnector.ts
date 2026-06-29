@@ -75,6 +75,7 @@ const BROMA_LANGUAGE_CODE_IDS: Record<string, number> = {
 };
 
 const toDateOnly = (value: unknown) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   const text = firstString(value);
   if (!text) return undefined;
   const date = new Date(text);
@@ -110,6 +111,12 @@ const requireBromaInteger = (value: unknown, label: string) => {
   return parsed;
 };
 
+const requireBromaString = (value: unknown, label: string) => {
+  const text = firstString(value);
+  if (!text) throw new Error(`${label} is required`);
+  return text;
+};
+
 const requireBromaDictionaryId = (value: unknown, label: string, codeMap: Record<string, number>) => {
   const parsed = bromaDictionaryId(value, codeMap);
   if (parsed === undefined) throw new Error(`${label} must be a numeric Broma dictionary id`);
@@ -120,6 +127,9 @@ const payloadRightsholder = (payload: DspReleasePayload) =>
   firstString(
     payload.label,
     payload.metadata?.label,
+    payload.metadata?.partyId,
+    payload.metadata?.party_id,
+    payload.metadata?.partyName,
     payload.metadata?.recordLabel,
     payload.metadata?.rightsholder,
     payload.metadata?.rightsHolder,
@@ -377,6 +387,7 @@ export class BromaConnector extends BaseDspConnector {
       payload.metadata?.createdDate,
       payload.metadata?.created_date,
       payload.metadata?.originalReleaseDate,
+      payload.metadata?.original_release_date,
       payload.releaseDate
     );
     return {
@@ -410,14 +421,29 @@ export class BromaConnector extends BaseDspConnector {
     const primaryArtist = firstString(track.artistName, payload.primaryArtist);
     const featuredArtist = firstString(track.metadata?.featuredArtist, track.metadata?.featuring, payload.metadata?.featuredArtist, payload.metadata?.featuring);
     const rightsholder = payloadRightsholder(payload);
-    const partyId = requireBromaInteger(firstString(config.partyId, config.accountId), 'Broma party_id');
+    const partyId = requireBromaString(
+      firstString(
+        track.metadata?.partyId,
+        track.metadata?.party_id,
+        track.metadata?.partyName,
+        payload.metadata?.partyId,
+        payload.metadata?.party_id,
+        payload.metadata?.partyName,
+        rightsholder,
+        payload.label
+      ),
+      'Broma party_id'
+    );
     const createdDate = nonFutureDateOnly(
       track.metadata?.createdDate,
       track.metadata?.created_date,
+      track.metadata?.originalReleaseDate,
+      track.metadata?.original_release_date,
       track.metadata?.recordingDate,
       payload.metadata?.createdDate,
       payload.metadata?.created_date,
       payload.metadata?.originalReleaseDate,
+      payload.metadata?.original_release_date,
       track.releaseDate,
       payload.releaseDate
     );
