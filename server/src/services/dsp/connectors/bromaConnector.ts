@@ -87,6 +87,8 @@ const BROMA_LANGUAGE_CODE_IDS: Record<string, number> = {
   HI: 59,
 };
 
+const DEFAULT_BROMA_RELEASE_TYPE_ID = 51;
+
 const toDateOnly = (value: unknown) => {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   const text = firstString(value);
@@ -224,12 +226,33 @@ const catalogNumber = (payload: DspReleasePayload, track?: DspReleasePayload['tr
     payload.releaseId
   );
 
+const releaseTypeKey = (payload: DspReleasePayload) => {
+  const explicit = firstString(payload.metadata?.bromaReleaseType, payload.metadata?.releaseType)?.toLowerCase();
+  if (explicit?.includes('album')) return 'album';
+  if (explicit?.includes('ep')) return 'ep';
+  if (explicit?.includes('single')) return 'single';
+  if (payload.tracks.length === 1) return 'single';
+  if (payload.tracks.length <= 7) return 'ep';
+  return 'album';
+};
+
 const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
-  const tracks = payload.tracks.length;
+  const key = releaseTypeKey(payload);
   const configured = config.releaseTypeIds as Record<string, unknown> | undefined;
-  if (tracks === 1) return Number(configured?.single || config.defaultSingleReleaseTypeId || 51);
-  if (tracks <= 7) return Number(configured?.ep || config.defaultEpReleaseTypeId || 52);
-  return Number(config.defaultAlbumReleaseTypeId || 53);
+  const releaseMetadata = payload.metadata || {};
+  const candidates = [
+    releaseMetadata.bromaReleaseTypeId,
+    releaseMetadata.release_type_id,
+    releaseMetadata.releaseTypeId,
+    configured?.[key],
+    key === 'single' ? config.defaultSingleReleaseTypeId : undefined,
+    key === 'ep' ? config.defaultEpReleaseTypeId : undefined,
+    key === 'album' ? config.defaultAlbumReleaseTypeId : undefined,
+    config.defaultReleaseTypeId,
+    DEFAULT_BROMA_RELEASE_TYPE_ID,
+  ];
+  const resolved = candidates.map(bromaInteger).find((value): value is number => value !== undefined);
+  return resolved || DEFAULT_BROMA_RELEASE_TYPE_ID;
 };
 
 const contentYear = (date?: string) => {
