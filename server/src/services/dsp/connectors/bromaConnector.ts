@@ -85,6 +85,12 @@ type BromaReleaseTypeOption = {
   max?: number;
 };
 
+type BromaOutletMapping = {
+  store?: string;
+  outletId?: string;
+  name?: string;
+};
+
 const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
   IN: 32,
 };
@@ -318,6 +324,33 @@ const shouldRecreateSingleDraftForMultiTrack = (metadata: Record<string, any>, p
   metadata.bromaReleaseId &&
   (metadata.bromaReleaseTypeId === undefined || bromaInteger(metadata.bromaReleaseTypeId) === DEFAULT_BROMA_RELEASE_TYPE_ID) &&
   ['upload_recordings', 'update_recordings', 'add_compositions', 'upload_cover', 'update_distribution', 'send_moderation'].includes(step);
+
+const TIKTOK_OUTLET_HINTS = ['tiktok', 'tik tok', 'dou yin', 'douyin'];
+
+const normalizeOutletText = (value: unknown) =>
+  firstString(value)?.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim() || '';
+
+const outletMappingText = (mapping: BromaOutletMapping) =>
+  normalizeOutletText([mapping.store, mapping.name, mapping.outletId].filter(Boolean).join(' '));
+
+const isTikTokOutletMapping = (mapping: BromaOutletMapping, config: Record<string, unknown>) => {
+  const configuredIds = bromaStringList(config.tiktokOutletIds, config.bromaTikTokOutletIds).map(String);
+  if (mapping.outletId && configuredIds.includes(String(mapping.outletId))) return true;
+  const text = outletMappingText(mapping);
+  return TIKTOK_OUTLET_HINTS.some((hint) => text.includes(hint));
+};
+
+const selectedTikTokMappings = (metadata: Record<string, any>, config: Record<string, unknown>) => {
+  const mappings = Array.isArray(metadata.bromaOutletMappings)
+    ? metadata.bromaOutletMappings.filter((mapping: unknown): mapping is BromaOutletMapping => Boolean(mapping) && typeof mapping === 'object')
+    : [];
+  return mappings.filter((mapping) => isTikTokOutletMapping(mapping, config));
+};
+
+const filteredParentOutletIds = (metadata: Record<string, any>, config: Record<string, unknown>, outletIds: unknown[]) => {
+  const tiktokOutletIds = new Set(selectedTikTokMappings(metadata, config).map((mapping) => String(mapping.outletId)).filter(Boolean));
+  return outletIds.filter((id) => !tiktokOutletIds.has(String(id)));
+};
 
 const contentYear = (date?: string) => {
   const parsed = date ? new Date(date) : new Date();
@@ -637,6 +670,8 @@ export class BromaConnector extends BaseDspConnector {
     if (step === 'update_distribution') {
       const outletIds = Array.isArray(next.bromaOutletIds) ? next.bromaOutletIds : [];
       if (!outletIds.length) throw new Error('Missing Broma outlet ids');
+      await this.ensureAdditionalReleases(client, payload, config, next, jobId);
+      const parentOutletIds = filteredParentOutletIds(next, config, outletIds);
       const distributionType = firstString(payload.metadata?.bromaDistributionType, config.bromaDistributionType, config.distributionType, 'asap') || 'asap';
       const saleStartDate = minFutureDateOnly(
         distributionType === 'transfer' ? 0 : 2,
@@ -644,11 +679,13 @@ export class BromaConnector extends BaseDspConnector {
         payload.metadata?.sale_start_date,
         payload.releaseDate
       );
-      await client.updateDistribution(String(next.bromaReleaseId), {
-        outlets: outletIds.map((id) => requireBromaInteger(id, 'Broma outlet id')),
-        type: ['asap', 'regular', 'transfer'].includes(distributionType) ? distributionType : 'asap',
-        sale_start_date: saleStartDate,
-      });
+      if (parentOutletIds.length) {
+        await client.updateDistribution(String(next.bromaReleaseId), {
+          outlets: parentOutletIds.map((id) => requireBromaInteger(id, 'Broma outlet id')),
+          type: ['asap', 'regular', 'transfer'].includes(distributionType) ? distributionType : 'asap',
+          sale_start_date: saleStartDate,
+        });
+      }
       step = next.bromaStep = 'send_moderation';
       await this.persistProgress(jobId, next);
     }
@@ -677,6 +714,58 @@ export class BromaConnector extends BaseDspConnector {
         },
       },
     });
+  }
+
+  private async ensureAdditionalReleases(
+    client: BromaClient,
+    payload: DspReleasePayload,
+    config: Record<string, unknown>,
+    metadata: Record<string, any>,
+    jobId?: string
+  ) {
+    const hasTikTok = selectedTikTokMappings(metadata, config).length > 0;
+    if (!hasTikTok || payload.metadata?.disableTikTokAdditionalRelease || config.disableTikTokAdditionalRelease) return;
+    if (!metadata.bromaReleaseId) throw new Error('Missing Broma release id for additional release');
+
+    const additionalReleaseIds = { ...(metadata.bromaAdditionalReleaseIds || {}) };
+    const releaseTypeId = requireBromaInteger(
+      firstString(
+        payload.metadata?.bromaTikTokReleaseTypeId,
+        payload.metadata?.additionalReleaseTypeId,
+        config.bromaTikTokReleaseTypeId,
+        config.defaultTikTokReleaseTypeId,
+        config.defaultAdditionalReleaseTypeId,
+        '70'
+      ),
+      'Broma TikTok additional release_type_id'
+    );
+    const distributionDate = minFutureDateOnly(
+      2,
+      payload.metadata?.additionalReleaseDate,
+      payload.metadata?.saleStartDate,
+      payload.metadata?.sale_start_date,
+      payload.releaseDate
+    );
+
+    for (const track of payload.tracks) {
+      if (additionalReleaseIds[track.trackId]) continue;
+      const recordingId = metadata.bromaRecordingIds?.[track.trackId];
+      if (!recordingId) throw new Error(`Missing Broma recording id for additional release: ${track.title}`);
+      const response = await client.createAdditionalRelease({
+        parent_release: requireBromaInteger(metadata.bromaReleaseId, 'Broma parent release id'),
+        parent_recording: requireBromaInteger(recordingId, 'Broma parent recording id'),
+        release_type_id: releaseTypeId,
+        sale_start_date: distributionDate,
+        generate_ean: 1,
+        generate_catalog_number: 1,
+        account_id: requireBromaInteger(config.accountId, 'Broma account_id'),
+        snippet_start: firstString(track.metadata?.snippetStart, payload.metadata?.snippetStart, config.defaultSnippetStart, '00:00:00'),
+        snippet_end: firstString(track.metadata?.snippetEnd, payload.metadata?.snippetEnd, config.defaultSnippetEnd, '00:00:30'),
+      });
+      additionalReleaseIds[track.trackId] = getResponseId(response) || true;
+      metadata.bromaAdditionalReleaseIds = additionalReleaseIds;
+      await this.persistProgress(jobId, metadata);
+    }
   }
 
   private async resolveReleaseTypeId(client: BromaClient, payload: DspReleasePayload, config: Record<string, unknown>) {

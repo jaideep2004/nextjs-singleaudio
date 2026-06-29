@@ -220,6 +220,14 @@ export class BromaClient {
     });
   }
 
+  async createAdditionalRelease(payload: Record<string, unknown>) {
+    return this.request<any>({
+      method: 'POST',
+      url: '/repertoire/release/additional/',
+      params: payload,
+    });
+  }
+
   async sendModeration(releaseId: string) {
     return this.request<any>({
       method: 'POST',
