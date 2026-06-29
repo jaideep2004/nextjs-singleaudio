@@ -659,7 +659,7 @@ GET    /api/stores/:storeName/reports - Fetch earnings report
 
 ## 🛠️ Development & Deployment
 
-### Local Setup
+### Local Setup a
 ```bash
 # Install dependencies (root + server)
 npm install
