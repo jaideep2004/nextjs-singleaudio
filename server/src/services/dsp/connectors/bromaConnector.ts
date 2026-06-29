@@ -325,6 +325,17 @@ const shouldRecreateSingleDraftForMultiTrack = (metadata: Record<string, any>, p
   (metadata.bromaReleaseTypeId === undefined || bromaInteger(metadata.bromaReleaseTypeId) === DEFAULT_BROMA_RELEASE_TYPE_ID) &&
   ['upload_recordings', 'update_recordings', 'add_compositions', 'upload_cover', 'update_distribution', 'send_moderation'].includes(step);
 
+const shouldRecreateDraftForMissedTikTokAdditional = (
+  metadata: Record<string, any>,
+  payload: DspReleasePayload,
+  config: Record<string, unknown>,
+  step: BromaStep
+) =>
+  metadata.bromaReleaseId &&
+  wantsTikTokAdditionalRelease(metadata, payload, config) &&
+  !hasAdditionalReleaseIds(metadata) &&
+  ['upload_cover', 'update_distribution', 'send_moderation'].includes(step);
+
 const TIKTOK_OUTLET_HINTS = ['tiktok', 'tik tok', 'dou yin', 'douyin'];
 
 const normalizeOutletText = (value: unknown) =>
@@ -351,6 +362,14 @@ const filteredParentOutletIds = (metadata: Record<string, any>, config: Record<s
   const tiktokOutletIds = new Set(selectedTikTokMappings(metadata, config).map((mapping) => String(mapping.outletId)).filter(Boolean));
   return outletIds.filter((id) => !tiktokOutletIds.has(String(id)));
 };
+
+const wantsTikTokAdditionalRelease = (metadata: Record<string, any>, payload: DspReleasePayload, config: Record<string, unknown>) =>
+  selectedTikTokMappings(metadata, config).length > 0 &&
+  !payload.metadata?.disableTikTokAdditionalRelease &&
+  !config.disableTikTokAdditionalRelease;
+
+const hasAdditionalReleaseIds = (metadata: Record<string, any>) =>
+  Boolean(metadata.bromaAdditionalReleaseIds && Object.keys(metadata.bromaAdditionalReleaseIds).length > 0);
 
 const contentYear = (date?: string) => {
   const parsed = date ? new Date(date) : new Date();
@@ -666,6 +685,19 @@ export class BromaConnector extends BaseDspConnector {
       delete next.bromaRecordingIds;
       delete next.bromaCoverUploaded;
       delete next.bromaModerationSentAt;
+      delete next.bromaAdditionalReleaseIds;
+      delete next.bromaAdditionalReleaseSkippedAt;
+      step = next.bromaStep = 'create_release';
+      await this.persistProgress(jobId, next);
+    }
+
+    if (shouldRecreateDraftForMissedTikTokAdditional(next, payload, config, step)) {
+      delete next.bromaReleaseId;
+      delete next.bromaRecordingIds;
+      delete next.bromaCoverUploaded;
+      delete next.bromaModerationSentAt;
+      delete next.bromaAdditionalReleaseIds;
+      delete next.bromaAdditionalReleaseSkippedAt;
       step = next.bromaStep = 'create_release';
       await this.persistProgress(jobId, next);
     }
@@ -705,11 +737,13 @@ export class BromaConnector extends BaseDspConnector {
         if (!recordingId) throw new Error(`Missing Broma recording id for ${track.title}`);
         await client.updateRecording(String(next.bromaReleaseId), String(recordingId), this.buildRecordingPayload(payload, track, config, recordingId));
       }
+      await this.ensureAdditionalReleases(client, payload, config, next, jobId);
       step = next.bromaStep = 'add_compositions';
       await this.persistProgress(jobId, next);
     }
 
     if (step === 'add_compositions') {
+      await this.ensureAdditionalReleases(client, payload, config, next, jobId);
       for (const track of payload.tracks) {
         const recordingId = next.bromaRecordingIds?.[track.trackId];
         await client.addComposition(String(next.bromaReleaseId), String(recordingId), this.buildCompositionPayload(payload, track));
@@ -732,7 +766,6 @@ export class BromaConnector extends BaseDspConnector {
     if (step === 'update_distribution') {
       const outletIds = Array.isArray(next.bromaOutletIds) ? next.bromaOutletIds : [];
       if (!outletIds.length) throw new Error('Missing Broma outlet ids');
-      await this.ensureAdditionalReleases(client, payload, config, next, jobId);
       const parentOutletIds = filteredParentOutletIds(next, config, outletIds);
       const distributionType = firstString(payload.metadata?.bromaDistributionType, config.bromaDistributionType, config.distributionType, 'asap') || 'asap';
       const saleStartDate = minFutureDateOnly(
