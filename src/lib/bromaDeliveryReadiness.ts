@@ -244,6 +244,9 @@ export async function evaluateBromaReleaseReadiness(
   if (tracks.length === 1 && String(release.releaseType || '').toLowerCase().includes('album')) {
     errors.push('Album release type requires at least two tracks');
   }
+  if (tracks.length === 1 && String(release.releaseType || release.metadata?.releaseType || '').toLowerCase().includes('ep')) {
+    warnings.push('Broma will deliver one-track EP releases as single releases because Broma EP requires 2-7 tracks');
+  }
   if (tracks.length > 40) errors.push('Broma album/compilation releases support at most 40 tracks');
 
   tracks.forEach((track, index) => {

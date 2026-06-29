@@ -191,10 +191,8 @@ const catalogNumber = (payload: DspReleasePayload, track?: DspReleasePayload['tr
 const releaseTypeId = (payload: DspReleasePayload, config: Record<string, unknown>) => {
   const tracks = payload.tracks.length;
   const configured = config.releaseTypeIds as Record<string, unknown> | undefined;
-  const releaseType = String(payload.metadata?.releaseType || '').toLowerCase();
-  if (releaseType && configured?.[releaseType]) return Number(configured[releaseType]);
-  if (tracks === 1) return Number(config.defaultSingleReleaseTypeId || 51);
-  if (tracks <= 7) return Number(config.defaultEpReleaseTypeId || 52);
+  if (tracks === 1) return Number(configured?.single || config.defaultSingleReleaseTypeId || 51);
+  if (tracks <= 7) return Number(configured?.ep || config.defaultEpReleaseTypeId || 52);
   return Number(config.defaultAlbumReleaseTypeId || 53);
 };
 
