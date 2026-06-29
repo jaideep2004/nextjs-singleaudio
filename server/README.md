@@ -147,7 +147,7 @@ The seed values currently come from `src/scripts/seedAdmin.ts`.
 
 If you need help generating a connection string or creating an Atlas cluster, use:
 
-- [MONGODB_SETUP.md](MONGODB_SETUP.md)
+- [MONGODB_SETUP.md](MONGODB_SETUP.md) ..
 
 ## Storage and Uploads .
 
