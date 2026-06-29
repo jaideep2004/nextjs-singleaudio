@@ -65,6 +65,19 @@ const bromaGenres = (...values: unknown[]) => bromaStringList(...values).slice(0
 const bromaRecordingTitle = (payload: DspReleasePayload, track: DspReleasePayload['tracks'][number]) =>
   payload.tracks.length === 1 ? payload.releaseTitle : track.title;
 
+const AUTHOR_ROLES = ['A', 'C', 'CA', 'AR', 'AD', 'TR'] as const;
+type BromaAuthorRole = typeof AUTHOR_ROLES[number];
+
+type BromaCompositionContributor = {
+  title: string;
+  ownership: string;
+  roles: BromaAuthorRole[];
+  controlled_by_submitter: 0 | 1;
+  publisher?: string;
+  publisher_share?: string;
+  contributor_author_id?: string;
+};
+
 const BROMA_COUNTRY_CODE_IDS: Record<string, number> = {
   IN: 32,
 };
@@ -211,6 +224,145 @@ const contentYear = (date?: string) => {
   return String(Number.isNaN(parsed.getTime()) ? new Date().getFullYear() : parsed.getFullYear());
 };
 
+const toFiniteNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const toOwnership = (value: number) => value.toFixed(2);
+
+const normalizeAuthorRoles = (value: unknown): BromaAuthorRole[] => {
+  const values = Array.isArray(value) ? value : [value];
+  const roles = values.flatMap((entry): BromaAuthorRole[] => {
+    const role = firstString(entry)?.toUpperCase().replace(/[^A-Z/]/g, '');
+    if (!role) return [];
+    if (role === 'A' || role.includes('LYRIC') || role.includes('AUTHOR') || role.includes('WRITER')) return ['A'];
+    if (role === 'C' || role.includes('COMPOSER') || role.includes('MUSIC')) return ['C'];
+    if (role === 'CA' || role.includes('SONGWRITER')) return ['CA'];
+    if (role === 'AR' || role.includes('ARRANGER')) return ['AR'];
+    if (role === 'AD' || role.includes('ADAPTER')) return ['AD'];
+    if (role === 'TR' || role.includes('TRANSLATOR')) return ['TR'];
+    return [];
+  });
+  return Array.from(new Set(roles));
+};
+
+const mergeAuthorRoles = (roles: BromaAuthorRole[]): BromaAuthorRole[] => {
+  const unique = Array.from(new Set(roles));
+  if (unique.includes('A') && unique.includes('C')) {
+    return ['CA', ...unique.filter((role) => role !== 'A' && role !== 'C' && role !== 'CA')];
+  }
+  return unique;
+};
+
+const splitContributorText = (value: string) =>
+  value
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const getContributorName = (value: unknown) => {
+  if (value && typeof value === 'object') {
+    return firstString(
+      (value as any).title,
+      (value as any).name,
+      (value as any).fullName,
+      (value as any).value,
+      (value as any).label
+    );
+  }
+  return firstString(value);
+};
+
+const getContributorOwnership = (value: unknown) => {
+  if (!value || typeof value !== 'object') return undefined;
+  return toFiniteNumber(
+    (value as any).ownership ??
+    (value as any).share ??
+    (value as any).percentage ??
+    (value as any).split
+  );
+};
+
+const getControlledBySubmitter = (value: unknown): 0 | 1 => {
+  if (!value || typeof value !== 'object') return 1;
+  const raw = (value as any).controlled_by_submitter ?? (value as any).controlledBySubmitter ?? (value as any).controlled;
+  return raw === false || raw === 0 || raw === '0' ? 0 : 1;
+};
+
+const collectBromaAuthors = (
+  value: unknown,
+  defaultRoles: BromaAuthorRole[] = []
+): Array<Omit<BromaCompositionContributor, 'ownership'> & { ownership?: number }> => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.flatMap((entry) => collectBromaAuthors(entry, defaultRoles));
+  if (typeof value === 'string') {
+    return splitContributorText(value).map((title) => ({
+      title,
+      roles: defaultRoles,
+      controlled_by_submitter: 1,
+    }));
+  }
+  if (typeof value !== 'object') return [];
+
+  const title = getContributorName(value);
+  if (!title) return [];
+  const roles = normalizeAuthorRoles((value as any).roles || (value as any).role || (value as any).type || (value as any).category);
+  const mergedRoles = mergeAuthorRoles(roles.length ? roles : defaultRoles);
+  if (!mergedRoles.some((role) => AUTHOR_ROLES.includes(role))) return [];
+
+  return [{
+    title,
+    roles: mergedRoles,
+    ownership: getContributorOwnership(value),
+    controlled_by_submitter: getControlledBySubmitter(value),
+    publisher: firstString((value as any).publisher, (value as any).publisherName),
+    publisher_share: firstString((value as any).publisher_share, (value as any).publisherShare),
+    contributor_author_id: firstString((value as any).contributor_author_id, (value as any).contributorAuthorId),
+  }];
+};
+
+const normalizeBromaCompositionContributors = (
+  contributors: Array<Omit<BromaCompositionContributor, 'ownership'> & { ownership?: number }>
+) => {
+  const byName = new Map<string, Omit<BromaCompositionContributor, 'ownership'> & { ownership?: number }>();
+  for (const contributor of contributors) {
+    const key = contributor.title.toLowerCase();
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, { ...contributor, roles: mergeAuthorRoles(contributor.roles) });
+      continue;
+    }
+    byName.set(key, {
+      ...existing,
+      roles: mergeAuthorRoles([...existing.roles, ...contributor.roles]),
+      ownership: existing.ownership ?? contributor.ownership,
+      publisher: existing.publisher || contributor.publisher,
+      publisher_share: existing.publisher_share || contributor.publisher_share,
+      contributor_author_id: existing.contributor_author_id || contributor.contributor_author_id,
+      controlled_by_submitter: existing.controlled_by_submitter || contributor.controlled_by_submitter,
+    });
+  }
+
+  const normalized = Array.from(byName.values()).filter((contributor) => contributor.roles.length > 0);
+  const providedTotal = normalized.reduce((sum, contributor) => sum + (contributor.ownership || 0), 0);
+  const missing = normalized.filter((contributor) => !contributor.ownership);
+  const fallbackShare = missing.length ? Math.max(0, 100 - providedTotal) / missing.length : 0;
+
+  return normalized.map((contributor) => {
+    const ownership = contributor.ownership || fallbackShare || (normalized.length ? 100 / normalized.length : 100);
+    return {
+      title: contributor.title,
+      ownership: toOwnership(ownership),
+      roles: contributor.roles,
+      controlled_by_submitter: contributor.controlled_by_submitter,
+      ...(contributor.publisher ? { publisher: contributor.publisher } : {}),
+      ...(contributor.publisher_share ? { publisher_share: contributor.publisher_share } : {}),
+      ...(contributor.contributor_author_id ? { contributor_author_id: contributor.contributor_author_id } : {}),
+    };
+  });
+};
+
 export class BromaConnector extends BaseDspConnector {
   key = 'broma';
   displayName = 'Broma';
@@ -325,7 +477,7 @@ export class BromaConnector extends BaseDspConnector {
     if (step === 'add_compositions') {
       for (const track of payload.tracks) {
         const recordingId = next.bromaRecordingIds?.[track.trackId];
-        await client.addComposition(String(next.bromaReleaseId), String(recordingId), this.buildCompositionPayload(track));
+        await client.addComposition(String(next.bromaReleaseId), String(recordingId), this.buildCompositionPayload(payload, track));
       }
       step = next.bromaStep = 'upload_cover';
       await this.persistProgress(jobId, next);
@@ -467,14 +619,32 @@ export class BromaConnector extends BaseDspConnector {
       parental_warning_type: track.explicit ? 'explicit' : 'not_explicit',
       label: rightsholder,
       producer: trackProducerRightsholder(payload, track),
+      lyrics: firstString(track.metadata?.lyrics, track.metadata?.lyric, (track as any).lyrics),
     };
   }
 
-  private buildCompositionPayload(track: DspReleasePayload['tracks'][number]) {
-    const contributors = Array.isArray(track.metadata?.contributors) ? track.metadata.contributors : track.contributors || [];
+  private buildCompositionPayload(payload: DspReleasePayload, track: DspReleasePayload['tracks'][number]) {
+    const contributors = [
+      ...collectBromaAuthors(track.metadata?.contributors),
+      ...collectBromaAuthors(track.contributors),
+      ...collectBromaAuthors(track.metadata?.composers, ['C']),
+      ...collectBromaAuthors((track as any).composers, ['C']),
+      ...collectBromaAuthors(track.metadata?.lyricists, ['A']),
+      ...collectBromaAuthors((track as any).lyricists, ['A']),
+      ...collectBromaAuthors(track.metadata?.writers, ['CA']),
+      ...collectBromaAuthors((track as any).writers, ['CA']),
+    ];
+
+    const normalizedContributors = normalizeBromaCompositionContributors(contributors);
+    const fallbackContributors = normalizedContributors.length
+      ? normalizedContributors
+      : normalizeBromaCompositionContributors(
+          collectBromaAuthors(firstString(track.artistName, payload.primaryArtist), ['CA'])
+        );
+
     return {
       title: track.title,
-      contributors,
+      contributors: fallbackContributors,
     };
   }
 }
