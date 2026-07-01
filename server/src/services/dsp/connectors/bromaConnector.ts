@@ -26,8 +26,213 @@ const STEP_ORDER: BromaStep[] = [
   'done',
 ];
 
-const firstString = (...values: unknown[]) =>
-  values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
+const firstString = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+};
+
+const normalizeBromaStatus = (value: unknown) =>
+  (firstString(value) || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const firstBromaReleaseStatus = (...values: unknown[]) => {
+  for (const value of values) {
+    const normalized = normalizeBromaStatus(value);
+    if (normalized && normalized !== 'ok') return normalized;
+  }
+  return '';
+};
+
+const BROMA_DELIVERED_STATUSES = new Set([
+  'live',
+  'published',
+  'delivered',
+  'processed',
+  'done',
+  'accepted',
+  'active',
+  'success',
+  'moderated',
+  'approved',
+  'shipped',
+]);
+
+const BROMA_REJECTED_STATUSES = new Set([
+  'rejected',
+  'declined',
+  'failed',
+  'error',
+  'cancelled',
+  'not_ready',
+]);
+
+type BromaStatusSnapshot = {
+  normalized: string;
+  source: 'release_detail' | 'asset_list';
+  releaseDetail: any;
+  assetRow?: any;
+  rejectionReason?: string;
+};
+
+const collectBromaAssetRows = (response: unknown): any[] => {
+  if (Array.isArray(response)) return response;
+  if (!response || typeof response !== 'object') return [];
+  const value = response as Record<string, any>;
+  return [value.data, value.items, value.results]
+    .flatMap((entry) => collectBromaAssetRows(entry))
+    .filter(Boolean);
+};
+
+const normalizeMatchText = (value: unknown) =>
+  firstString(value)?.toLowerCase().replace(/\s+/g, ' ').trim() || '';
+
+const getBromaAssetStatus = (asset: any) =>
+  firstBromaReleaseStatus(
+    asset?.moderation_status,
+    asset?.moderationStatus,
+    asset?.release_status,
+    asset?.status,
+    ...(Array.isArray(asset?.statuses) ? asset.statuses : [])
+  );
+
+const findBromaAssetRow = (rows: any[], detail: any) => {
+  const ean = firstString(detail?.ean, detail?.upc, detail?.catalogue_number);
+  if (ean) {
+    const exact = rows.find((row) => firstString(row?.ean, row?.upc, row?.catalogue_number) === ean);
+    if (exact) return exact;
+  }
+
+  const title = normalizeMatchText(detail?.title);
+  const releaseTypeId = firstString(detail?.release_type_id, detail?.releaseTypeId);
+  if (title && releaseTypeId) {
+    const exact = rows.find(
+      (row) =>
+        normalizeMatchText(row?.title) === title &&
+        firstString(row?.release_type_id, row?.releaseTypeId) === releaseTypeId
+    );
+    if (exact) return exact;
+  }
+
+  if (title) return rows.find((row) => normalizeMatchText(row?.title) === title);
+  return rows[0];
+};
+
+const getBromaRejectionReason = (detail: any, response: any, asset?: any) =>
+  firstString(
+    asset?.reject_reason,
+    asset?.rejection_reason,
+    asset?.rejected_reason,
+    asset?.moderation_comment,
+    asset?.comment,
+    asset?.message,
+    detail?.reject_reason,
+    detail?.rejection_reason,
+    detail?.rejected_reason,
+    detail?.moderation_comment,
+    detail?.comment,
+    detail?.message,
+    response?.message
+  );
+
+const cleanBromaUserReason = (value: unknown) => {
+  const text = firstString(value);
+  if (!text) return undefined;
+  const cleaned = text
+    .replace(/^broma\s*status\s*:\s*/i, '')
+    .replace(/^broma\s+/i, '')
+    .trim();
+  if (!cleaned || cleaned.toLowerCase() === 'rejected') return undefined;
+  return cleaned;
+};
+
+const collectBromaModerationReasons = (moderation: any) => {
+  const reasons = Array.isArray(moderation?.data?.reason)
+    ? moderation.data.reason
+    : Array.isArray(moderation?.reason)
+      ? moderation.reason
+      : [];
+  const messages: string[] = [];
+
+  for (const reason of reasons) {
+    const categories = reason?.categories;
+    if (!categories || typeof categories !== 'object') continue;
+    for (const entries of Object.values(categories)) {
+      const list = Array.isArray(entries) ? entries : [entries];
+      for (const entry of list) {
+        const text = cleanBromaUserReason(
+          typeof entry === 'object' && entry
+            ? firstString((entry as any).title_en, (entry as any).title, (entry as any).message, (entry as any).value)
+            : entry
+        );
+        if (text) messages.push(text);
+      }
+    }
+  }
+
+  return Array.from(new Set(messages)).join('; ') || undefined;
+};
+
+const fetchBromaStatusSnapshot = async (
+  client: BromaClient,
+  releaseId: string,
+  config: Record<string, unknown>
+): Promise<BromaStatusSnapshot> => {
+  const response = await client.getRelease(releaseId);
+  const detail = response?.data || response || {};
+  let normalized = firstBromaReleaseStatus(
+    response?.moderation_status,
+    response?.moderationStatus,
+    response?.release_status,
+    response?.state,
+    detail?.moderation_status,
+    detail?.moderationStatus,
+    detail?.release_status,
+    detail?.status,
+    detail?.state
+  );
+  let source: BromaStatusSnapshot['source'] = 'release_detail';
+  let assetRow: any;
+
+  const accountId = firstString(config.accountId, config.account_id);
+  const search = firstString(detail?.ean, detail?.upc, detail?.catalogue_number, detail?.title);
+  if (accountId && search && !BROMA_DELIVERED_STATUSES.has(normalized) && !BROMA_REJECTED_STATUSES.has(normalized)) {
+    const assets = await client.getAccountReleaseAssets(accountId, {
+      search,
+      page: 1,
+      limit: 10,
+    });
+    assetRow = findBromaAssetRow(collectBromaAssetRows(assets), detail);
+    const assetStatus = getBromaAssetStatus(assetRow);
+    if (assetStatus) {
+      normalized = assetStatus;
+      source = 'asset_list';
+    }
+  }
+
+  if (!normalized) normalized = firstBromaReleaseStatus(detail?.step);
+  let rejectionReason = cleanBromaUserReason(getBromaRejectionReason(detail, response, assetRow));
+  if (BROMA_REJECTED_STATUSES.has(normalized) && accountId && assetRow?.id) {
+    try {
+      const moderation = await client.getReleaseModeration(accountId, assetRow.id);
+      rejectionReason = collectBromaModerationReasons(moderation) || rejectionReason;
+    } catch {
+      // Status sync must not fail only because moderation details are temporarily unavailable.
+    }
+  }
+
+  return {
+    normalized,
+    source,
+    releaseDetail: detail,
+    assetRow,
+    rejectionReason,
+  };
+};
 
 const getResponseId = (response: any) =>
   String(response?.data?.id || response?.data?.release_id || response?.id || response?.release_id || '');
@@ -612,18 +817,24 @@ export class BromaConnector extends BaseDspConnector {
     const step = STEP_ORDER.includes(currentStep) ? currentStep : 'create_release';
 
     if (step === 'poll_status' && releaseId) {
-      const response = await client.getRelease(releaseId);
-      const status = String(response?.data?.moderation_status || response?.data?.status || response?.status || '').toLowerCase();
-      const live = ['live', 'published', 'delivered', 'processed', 'done', 'accepted', 'active', 'success', 'moderated'].includes(status);
+      const snapshot = await fetchBromaStatusSnapshot(client, releaseId, config);
+      const normalized = snapshot.normalized;
+      const live = BROMA_DELIVERED_STATUSES.has(normalized);
+      const rejected = BROMA_REJECTED_STATUSES.has(normalized);
       return {
-        state: live ? 'delivered' : 'processing',
+        state: live ? 'delivered' : rejected ? 'needs_attention' : 'processing',
         externalId: releaseId,
-        message: live ? 'Broma release is live/processed' : 'Broma release still processing',
+        message: live ? `Broma release is ${normalized}` : rejected ? `Broma release is ${normalized}` : 'Broma release still processing',
         metadata: {
           ...metadata,
           bromaStep: live ? 'done' : 'poll_status',
-          bromaModerationStatus: status || 'processing',
-          nextPollAt: live ? undefined : new Date(Date.now() + Number(config.pollIntervalMs || 30 * 60_000)).toISOString(),
+          bromaModerationStatus: normalized || 'processing',
+          bromaStatusSource: snapshot.source,
+          bromaAssetId: snapshot.assetRow?.id,
+          bromaAssetStatuses: snapshot.assetRow?.statuses,
+          bromaRejectionReason: rejected ? snapshot.rejectionReason || 'Rejected during moderation' : undefined,
+          bromaLastStatusAt: new Date().toISOString(),
+          nextPollAt: live || rejected ? undefined : new Date(Date.now() + Number(config.pollIntervalMs || 30 * 60_000)).toISOString(),
         },
       };
     }
@@ -641,29 +852,25 @@ export class BromaConnector extends BaseDspConnector {
   }
 
   async getDeliveryStatus(externalId: string, context: DspConnectorContext): Promise<DspDeliveryResult> {
-    const client = new BromaClient({ credentials: context.credentials, config: context.config || {} });
-    const response = await client.getRelease(externalId);
-    const data = response?.data || response || {};
-    const status = String(
-      data?.moderation_status ||
-      data?.moderationStatus ||
-      data?.release_status ||
-      data?.status ||
-      data?.state ||
-      ''
-    ).toLowerCase().trim();
-    const normalized = status.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    const delivered = ['live', 'published', 'delivered', 'processed', 'done', 'accepted', 'active', 'success', 'moderated', 'approved'].includes(normalized);
-    const rejected = ['rejected', 'declined', 'failed', 'error', 'cancelled'].includes(normalized);
+    const config = context.config || {};
+    const client = new BromaClient({ credentials: context.credentials, config });
+    const snapshot = await fetchBromaStatusSnapshot(client, externalId, config);
+    const normalized = snapshot.normalized;
+    const delivered = BROMA_DELIVERED_STATUSES.has(normalized);
+    const rejected = BROMA_REJECTED_STATUSES.has(normalized);
 
     return {
       state: delivered ? 'delivered' : rejected ? 'needs_attention' : 'processing',
       externalId,
-      message: status ? `Broma status: ${status}` : 'Broma status refreshed',
+      message: normalized ? `Broma status: ${normalized}` : 'Broma status refreshed',
       metadata: {
         bromaReleaseId: externalId,
         bromaStep: delivered ? 'done' : 'poll_status',
         bromaModerationStatus: normalized || 'processing',
+        bromaStatusSource: snapshot.source,
+        bromaAssetId: snapshot.assetRow?.id,
+        bromaAssetStatuses: snapshot.assetRow?.statuses,
+        bromaRejectionReason: rejected ? snapshot.rejectionReason || 'Rejected during moderation' : undefined,
         bromaLastStatusAt: new Date().toISOString(),
       },
     };

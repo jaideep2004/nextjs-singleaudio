@@ -148,6 +148,19 @@ export const refreshDeliveryStatus = async (req: AuthRequest, res: Response): Pr
   }
 };
 
+export const syncBromaReleaseStatuses = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const releaseIds = Array.isArray(req.body?.releaseIds)
+      ? req.body.releaseIds.map((id: unknown) => String(id)).filter(Boolean)
+      : undefined;
+    const limit = req.body?.limit ? Number(req.body.limit) : undefined;
+    const result = await dspDeliveryService.syncBromaReleaseStatuses({ releaseIds, limit });
+    successResponse(res, result, 'Broma release statuses synced');
+  } catch (error) {
+    errorResponse(res, 'Failed to sync Broma release statuses', error);
+  }
+};
+
 export const clearDeliveryLogs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const job = await dspDeliveryService.clearJobLogs(req.params.jobId, req.user?._id?.toString());

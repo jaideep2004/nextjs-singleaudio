@@ -39,7 +39,7 @@ import {
   UploadFile,
 } from '@mui/icons-material';
 import Link from 'next/link';
-import { releaseAPI } from '@/services/api';
+import { adminAPI, releaseAPI } from '@/services/api';
 import { useColorMode } from '@/context/ColorModeContext';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import { useRouter } from 'next/navigation';
@@ -90,6 +90,8 @@ export default function AdminReleasesPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [pendingExporting, setPendingExporting] = useState(false);
   const [pendingExportMessage, setPendingExportMessage] = useState('');
+  const [syncingBromaStatuses, setSyncingBromaStatuses] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
   const { mode } = useColorMode();
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -116,26 +118,54 @@ export default function AdminReleasesPage() {
   }, [statusFilter]);
 
   useEffect(() => {
-    const fetchReleases = async () => {
-      try {
-        setLoading(true);
-        const response = await releaseAPI.getReleases({ summary: '1' });
-        if (response && response.success) {
-          const data = Array.isArray(response.data) ? response.data : [];
-          setReleases(data);
-        } else {
-          setError('Failed to load releases');
-          setReleases([]);
-        }
-      } catch {
-        setError('An error occurred while fetching releases');
-        setReleases([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchReleases();
   }, []);
+
+  const fetchReleases = async () => {
+    try {
+      setLoading(true);
+      const response = await releaseAPI.getReleases({ summary: '1' });
+      if (response && response.success) {
+        const data = Array.isArray(response.data) ? response.data : [];
+        setReleases(data);
+      } else {
+        setError('Failed to load releases');
+        setReleases([]);
+      }
+    } catch {
+      setError('An error occurred while fetching releases');
+      setReleases([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncBromaStatuses = async () => {
+    try {
+      setSyncingBromaStatuses(true);
+      setSyncMessage('');
+      const inProcessReleaseIds = releases
+        .filter((release) => getNormalizedReleaseStatus(release.status) === 'in_process')
+        .map((release) => String(release._id))
+        .filter(Boolean);
+      const response = await adminAPI.syncBromaReleaseStatuses({
+        releaseIds: inProcessReleaseIds,
+        limit: Math.max(150, inProcessReleaseIds.length),
+      });
+      if (!response?.success) {
+        throw new Error(response?.error || response?.message || 'Failed to sync Broma statuses');
+      }
+      const result = response.data || {};
+      setSyncMessage(
+        `Broma sync checked ${result.checked || 0}: ${result.approved || 0} approved, ${result.rejected || 0} rejected, ${result.stillProcessing || 0} still processing.`
+      );
+      await fetchReleases();
+    } catch (err) {
+      setSyncMessage(err instanceof Error ? err.message : 'Failed to sync Broma statuses');
+    } finally {
+      setSyncingBromaStatuses(false);
+    }
+  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     if (newValue === 5) {
@@ -191,7 +221,8 @@ export default function AdminReleasesPage() {
 
   const filteredReleases = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    return statusFilteredReleases.filter((release) => {
+    const searchSource = query ? releases : statusFilteredReleases;
+    return searchSource.filter((release) => {
       const haystack = [
         release.releaseTitle,
         release.title,
@@ -207,7 +238,7 @@ export default function AdminReleasesPage() {
       const matchesType = typeFilter === 'all' || String(release.releaseType || release.type || '').toLowerCase() === typeFilter;
       return matchesSearch && matchesType;
     });
-  }, [searchTerm, statusFilteredReleases, typeFilter]);
+  }, [releases, searchTerm, statusFilteredReleases, typeFilter]);
 
   const paginatedReleases = useMemo(
     () => filteredReleases.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
@@ -403,7 +434,7 @@ export default function AdminReleasesPage() {
               setSearchTerm(event.target.value);
               resetPage();
             }}
-            placeholder="Filter by release, artist, label, UPC..."
+            placeholder="Search all releases by title, artist, label, UPC..."
             size="small"
             fullWidth
             InputProps={{
@@ -414,6 +445,15 @@ export default function AdminReleasesPage() {
               ),
             }}
           />
+          <Button
+            variant="outlined"
+            startIcon={syncingBromaStatuses ? <CircularProgress size={16} color="inherit" /> : <Sync />}
+            onClick={handleSyncBromaStatuses}
+            disabled={syncingBromaStatuses || inProcessCount === 0}
+            sx={{ minHeight: 40, whiteSpace: 'nowrap', px: 2 }}
+          >
+            {syncingBromaStatuses ? 'Syncing' : 'Sync Broma'}
+          </Button>
           <TextField
             select
             label="Type"
@@ -457,6 +497,16 @@ export default function AdminReleasesPage() {
             onClose={() => setPendingExportMessage('')}
           >
             {pendingExportMessage}
+          </Alert>
+        ) : null}
+
+        {syncMessage ? (
+          <Alert
+            severity={syncMessage.toLowerCase().includes('failed') ? 'error' : 'success'}
+            sx={{ mx: 1.5, mb: 1.5 }}
+            onClose={() => setSyncMessage('')}
+          >
+            {syncMessage}
           </Alert>
         ) : null}
 

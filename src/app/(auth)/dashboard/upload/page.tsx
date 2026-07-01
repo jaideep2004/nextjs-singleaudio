@@ -84,6 +84,7 @@ import {
   requiresYoutubePolicy,
 } from '@/lib/releaseConsent';
 import { getConfiguredApiBaseUrl } from '@/lib/urlConfig';
+import { getReleaseRejectionReason } from '@/lib/releaseStatus';
 
 // Helper: call Express API for uploads (uses NEXT_PUBLIC_API_URL in browser)
 const API_BASE =
@@ -658,6 +659,7 @@ export default function UploadPage() {
   const [reviewTerritoriesExpanded, setReviewTerritoriesExpanded] = useState(false);
   const [applyingTrackInfoToAll, setApplyingTrackInfoToAll] = useState(false);
   const [editReleaseLoading, setEditReleaseLoading] = useState(false);
+  const [editRejectReason, setEditRejectReason] = useState('');
 
   // Computed values (not state)
   const isPlatformAccessLoading = allowedDspKeys === null;
@@ -830,6 +832,7 @@ export default function UploadPage() {
 
         const release = payload.release;
         const releaseTracks = Array.isArray(release.tracks) ? release.tracks : [];
+        setEditRejectReason(getReleaseRejectionReason(release.rejectionReason || release.rejectReason || ''));
         setReleaseType((release.releaseType || 'single') as ReleaseType);
         setReleaseTitle(release.releaseTitle || release.title || '');
         setLabel(release.label || '');
@@ -837,7 +840,11 @@ export default function UploadPage() {
         setAutoGenerateCodes(!release.upc);
         setReleaseDate(toDateInputValue(release.releaseDate));
         setOriginalReleaseDate(toDateInputValue(release.originalReleaseDate));
-        setArtworkUploadedUrl(release.artworkUrl || null);
+        const restoredArtworkUrl =
+          release.artworkUrl || release.artwork || release.coverArt || release.coverArtUrl || null;
+        setArtworkFile(null);
+        setArtworkUploadedUrl(restoredArtworkUrl);
+        setArtworkPreview(restoredArtworkUrl);
         setArtworkUploadedFilename(release.artworkFile || null);
         setTerritoryCountries(Array.isArray(release.territories) ? release.territories : []);
         setSelectedDSPs(Array.isArray(release.stores) ? release.stores : []);
@@ -4676,6 +4683,15 @@ export default function UploadPage() {
           sx={{ mb: 2, borderRadius: 2 }}
         >
           Loading rejected release details...
+        </Alert>
+      ) : null}
+
+      {isEditMode && editRejectReason && !editReleaseLoading ? (
+        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+          <Typography variant="subtitle2" fontWeight={800}>
+            Admin rejection message
+          </Typography>
+          <Typography variant="body2">{editRejectReason}</Typography>
         </Alert>
       ) : null}
 

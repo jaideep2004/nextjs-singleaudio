@@ -46,6 +46,7 @@ import {
 } from '@/lib/acrCloud';
 import { getDspDisplayName } from '@/lib/platforms';
 import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
+import { getReleaseRejectionReason } from '@/lib/releaseStatus';
 
 type Track = {
   _id?: string;
@@ -274,7 +275,7 @@ function ReleaseDetail() {
   const stores = Array.isArray(release?.stores) ? release.stores : [];
   const readyAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'ready').length;
   const pendingAcrCount = tracks.filter((track) => getAcrCloudState(track.acrCloud) === 'pending').length;
-  const rejectedReason = release?.rejectionReason || release?.rejectReason;
+  const rejectedReason = getReleaseRejectionReason(release?.rejectionReason || release?.rejectReason);
   const firstTrack = tracks[0];
   const releaseGenre = release?.genre || firstTrack?.genre || '';
   const releaseSubGenre = release?.subGenre || firstTrack?.subGenre || '';

@@ -627,7 +627,9 @@ class DspDeliveryService {
     let releaseStatus: string | null = null;
     const step = String(metadata.bromaStep || '');
     const moderationStatus = String(metadata.bromaModerationStatus || '').toLowerCase();
-    if (state === 'delivered') releaseStatus = 'approved';
+    const bromaRejected = ['rejected', 'declined', 'cancelled'].includes(moderationStatus);
+    if (bromaRejected) releaseStatus = 'rejected';
+    else if (state === 'delivered') releaseStatus = 'approved';
     else if (step === 'send_moderation') releaseStatus = 'broma_moderation';
     else if (step === 'poll_status') {
       releaseStatus = ['accepted', 'approved', 'processing', 'distributed', 'in_distribution'].includes(moderationStatus)
@@ -639,21 +641,28 @@ class DspDeliveryService {
     else if (state === 'needs_attention') releaseStatus = 'uploading_to_broma';
 
     if (!releaseStatus) return;
+    const releaseUpdate: Record<string, any> = {
+      status: releaseStatus,
+      updatedAt: new Date(),
+      bromaDelivery: {
+        releaseId: metadata.bromaReleaseId,
+        recordingIds: metadata.bromaRecordingIds || {},
+        step,
+        moderationStatus: metadata.bromaModerationStatus,
+        outletIds: metadata.bromaOutletIds || [],
+        updatedAt: new Date(),
+      },
+    };
+    if (bromaRejected) {
+      releaseUpdate.rejectReason = metadata.bromaRejectionReason || 'Rejected during moderation';
+      releaseUpdate.rejectionReason = releaseUpdate.rejectReason;
+      releaseUpdate.rejectedAt = new Date();
+    }
+
     await mongoose.connection.collection('releases').updateOne(
       { _id: job.releaseId },
       {
-        $set: {
-          status: releaseStatus,
-          updatedAt: new Date(),
-          bromaDelivery: {
-            releaseId: metadata.bromaReleaseId,
-            recordingIds: metadata.bromaRecordingIds || {},
-            step,
-            moderationStatus: metadata.bromaModerationStatus,
-            outletIds: metadata.bromaOutletIds || [],
-            updatedAt: new Date(),
-          },
-        },
+        $set: releaseUpdate,
       }
     );
   }
@@ -976,25 +985,87 @@ class DspDeliveryService {
     return DeliveryJob.findById(jobId);
   }
 
+  async syncBromaReleaseStatuses(input: { releaseIds?: string[]; limit?: number } = {}) {
+    const limit = Math.min(300, Math.max(1, input.limit || 150));
+    const releaseObjectIds = (input.releaseIds || [])
+      .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id));
+    const query: Record<string, any> = {
+      providerKey: 'broma',
+      targetType: 'release',
+      state: { $in: ['processing', 'needs_attention'] },
+      $or: [
+        { externalId: { $exists: true, $ne: '' } },
+        { 'metadata.bromaReleaseId': { $exists: true, $ne: '' } },
+      ],
+    };
+    if (releaseObjectIds.length > 0) query.releaseId = { $in: releaseObjectIds };
+
+    const jobs = await DeliveryJob.find(query)
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(limit)
+      .select('_id releaseId state externalId metadata');
+
+    const seenReleaseIds = new Set<string>();
+    const results: Array<{ jobId: string; releaseId?: string; state?: string; status?: string; error?: string }> = [];
+
+    for (const job of jobs) {
+      const releaseId = job.releaseId?.toString();
+      if (releaseId && seenReleaseIds.has(releaseId)) continue;
+      if (releaseId) seenReleaseIds.add(releaseId);
+
+      try {
+        const refreshed = await this.refreshJobStatus(job._id.toString());
+        results.push({
+          jobId: job._id.toString(),
+          releaseId,
+          state: refreshed?.state,
+          status: (refreshed?.metadata as Record<string, any> | undefined)?.bromaModerationStatus,
+        });
+      } catch (error) {
+        results.push({
+          jobId: job._id.toString(),
+          releaseId,
+          error: getErrorMessage(error),
+        });
+      }
+    }
+
+    return {
+      checked: results.length,
+      approved: results.filter((item) => item.state === 'delivered').length,
+      rejected: results.filter((item) => item.state === 'needs_attention' && item.status === 'rejected').length,
+      stillProcessing: results.filter((item) => item.state === 'processing').length,
+      failed: results.filter((item) => item.error).length,
+      results,
+    };
+  }
+
   async clearJobLogs(jobId: string, actorId?: string) {
     const job = await DeliveryJob.findById(jobId);
     if (!job) throw new Error('Delivery job not found');
     const clearedAt = new Date();
     const attemptsCleared = job.attempts?.length || 0;
     const eventsCleared = job.events?.length || 0;
+    const resetState: DspDeliveryState = 'cancelled';
 
     await DeliveryJob.findByIdAndUpdate(jobId, {
+      state: resetState,
+      retryCount: 0,
+      deadLettered: false,
+      updatedAt: clearedAt,
       attempts: [],
       events: [
         {
-          state: job.state,
-          message: `Admin cleared ${attemptsCleared} attempts and ${eventsCleared} events`,
+          state: resetState,
+          message: `Admin cleared ${attemptsCleared} attempts and ${eventsCleared} events; release moved back to pending`,
           source: 'user',
           createdAt: clearedAt,
         },
       ],
       metadata: {
         ...(job.metadata || {}),
+        resetForApproval: true,
         lastLogClear: {
           at: clearedAt.toISOString(),
           by: actorId,
@@ -1002,7 +1073,29 @@ class DspDeliveryService {
           eventsCleared,
         },
       },
+      $unset: {
+        errorMessage: '',
+        lockedAt: '',
+        lockedBy: '',
+        lockExpiresAt: '',
+        nextRetryAt: '',
+        lastAttemptAt: '',
+      },
     });
+
+    if (job.targetType === 'release' && job.releaseId) {
+      await mongoose.connection.collection('releases').updateOne(
+        { _id: job.releaseId },
+        {
+          $set: {
+            status: 'pending',
+            updatedAt: clearedAt,
+            'bromaDelivery.resetForApprovalAt': clearedAt,
+            'bromaDelivery.resetForApprovalBy': actorId || null,
+          },
+        }
+      );
+    }
 
     return DeliveryJob.findById(jobId);
   }

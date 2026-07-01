@@ -317,6 +317,53 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
     await db.collection('deliveryjobs').bulkWrite(
       jobs.map((job) => ({
         updateOne: {
+          filter: {
+            idempotencyKey: job.idempotencyKey,
+            state: { $in: ['cancelled', 'failed', 'needs_attention'] },
+            'metadata.resetForApproval': true,
+          },
+          update: {
+            $set: {
+              targetType: job.targetType,
+              releaseId: job.releaseId,
+              snapshotId: job.snapshotId,
+              providerKey: job.providerKey,
+              operation: job.operation,
+              state: job.state,
+              priority: job.priority,
+              maxRetries: job.maxRetries,
+              retryCount: 0,
+              nextRetryAt: now,
+              deadLettered: false,
+              metadata: {
+                ...job.metadata,
+                resetForApproval: false,
+                requeuedFromApprovalAt: now.toISOString(),
+              },
+              errorMessage: job.errorMessage,
+              updatedAt: now,
+            },
+            $unset: {
+              lockedAt: '',
+              lockedBy: '',
+              lockExpiresAt: '',
+            },
+            $push: {
+              events: {
+                state: job.state,
+                message: 'Release delivery job requeued from admin approval',
+                source: 'system',
+                createdAt: now,
+              },
+            },
+          },
+        },
+      })) as any[]
+    );
+
+    await db.collection('deliveryjobs').bulkWrite(
+      jobs.map((job) => ({
+        updateOne: {
           filter: { idempotencyKey: job.idempotencyKey },
           update: { $setOnInsert: job },
           upsert: true,

@@ -193,6 +193,21 @@ export class BromaClient {
     });
   }
 
+  async getAccountReleaseAssets(accountId: string | number, params: Record<string, unknown> = {}) {
+    return this.request<any>({
+      method: 'GET',
+      url: `/accounts/${accountId}/assets/releases`,
+      params,
+    });
+  }
+
+  async getReleaseModeration(accountId: string | number, assetId: string | number) {
+    return this.request<any>({
+      method: 'GET',
+      url: `/accounts/${accountId}/releases/${assetId}/moderation`,
+    });
+  }
+
   async deleteStatisticsReport(accountId: string | number, reportId: string | number) {
     return this.request<any>({
       method: 'DELETE',

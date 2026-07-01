@@ -55,7 +55,8 @@ import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
 import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
 import { resolveMediaUrl } from '@/lib/urlConfig';
-import { getNormalizedReleaseStatus, getReleaseStatusLabel } from '@/lib/releaseStatus';
+import { getNormalizedReleaseStatus, getReleaseRejectionReason, getReleaseStatusLabel } from '@/lib/releaseStatus';
+import { toast } from 'sonner';
 
 const formatAcrProbability = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
@@ -225,6 +226,9 @@ export default function AdminReleaseDetailPage() {
       if (resp?.success) {
         const nextStatus = resp.release?.status || resp.data?.status || "uploading_to_broma";
         setRelease((r: any) => (r ? { ...r, status: nextStatus, rejectReason: undefined, rejectionReason: undefined } : r));
+        if (getNormalizedReleaseStatus(nextStatus) === 'in_process') {
+          toast.success('Release moved to processing');
+        }
         const list = await releaseAPI.getReleases({ summary: '1' });
         const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => getNormalizedReleaseStatus(item.status) === 'pending');
         router.push(hasPending ? '/admin/releases?status=pending' : '/admin/releases');
@@ -423,6 +427,7 @@ export default function AdminReleaseDetailPage() {
     firstTrack?.copyrightPYear,
     firstTrack?.copyrightP,
   ].filter(Boolean).join(' ');
+  const rejectedReason = getReleaseRejectionReason(release?.rejectionReason || release?.rejectReason);
   const releaseUser = release?.userName || release?.ownerName || release?.artistName ||
     release?.ownerUser?.name || release?.user?.name || release?.owner?.name || release?.userId?.name || release?.ownerId?.name ||
     release?.createdBy?.name || release?.userEmail || release?.ownerEmail || release?.user?.email ||
@@ -1075,7 +1080,7 @@ export default function AdminReleaseDetailPage() {
               )}
             </Box>
             
-            {release.status === "rejected" && release.rejectReason && (
+            {release.status === "rejected" && rejectedReason && (
               <Card 
                 elevation={0} 
                 sx={{ 
@@ -1089,7 +1094,7 @@ export default function AdminReleaseDetailPage() {
                     <Info sx={{ mr: 1 }} /> Rejection Reason
                   </Typography>
                   <Typography variant="body2">
-                    {release.rejectReason}
+                    {rejectedReason}
                   </Typography>
                 </CardContent>
               </Card>

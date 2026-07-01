@@ -1155,4 +1155,13 @@ export const adminAPI = {
       return handleApiError(error);
     }
   },
+
+  syncBromaReleaseStatuses: async (payload: { releaseIds?: string[]; limit?: number } = {}) => {
+    try {
+      const response = await api.post<ApiResponse<any>>('/admin/broma-release-statuses-sync', payload);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
 };

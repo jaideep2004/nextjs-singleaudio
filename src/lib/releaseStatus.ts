@@ -34,3 +34,19 @@ export function getReleaseStatusLabel(status: unknown) {
     ? value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
     : 'Unknown';
 }
+
+export function getReleaseRejectionReason(reason: unknown) {
+  const value = String(reason ?? '').trim();
+  if (!value) return '';
+
+  const cleaned = value
+    .replace(/^broma\s*status\s*:\s*/i, '')
+    .replace(/^broma\s+/i, '')
+    .trim();
+
+  if (!cleaned || cleaned.toLowerCase() === 'rejected') {
+    return 'Rejected during moderation';
+  }
+
+  return cleaned;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Box,
@@ -165,34 +165,15 @@ export default function AdminDspDeliveriesPage() {
     password: '',
     integrationMode: 'sandbox',
   });
-  const notifiedJobErrorsRef = useRef<Set<string>>(new Set());
-
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
+  const visibleProviders = useMemo(
+    () => providers.filter((provider) => provider.key !== 'mock_dsp'),
+    [providers]
+  );
   const bromaProvider = useMemo(() => providers.find((provider) => provider.key === 'broma'), [providers]);
   const bromaCredentialKeys = bromaProvider?.configuredCredentialKeys || [];
   const hasBromaEmail = bromaCredentialKeys.includes('email');
   const hasBromaPassword = bromaCredentialKeys.includes('password');
-  const getLatestJobError = (job: DeliveryJob) => {
-    if (job.errorMessage) return job.errorMessage;
-    const failedAttempt = [...(job.attempts || [])].reverse().find((attempt) => attempt.status === 'failed');
-    if (!failedAttempt) return '';
-    return failedAttempt.errorMessage || formatAttemptResponse(failedAttempt.responseBody);
-  };
-
-  const notifyBromaJobErrors = (nextJobs: DeliveryJob[]) => {
-    nextJobs
-      .filter((job) => job.providerKey === 'broma' && ['failed', 'needs_attention'].includes(job.state))
-      .slice(0, 3)
-      .forEach((job) => {
-        const message = getLatestJobError(job);
-        if (!message) return;
-        const key = `${job._id}:${job.retryCount}:${job.state}:${message}`;
-        if (notifiedJobErrorsRef.current.has(key)) return;
-        notifiedJobErrorsRef.current.add(key);
-        toast.error(`Broma delivery issue: ${message.slice(0, 220)}`);
-      });
-  };
-
   const load = async () => {
     try {
       setLoading(true);
@@ -211,7 +192,6 @@ export default function AdminDspDeliveriesPage() {
       setProviders(providerRes?.data || []);
       setJobs(nextJobs);
       setBromaOutlets(outletRes?.data || []);
-      notifyBromaJobErrors(nextJobs);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load DSP data');
     } finally {
@@ -340,7 +320,9 @@ export default function AdminDspDeliveriesPage() {
       const processedItems = response?.data?.processed || [];
       const processed = processedItems.length || 0;
       const issue = processedItems.find((item: any) => ['failed', 'needs_attention'].includes(item.state) && item.error);
+      const processing = processedItems.filter((item: any) => item.state === 'processing').length;
       if (issue?.error) toast.error(`Broma delivery issue: ${String(issue.error).slice(0, 220)}`);
+      else if (processing > 0) toast.success(`${processing} release${processing === 1 ? '' : 's'} moved to processing`);
       else toast.success(`Processed ${processed} delivery job${processed === 1 ? '' : 's'}`);
       await load();
     } catch (error) {
@@ -383,7 +365,42 @@ export default function AdminDspDeliveriesPage() {
         title="Mediator Delivery"
         description="Queue release deliveries through Broma, sync outlets, monitor moderation, and retry failed attempts."
         action={
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} alignItems={{ md: 'center' }}>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="provider-filter">Provider</InputLabel>
+              <Select
+                labelId="provider-filter"
+                label="Provider"
+                value={providerFilter}
+                onChange={(e) => setProviderFilter(e.target.value)}
+              >
+                <MenuItem value="all">All providers</MenuItem>
+                {visibleProviders.map((provider) => (
+                  <MenuItem key={provider.key} value={provider.key}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <DspLogo value={provider.key} alt={provider.displayName} size={20} padding={0.25} />
+                      <span>{provider.displayName}</span>
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: 180 }}>
+              <InputLabel id="status-filter">Status</InputLabel>
+              <Select
+                labelId="status-filter"
+                label="Status"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <MenuItem value="all">All states</MenuItem>
+                <MenuItem value="queued">Queued</MenuItem>
+                <MenuItem value="processing">Processing</MenuItem>
+                <MenuItem value="delivered">Delivered</MenuItem>
+                <MenuItem value="failed">Failed</MenuItem>
+                <MenuItem value="needs_attention">Needs Attention</MenuItem>
+              </Select>
+            </FormControl>
             <Button startIcon={<SyncIcon />} variant="outlined" onClick={handleSyncBromaOutlets} disabled={syncingOutlets}>
               {syncingOutlets ? 'Syncing...' : 'Sync Outlets'}
             </Button>
@@ -397,9 +414,9 @@ export default function AdminDspDeliveriesPage() {
         }
       />
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack spacing={2}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ md: 'center' }}>
+      <Paper sx={{ p: { xs: 1.5, md: 2 }, mb: 2.5 }}>
+        <Stack spacing={1.5}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.25} justifyContent="space-between" alignItems={{ md: 'center' }}>
             <Box>
               <Typography variant="subtitle2" fontWeight={800}>
                 Configure Broma
@@ -415,12 +432,13 @@ export default function AdminDspDeliveriesPage() {
             </Stack>
           </Stack>
 
-          <Alert severity="info">
+          <Alert severity="info" sx={{ py: 0.75 }}>
             Leave password blank to keep existing encrypted credentials. Enter email and password together to replace them.
           </Alert>
 
-          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={1.5}>
             <TextField
+              size="small"
               label="Base URL"
               value={bromaForm.baseUrl}
               onChange={(e) => setBromaForm((current) => ({ ...current, baseUrl: e.target.value }))}
@@ -430,6 +448,7 @@ export default function AdminDspDeliveriesPage() {
               inputProps={{ 'aria-label': 'Broma API base URL' }}
             />
             <TextField
+              size="small"
               label="Account ID"
               value={bromaForm.accountId}
               onChange={(e) => setBromaForm((current) => ({ ...current, accountId: e.target.value }))}
@@ -439,6 +458,7 @@ export default function AdminDspDeliveriesPage() {
               inputProps={{ 'aria-label': 'Broma account ID' }}
             />
             <TextField
+              size="small"
               label="Created Country ID"
               value={bromaForm.createdCountryId}
               onChange={(e) => setBromaForm((current) => ({ ...current, createdCountryId: e.target.value }))}
@@ -448,7 +468,7 @@ export default function AdminDspDeliveriesPage() {
               helperText="Use the numeric country id from Broma dictionaries. India is 32."
               inputProps={{ 'aria-label': 'Broma created country ID' }}
             />
-            <FormControl fullWidth>
+            <FormControl fullWidth size="small">
               <InputLabel id="broma-mode-select">Mode</InputLabel>
               <Select
                 labelId="broma-mode-select"
@@ -464,8 +484,9 @@ export default function AdminDspDeliveriesPage() {
             </FormControl>
           </Stack>
 
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
             <TextField
+              size="small"
               label="Broma Email"
               value={bromaForm.email}
               onChange={(e) => setBromaForm((current) => ({ ...current, email: e.target.value }))}
@@ -477,6 +498,7 @@ export default function AdminDspDeliveriesPage() {
               inputProps={{ 'aria-label': 'Broma email' }}
             />
             <TextField
+              size="small"
               label="Broma Password"
               value={bromaForm.password}
               onChange={(e) => setBromaForm((current) => ({ ...current, password: e.target.value }))}
@@ -491,7 +513,7 @@ export default function AdminDspDeliveriesPage() {
               variant="contained"
               onClick={handleSaveBromaConfig}
               disabled={savingBroma}
-              sx={{ minWidth: { md: 180 } }}
+              sx={{ minWidth: { md: 180 }, minHeight: 40 }}
             >
               {savingBroma ? 'Saving...' : 'Save Broma'}
             </Button>
@@ -549,54 +571,6 @@ export default function AdminDspDeliveriesPage() {
               </Table>
             </Box>
           )}
-        </Stack>
-      </Paper>
-
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle2" fontWeight={800}>
-              Delivery Jobs
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Broma release delivery jobs are shown by default. Legacy per-DSP track jobs stay hidden unless selected.
-            </Typography>
-          </Box>
-          <FormControl fullWidth>
-            <InputLabel id="provider-filter">Provider Filter</InputLabel>
-            <Select
-              labelId="provider-filter"
-              label="Provider Filter"
-              value={providerFilter}
-              onChange={(e) => setProviderFilter(e.target.value)}
-            >
-              <MenuItem value="all">All providers</MenuItem>
-              {providers.map((provider) => (
-                <MenuItem key={provider.key} value={provider.key}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <DspLogo value={provider.key} alt={provider.displayName} size={24} padding={0.25} />
-                    <span>{provider.displayName}</span>
-                  </Stack>
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel id="status-filter">Status Filter</InputLabel>
-            <Select
-              labelId="status-filter"
-              label="Status Filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <MenuItem value="all">All states</MenuItem>
-              <MenuItem value="queued">Queued</MenuItem>
-              <MenuItem value="processing">Processing</MenuItem>
-              <MenuItem value="delivered">Delivered</MenuItem>
-              <MenuItem value="failed">Failed</MenuItem>
-              <MenuItem value="needs_attention">Needs Attention</MenuItem>
-            </Select>
-          </FormControl>
         </Stack>
       </Paper>
 
