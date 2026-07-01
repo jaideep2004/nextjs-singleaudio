@@ -163,6 +163,10 @@ function normalizeNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function formatChartCurrency(value: unknown): [string, string] {
+  return [formatCurrency(normalizeNumber(value)), 'Earnings'];
+}
+
 function buildCsv(rows: RoyaltyItem[]) {
   const header = ['Track', 'Platform', 'Streams', 'Earnings', 'Date'];
   const body = rows.map((row) => [
@@ -901,7 +905,7 @@ function RoyaltiesContent() {
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: mutedText }} axisLine={false} tickLine={false} />
                     <YAxis tickFormatter={(value) => `$${value}`} tick={{ fontSize: 11, fill: mutedText }} axisLine={false} tickLine={false} />
                     <RechartsTooltip
-                      formatter={(value: number | string) => [formatCurrency(normalizeNumber(value)), 'Earnings']}
+                      formatter={formatChartCurrency}
                       contentStyle={{ background: isDark ? '#1a2035' : '#fff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)'}`, borderRadius: 10, fontSize: '0.8rem' }}
                     />
                     <Bar dataKey="amount" fill="#4a6cf7" radius={[8, 8, 0, 0]} />
@@ -927,7 +931,7 @@ function RoyaltiesContent() {
                       ))}
                     </Pie>
                     <RechartsTooltip
-                      formatter={(value: number | string) => [formatCurrency(normalizeNumber(value)), 'Earnings']}
+                      formatter={formatChartCurrency}
                       contentStyle={{ background: isDark ? '#1a2035' : '#fff', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(15,23,42,0.1)'}`, borderRadius: 10, fontSize: '0.8rem' }}
                     />
                   </PieChart>
@@ -1098,7 +1102,7 @@ function RoyaltiesContent() {
                       <Box>
                         <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: mutedText }}>Payment Method</Typography>
                         <Typography sx={{ color: headingText, fontWeight: 700 }}>
-                          {payout.paymentMethod === 'upi' ? 'UPI' : 'PayPal'}
+                          {payout.paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'PayPal'}
                         </Typography>
                       </Box>
                       <Box>

@@ -166,6 +166,40 @@ export class BromaClient {
     return this.request<any>({ method: 'GET', url: '/dictionaries/outlets' });
   }
 
+  async getStatisticsOutlets() {
+    return this.request<any>({ method: 'GET', url: '/stat/v1/statistics/outlets' });
+  }
+
+  async createStatisticsReport(accountId: string | number, payload: Record<string, unknown>) {
+    return this.request<any>({
+      method: 'POST',
+      url: `/stat/v1/statistics/accounts/${accountId}/report`,
+      data: payload,
+    });
+  }
+
+  async createStatisticsSummaryReport(accountId: string | number, payload: Record<string, unknown>) {
+    return this.request<any>({
+      method: 'POST',
+      url: `/stat/v1/statistics/accounts/${accountId}/report/summary`,
+      data: payload,
+    });
+  }
+
+  async getStatisticsReport(accountId: string | number, reportId: string | number) {
+    return this.request<any>({
+      method: 'GET',
+      url: `/stat/v1/statistics/accounts/${accountId}/report/${reportId}`,
+    });
+  }
+
+  async deleteStatisticsReport(accountId: string | number, reportId: string | number) {
+    return this.request<any>({
+      method: 'DELETE',
+      url: `/stat/v1/statistics/accounts/${accountId}/report/${reportId}/`,
+    });
+  }
+
   async getReleaseTypes() {
     return this.request<any>({
       method: 'GET',

@@ -22,12 +22,14 @@ import {
   CloudUpload as CloudUploadIcon,
   TrendingUp,
   ArrowForward,
+  Sync as SyncIcon,
   Error as ErrorIcon,
 } from '@mui/icons-material';
 import { useAuth } from '@/context/AppContext';
 import { trackAPI, releaseAPI } from '@/services/api';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader } from '@/components/premium/PremiumSurface';
+import { getNormalizedReleaseStatus } from '@/lib/releaseStatus';
 
 // Types
 interface Track {
@@ -122,11 +124,10 @@ function DashboardPage() {
   const getReleaseTrackCount = (release: any) =>
     Number(release?.trackCount ?? (Array.isArray(release?.tracks) ? release.tracks.length : 0));
 
-  const pendingTracks = safeTracks.filter(t => t?.status === 'pending').length;
-  const rejectedTracks = safeTracks.filter(t => t?.status === 'rejected').length;
-  const approvedReleases = safeReleases.filter(r => r?.status === 'approved').length;
-  const pendingReleases = safeReleases.filter(r => r?.status === 'pending').length;
-  const rejectedReleases = safeReleases.filter(r => r?.status === 'rejected').length;
+  const approvedReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'approved').length;
+  const inProcessReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'in_process').length;
+  const pendingReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'pending').length;
+  const rejectedReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'rejected').length;
 
   const recentReleases = safeReleases.slice(0, 5);
   const recentTracks = safeTracks.slice(0, 6);
@@ -134,18 +135,18 @@ function DashboardPage() {
   // KPI metrics
   const metrics = [
     {
-      label: 'Total Tracks',
-      value: safeTracks.length,
-      icon: <MusicNoteIcon />,
-      color: '#4a6cf7',
-      bgColor: isDark ? 'rgba(74, 108, 247, 0.1)' : 'rgba(74, 108, 247, 0.08)',
-    },
-    {
       label: 'Total Releases',
       value: safeReleases.length,
       icon: <AlbumIcon />,
       color: '#f59e0b',
       bgColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
+    },
+    {
+      label: 'In Process',
+      value: inProcessReleases,
+      icon: <SyncIcon />,
+      color: '#0ea5e9',
+      bgColor: isDark ? 'rgba(14, 165, 233, 0.12)' : 'rgba(14, 165, 233, 0.08)',
     },
     {
       label: 'Approved',
@@ -156,14 +157,14 @@ function DashboardPage() {
     },
     {
       label: 'Pending Review',
-      value: pendingTracks + pendingReleases,
+      value: pendingReleases,
       icon: <PendingActionsIcon />,
       color: '#f59e0b',
       bgColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
     },
     {
       label: 'Rejected',
-      value: rejectedTracks + rejectedReleases,
+      value: rejectedReleases,
       icon: <ErrorIcon />,
       color: '#ef4444',
       bgColor: isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.08)',
@@ -173,10 +174,11 @@ function DashboardPage() {
   const getStatusChip = (status: string) => {
     const map: Record<string, { color: string; bg: string; label: string }> = {
       approved: { color: '#10b981', bg: isDark ? 'rgba(16,185,129,0.12)' : 'rgba(16,185,129,0.08)', label: 'Approved' },
+      in_process: { color: '#0ea5e9', bg: isDark ? 'rgba(14,165,233,0.14)' : 'rgba(14,165,233,0.09)', label: 'In Process' },
       pending: { color: '#f59e0b', bg: isDark ? 'rgba(245,158,11,0.12)' : 'rgba(245,158,11,0.08)', label: 'Pending' },
       rejected: { color: '#ef4444', bg: isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)', label: 'Rejected' },
     };
-    const s = map[status] || map.pending;
+    const s = map[getNormalizedReleaseStatus(status)] || map.pending;
     return (
       <Box
         sx={{
@@ -404,8 +406,9 @@ function DashboardPage() {
             </Typography>
             {[
               { label: 'Approved', count: approvedReleases, total: safeReleases.length, color: '#10b981' },
+              { label: 'In Process', count: inProcessReleases, total: safeReleases.length, color: '#0ea5e9' },
               { label: 'Pending', count: pendingReleases, total: safeReleases.length, color: '#f59e0b' },
-              { label: 'Rejected', count: safeReleases.filter(r => r?.status === 'rejected').length, total: safeReleases.length, color: '#ef4444' },
+              { label: 'Rejected', count: rejectedReleases, total: safeReleases.length, color: '#ef4444' },
             ].map((item) => (
               <Box key={item.label} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>

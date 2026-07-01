@@ -5,6 +5,7 @@ import { useColorMode } from '@/context/ColorModeContext';
 import useAdminAuth from '@/hooks/useAdminAuth';
 import { adminAPI, releaseAPI } from '@/services/api';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
+import { getNormalizedReleaseStatus, getReleaseStatusLabel } from '@/lib/releaseStatus';
 import {
   Container,
   Box,
@@ -187,7 +188,7 @@ export default function AdminDashboard() {
         if (releasesResponse.success && Array.isArray(releasesResponse.data)) {
           const releases = releasesResponse.data as DashboardRelease[];
           setAllReleases(releases);
-          setPendingReleases(releases.filter(release => release.status === 'pending'));
+          setPendingReleases(releases.filter(release => getNormalizedReleaseStatus(release.status) === 'pending'));
         } else {
           setAllReleases([]);
           setPendingReleases([]);
@@ -220,7 +221,7 @@ export default function AdminDashboard() {
     { label: 'Total Releases', value: allReleases.length, icon: Album, avatarColor: 'secondary' },
     {
       label: 'Pending Approvals',
-      value: stats.pendingReleases,
+      value: pendingReleases.length,
       icon: PendingActions,
       avatarColor: 'warning',
     },
@@ -232,8 +233,8 @@ export default function AdminDashboard() {
     },
   ];
 
-  const approvedReleases = allReleases.filter(release => release.status === 'approved').length;
-  const rejectedReleases = allReleases.filter(release => release.status === 'rejected').length;
+  const approvedReleases = allReleases.filter(release => getNormalizedReleaseStatus(release.status) === 'approved').length;
+  const rejectedReleases = allReleases.filter(release => getNormalizedReleaseStatus(release.status) === 'rejected').length;
   const reviewLoad =
     allReleases.length > 0 ? Math.round((pendingReleases.length / allReleases.length) * 100) : 0;
   const surfaceSx = {
@@ -866,7 +867,10 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {allReleases.slice(0, 5).map(release => (
+                    {allReleases.slice(0, 5).map(release => {
+                      const displayStatus = getNormalizedReleaseStatus(release.status);
+
+                      return (
                       <TableRow
                         key={release._id}
                         sx={{
@@ -898,13 +902,17 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={release.status.charAt(0).toUpperCase() + release.status.slice(1)}
+                            label={getReleaseStatusLabel(release.status)}
                             color={
-                              release.status === 'approved'
+                              displayStatus === 'approved'
                                 ? 'success'
-                                : release.status === 'pending'
+                                : displayStatus === 'pending'
                                   ? 'warning'
-                                  : 'error'
+                                  : displayStatus === 'in_process'
+                                    ? 'info'
+                                    : displayStatus === 'rejected'
+                                      ? 'error'
+                                      : 'default'
                             }
                             size="small"
                             sx={{
@@ -934,7 +942,8 @@ export default function AdminDashboard() {
                           </Typography>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

@@ -23,12 +23,12 @@ export async function GET() {
     const dspKeys = Array.isArray(record?.dspKeys) ? record!.dspKeys : ALL_DSP_KEYS;
     return NextResponse.json({ success: true, data: { dspKeys } });
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to load platforms';
     return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : 'Failed to load platforms' },
-      { status: 500 }
+      { success: false, message },
+      { status: message === 'Authentication required' ? 401 : 500 }
     );
   }
 }
 
 export const dynamic = 'force-dynamic';
-

@@ -22,7 +22,7 @@ router.post(
   }
   const filename = file.filename;
   const url = getFileUrl(filename, 'image');
-  return res.json({ success: true, filename, url });
+  return res.json({ success: true, filename, originalName: file.originalname, url });
   }
 );
 
@@ -92,7 +92,7 @@ router.post(
     };
   }
 
-  return res.json({ success: true, filename, url, acrCloud });
+  return res.json({ success: true, filename, originalName: file.originalname, url, acrCloud });
   }
 );
 

@@ -36,7 +36,7 @@ export default function ViewUserPage({ params }: { params: { id: string } }) {
   const { isAdmin } = useAdminAuth();
   const userId = params.id;
   
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -77,7 +77,7 @@ export default function ViewUserPage({ params }: { params: { id: string } }) {
       });
       
       if (response.success) {
-        setUser(prev => ({ ...prev, isActive: newStatus }));
+        setUser((prev: any | null) => (prev ? { ...prev, isActive: newStatus } : prev));
       } else {
         throw new Error(response.message || `Failed to ${newStatus ? 'activate' : 'deactivate'} user`);
       }

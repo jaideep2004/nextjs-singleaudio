@@ -33,21 +33,40 @@ import SettingsModel from '../models/settings.model';
   }
 });
 
-const createUniqueFilename = (file: Express.Multer.File) =>
-  `${uuidv4()}${path.extname(file.originalname)}`;
+const sanitizeUploadBasename = (originalName: string) => {
+  const parsed = path.parse(originalName || 'upload');
+  const safe = parsed.name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-._]+|[-._]+$/g, '')
+    .slice(0, 120);
 
-const createStorage = (destination: string) =>
+  return safe || 'upload';
+};
+
+const createUniqueFilename = (file: Express.Multer.File) =>
+  `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`;
+
+const createReadableUniqueFilename = (file: Express.Multer.File) =>
+  `${sanitizeUploadBasename(file.originalname)}-${uuidv4().slice(0, 8)}${path.extname(file.originalname).toLowerCase()}`;
+
+const createStorage = (
+  destination: string,
+  filenameFactory: (file: Express.Multer.File) => string = createUniqueFilename
+) =>
   multer.diskStorage({
     destination: (_req, _file, cb) => {
       cb(null, destination);
     },
     filename: (_req, file, cb) => {
-      cb(null, createUniqueFilename(file));
+      cb(null, filenameFactory(file));
     }
   });
 
-const audioStorage = createStorage(TRACKS_DIR);
-const imageStorage = createStorage(ARTWORK_DIR);
+const audioStorage = createStorage(TRACKS_DIR, createReadableUniqueFilename);
+const imageStorage = createStorage(ARTWORK_DIR, createReadableUniqueFilename);
 
 const mixedTrackStorage = multer.diskStorage({
   destination: (_req, file, cb) => {
@@ -64,7 +83,7 @@ const mixedTrackStorage = multer.diskStorage({
     cb(new ApiError(`Unsupported upload field: ${file.fieldname}`, 400), TRACKS_DIR);
   },
   filename: (_req, file, cb) => {
-    cb(null, createUniqueFilename(file));
+    cb(null, createReadableUniqueFilename(file));
   }
 });
 

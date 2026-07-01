@@ -137,7 +137,7 @@ export default function ArtistProfileClient() {
         <Typography variant="h6" gutterBottom>Tracks</Typography>
         <Grid container spacing={2}>
           {artist.tracks.map((track: any) => (
-            <Grid item xs={12} sm={6} md={4} key={track.id}>
+            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={track.id}>
               <Card>
                 <CardMedia
                   component="img"

@@ -1,6 +1,8 @@
 'use client';
 
-import Cookies, { type CookieAttributes } from 'js-cookie';
+import Cookies from 'js-cookie';
+
+type CookieAttributes = Parameters<typeof Cookies.set>[2];
 
 const TOKEN_COOKIE = 'token';
 const COOKIE_DAYS = 30;

@@ -52,6 +52,47 @@ export const listBromaOutlets = async (_req: AuthRequest, res: Response): Promis
   }
 };
 
+export const createBromaStatisticsReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await dspDeliveryService.createBromaStatisticsReport({
+      payload: req.body?.payload && typeof req.body.payload === 'object' ? req.body.payload : {},
+      reportKind: req.body?.reportKind === 'detail' ? 'detail' : 'summary',
+      requestedBy: req.user?._id?.toString(),
+    });
+    successResponse(res, result, 'Broma statistics report queued', 201);
+  } catch (error) {
+    errorResponse(res, 'Failed to create Broma statistics report', error);
+  }
+};
+
+export const listBromaStatisticsReports = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const result = await dspDeliveryService.listBromaStatisticsReports(limit);
+    successResponse(res, result, 'Broma statistics reports fetched');
+  } catch (error) {
+    errorResponse(res, 'Failed to fetch Broma statistics reports', error);
+  }
+};
+
+export const refreshBromaStatisticsReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await dspDeliveryService.refreshBromaStatisticsReport(req.params.reportId);
+    successResponse(res, result, 'Broma statistics report refreshed');
+  } catch (error) {
+    errorResponse(res, 'Failed to refresh Broma statistics report', error);
+  }
+};
+
+export const deleteBromaStatisticsReport = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await dspDeliveryService.deleteBromaStatisticsReport(req.params.reportId);
+    successResponse(res, result, 'Broma statistics report deleted');
+  } catch (error) {
+    errorResponse(res, 'Failed to delete Broma statistics report', error);
+  }
+};
+
 export const dispatchDelivery = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { trackId, providerKey, operation = 'deliver' } = req.body;

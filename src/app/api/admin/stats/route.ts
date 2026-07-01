@@ -15,17 +15,18 @@ export async function GET() {
         pendingReleases?: number;
       };
     } | null;
+    const stats = data?.data;
 
     return NextResponse.json({
       success: result.ok,
       data: {
-        totalUsers: data.data?.totalUsers || 0,
-        totalTracks: data.data?.totalTracks || 0,
-        pendingTracks: data.data?.pendingTracks || 0,
-        pendingPayouts: data.data?.pendingPayouts || 0,
-        totalRevenue: data.data?.totalRevenue || 0,
-        totalReleases: data.data?.totalReleases || 0,
-        pendingReleases: data.data?.pendingReleases || 0
+        totalUsers: stats?.totalUsers || 0,
+        totalTracks: stats?.totalTracks || 0,
+        pendingTracks: stats?.pendingTracks || 0,
+        pendingPayouts: stats?.pendingPayouts || 0,
+        totalRevenue: stats?.totalRevenue || 0,
+        totalReleases: stats?.totalReleases || 0,
+        pendingReleases: stats?.pendingReleases || 0
       }
     }, { status: result.status });
   } catch (error) {

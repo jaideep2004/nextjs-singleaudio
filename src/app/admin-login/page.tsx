@@ -54,10 +54,7 @@ export default function AdminLoginPage() {
       {/* Left side - Admin branding */}
       {!isMobile && (
         <Grid
-          item
-          xs={false}
-          sm={4}
-          md={6}
+          size={{ xs: false, sm: 4, md: 6 }}
           sx={{
             backgroundImage: 'url(/admin-login-bg.jpg)',
             backgroundRepeat: 'no-repeat',
@@ -104,7 +101,7 @@ export default function AdminLoginPage() {
       )}
 
       {/* Right side - Login form */}
-      <Grid item xs={12} sm={8} md={6} component={Paper} elevation={6} square>
+      <Grid size={{ xs: 12, sm: 8, md: 6 }} component={Paper} elevation={6} square>
         <Box
           sx={{
             my: 8,

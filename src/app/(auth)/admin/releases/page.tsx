@@ -45,10 +45,7 @@ import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSur
 import { useRouter } from 'next/navigation';
 import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
-
-const IN_PROCESS_RELEASE_STATUSES = new Set(['uploading_to_broma', 'broma_moderation', 'dsp_processing']);
-const getReleaseDisplayStatus = (status?: string) =>
-  IN_PROCESS_RELEASE_STATUSES.has(String(status || '')) ? 'in_process' : status || 'pending';
+import { getNormalizedReleaseStatus, getReleaseStatusLabel } from '@/lib/releaseStatus';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -124,13 +121,13 @@ export default function AdminReleasesPage() {
         setLoading(true);
         const response = await releaseAPI.getReleases({ summary: '1' });
         if (response && response.success) {
-          let data = Array.isArray(response.data) ? response.data : [];
+          const data = Array.isArray(response.data) ? response.data : [];
           setReleases(data);
         } else {
           setError('Failed to load releases');
           setReleases([]);
         }
-      } catch (err) {
+      } catch {
         setError('An error occurred while fetching releases');
         setReleases([]);
       } finally {
@@ -164,21 +161,21 @@ export default function AdminReleasesPage() {
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
   const getReleaseArtwork = (release: any) =>
     release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
-  const pendingCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'pending').length;
-  const inProcessCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'in_process').length;
-  const approvedCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'approved').length;
-  const rejectedCount = releases.filter(r => getReleaseDisplayStatus(r.status) === 'rejected').length;
+  const pendingCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending').length;
+  const inProcessCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process').length;
+  const approvedCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved').length;
+  const rejectedCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected').length;
 
   const statusFilteredReleases = useMemo(() => {
     switch (tabValue) {
       case 1: // Pending
-        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'pending');
+        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending');
       case 2: // In Process
-        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'in_process');
+        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process');
       case 3: // Approved
-        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'approved');
+        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved');
       case 4: // Rejected
-        return releases.filter(r => getReleaseDisplayStatus(r.status) === 'rejected');
+        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected');
       default: // All
         return releases;
     }
@@ -227,7 +224,7 @@ export default function AdminReleasesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scope: 'status',
-          statuses: ['pending'],
+          statuses: ['pending', 'pending_review'],
           zipGrouping: 'per_release',
         }),
       });
@@ -261,9 +258,9 @@ export default function AdminReleasesPage() {
       rejected: { label: 'Rejected', color: 'error', icon: <Cancel /> },
     };
 
-    const displayStatus = getReleaseDisplayStatus(status);
+    const displayStatus = getNormalizedReleaseStatus(status);
     const config = statusConfig[displayStatus as keyof typeof statusConfig] || {
-      label: status,
+      label: getReleaseStatusLabel(status),
       color: 'default',
       icon: null,
     };
@@ -510,10 +507,12 @@ export default function AdminReleasesPage() {
             {tabValue === 1
               ? 'There are no pending release at the moment.'
               : tabValue === 2
-                ? 'No releases have been approved yet.'
+                ? 'No releases are in process at the moment.'
                 : tabValue === 3
-                  ? 'No releases have been rejected.'
-                  : 'No releases match your current filters.'}
+                  ? 'No releases have been approved yet.'
+                  : tabValue === 4
+                    ? 'No releases have been rejected.'
+                    : 'No releases match your current filters.'}
           </Typography>
         </Box>
       );

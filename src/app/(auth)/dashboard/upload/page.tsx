@@ -707,16 +707,18 @@ export default function UploadPage() {
   const releaseDraftHasData = (draft = buildReleaseDraft()) =>
     Boolean(
       String(draft.releaseTitle || '').trim() ||
-        String(draft.label || '').trim() ||
-        String(draft.upc || '').trim() ||
-        draft.releaseDate ||
-        draft.originalReleaseDate ||
-        draft.artworkUploadedUrl ||
-        draft.trackInfos.some((track) => Object.values(track).some((value) => {
-          if (Array.isArray(value)) return value.some((item) => Object.values(item).some(Boolean));
+      String(draft.label || '').trim() ||
+      String(draft.upc || '').trim() ||
+      draft.releaseDate ||
+      draft.originalReleaseDate ||
+      draft.artworkUploadedUrl ||
+      draft.trackInfos.some(track =>
+        Object.values(track).some(value => {
+          if (Array.isArray(value)) return value.some(item => Object.values(item).some(Boolean));
           return Boolean(value);
-        })) ||
-        draft.audioUploadedUrls.some(Boolean)
+        })
+      ) ||
+      draft.audioUploadedUrls.some(Boolean)
     );
 
   const persistReleaseDraftLocally = (draft = buildReleaseDraft()) => {
@@ -1130,9 +1132,15 @@ export default function UploadPage() {
       if (!trackHasRequiredContributor(info, 'artist'))
         issues.push({ trackIndex: idx, message: `${label}: add at least one Artist contributor.` });
       if (!trackHasRequiredContributor(info, 'composer'))
-        issues.push({ trackIndex: idx, message: `${label}: add at least one Composer contributor.` });
+        issues.push({
+          trackIndex: idx,
+          message: `${label}: add at least one Composer contributor.`,
+        });
       if (!trackHasRequiredContributor(info, 'lyricist'))
-        issues.push({ trackIndex: idx, message: `${label}: add at least one Lyricist contributor.` });
+        issues.push({
+          trackIndex: idx,
+          message: `${label}: add at least one Lyricist contributor.`,
+        });
       if (!info.metadataLanguage)
         issues.push({ trackIndex: idx, message: `${label}: metadata language is required.` });
       if (!(info.audioLanguage || info.language))
@@ -1265,7 +1273,9 @@ export default function UploadPage() {
       setArtworkUploadedUrl(draft.artworkUploadedUrl || null);
       setArtworkUploadedFilename(draft.artworkUploadedFilename || null);
       setArtworkPreview(draft.artworkUploadedUrl || null);
-      setTerritoryCountries(Array.isArray(draft.territoryCountries) ? draft.territoryCountries : []);
+      setTerritoryCountries(
+        Array.isArray(draft.territoryCountries) ? draft.territoryCountries : []
+      );
       setTerritoryMode(draft.territoryMode || 'allowed');
       setRightsType(draft.rightsType || 'exclusive');
       setRightsDescription(draft.rightsDescription || '');
@@ -1284,14 +1294,38 @@ export default function UploadPage() {
           }))
         : [];
       const nextAudioUrls = Array.isArray(draft.audioUploadedUrls) ? draft.audioUploadedUrls : [];
-      const nextAudioFiles = Array.isArray(draft.audioUploadedFilenames) ? draft.audioUploadedFilenames : [];
-      const trackCount = Math.max(nextTrackInfos.length, nextAudioUrls.length, nextAudioFiles.length);
+      const nextAudioFiles = Array.isArray(draft.audioUploadedFilenames)
+        ? draft.audioUploadedFilenames
+        : [];
+      const trackCount = Math.max(
+        nextTrackInfos.length,
+        nextAudioUrls.length,
+        nextAudioFiles.length
+      );
       setTrackInfos(nextTrackInfos.length ? nextTrackInfos : []);
-      setTracks(Array.from({ length: trackCount }, (_, index) => new File([], nextAudioFiles[index] || nextTrackInfos[index]?.title || `track-${index + 1}.mp3`, { type: 'audio/mpeg' })));
+      setTracks(
+        Array.from(
+          { length: trackCount },
+          (_, index) =>
+            new File(
+              [],
+              nextAudioFiles[index] || nextTrackInfos[index]?.title || `track-${index + 1}.mp3`,
+              { type: 'audio/mpeg' }
+            )
+        )
+      );
       setAudioUploadedUrls(resizeList(nextAudioUrls, trackCount, null));
       setAudioUploadedFilenames(resizeList(nextAudioFiles, trackCount, null));
-      setAudioAcrCloudStatuses(resizeList(Array.isArray(draft.audioAcrCloudStatuses) ? draft.audioAcrCloudStatuses : [], trackCount, null));
-      setAudioUploadPct(Array.from({ length: trackCount }, (_, index) => (nextAudioUrls[index] ? 100 : 0)));
+      setAudioAcrCloudStatuses(
+        resizeList(
+          Array.isArray(draft.audioAcrCloudStatuses) ? draft.audioAcrCloudStatuses : [],
+          trackCount,
+          null
+        )
+      );
+      setAudioUploadPct(
+        Array.from({ length: trackCount }, (_, index) => (nextAudioUrls[index] ? 100 : 0))
+      );
       setTrackPreviewUrls(resizeList(nextAudioUrls, trackCount, null));
       setTrackUploading(Array.from({ length: trackCount }, () => false));
       setAnalysisLoading(Array.from({ length: trackCount }, () => false));
@@ -1340,7 +1374,15 @@ export default function UploadPage() {
   }, [editReleaseId, mounted, releaseDraftKey, releaseDraftUserId]);
 
   useEffect(() => {
-    if (!mounted || !releaseDraftReady || !releaseDraftId || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+    if (
+      !mounted ||
+      !releaseDraftReady ||
+      !releaseDraftId ||
+      editReleaseId ||
+      submitState === 'success' ||
+      typeof window === 'undefined'
+    )
+      return;
 
     const draft = buildReleaseDraft();
     if (!releaseDraftHasData(draft)) return;
@@ -1390,7 +1432,14 @@ export default function UploadPage() {
   ]);
 
   useEffect(() => {
-    if (!mounted || !releaseDraftId || editReleaseId || submitState === 'success' || typeof window === 'undefined') return;
+    if (
+      !mounted ||
+      !releaseDraftId ||
+      editReleaseId ||
+      submitState === 'success' ||
+      typeof window === 'undefined'
+    )
+      return;
 
     const persistBeforeExit = () => {
       if (submitSucceededRef.current) return;
@@ -1622,7 +1671,9 @@ export default function UploadPage() {
     }
 
     if (accepted.length > maxCount) {
-      toast.info(`Only ${maxCount} track${maxCount === 1 ? '' : 's'} allowed for this release type.`);
+      toast.info(
+        `Only ${maxCount} track${maxCount === 1 ? '' : 's'} allowed for this release type.`
+      );
     }
 
     return accepted.slice(0, maxCount);
@@ -2289,7 +2340,8 @@ export default function UploadPage() {
                       onDragLeave={handleArtworkDragLeave}
                       sx={{
                         border: '2px dashed',
-                        borderColor: artworkDragActive || artworkPreview ? 'primary.main' : 'divider',
+                        borderColor:
+                          artworkDragActive || artworkPreview ? 'primary.main' : 'divider',
                         borderRadius: '22px',
                         p: { xs: 1.5, sm: 2 },
                         display: 'grid',
@@ -2505,6 +2557,23 @@ export default function UploadPage() {
                 `Need ${selectedTypeLb.minTracks}–${selectedTypeLb.maxTracks} tracks. Upload multiple files or add more.`}
               {selectedTypeLb?.label === 'Album' && `Up to ${selectedTypeLb.maxTracks} tracks.`}
             </Typography>
+            <Alert
+              severity="info"
+              icon={<Info />}
+              sx={{
+                mb: 3,
+                borderRadius: 2,
+                alignItems: 'center',
+                '& .MuiAlert-message': { width: '100%' },
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={800}>
+                File formats and requirements
+              </Typography>
+              <Typography variant="body2">
+                Accepted audio formats: FLAC 44100 Hz 24 bit or WAV 44100 Hz 16 bit
+              </Typography>
+            </Alert>
 
             {showAggBar && (
               <Paper
@@ -2608,6 +2677,12 @@ export default function UploadPage() {
                   width: { xs: '100%', md: 'auto' },
                   maxWidth: { md: 520 },
                   p: { xs: 1.25, sm: 1.5 },
+                  position: { md: 'sticky' },
+                  top: { md: 154 },
+                  alignSelf: { md: 'flex-start' },
+                  // maxHeight: { md: 'calc(100vh - 178px)' },
+                  overflowY: { md: 'auto' },
+                  overscrollBehavior: { md: 'contain' },
                   border: '2px dashed',
                   borderColor: audioDragActive ? 'primary.main' : 'divider',
                   borderRadius: 2,
@@ -2725,7 +2800,9 @@ export default function UploadPage() {
                             <input
                               id={`track-replace-${idx}`}
                               type="file"
-                              accept={allowedAudioExtensions.map(extension => `.${extension}`).join(',')}
+                              accept={allowedAudioExtensions
+                                .map(extension => `.${extension}`)
+                                .join(',')}
                               style={{ display: 'none' }}
                               onChange={e => {
                                 const next = e.target.files?.[0];
@@ -3203,7 +3280,8 @@ export default function UploadPage() {
                                     )
                                   }
                                   error={
-                                    ((selectedTrackMissingArtist && contributor.role === 'artist') ||
+                                    ((selectedTrackMissingArtist &&
+                                      contributor.role === 'artist') ||
                                       (selectedTrackMissingComposer &&
                                         contributor.role === 'composer') ||
                                       (selectedTrackMissingLyricist &&
@@ -3211,7 +3289,8 @@ export default function UploadPage() {
                                     !contributor.name.trim()
                                   }
                                   helperText={
-                                    ((selectedTrackMissingArtist && contributor.role === 'artist') ||
+                                    ((selectedTrackMissingArtist &&
+                                      contributor.role === 'artist') ||
                                       (selectedTrackMissingComposer &&
                                         contributor.role === 'composer') ||
                                       (selectedTrackMissingLyricist &&
@@ -3942,7 +4021,9 @@ export default function UploadPage() {
                     ? 'success.main'
                     : 'warning.main',
                 bgcolor: theme =>
-                  theme.palette.mode === 'dark' ? 'rgba(237,30,121,0.08)' : 'rgba(237,30,121,0.035)',
+                  theme.palette.mode === 'dark'
+                    ? 'rgba(237,30,121,0.08)'
+                    : 'rgba(237,30,121,0.035)',
               }}
             >
               <FormControlLabel
@@ -4506,7 +4587,8 @@ export default function UploadPage() {
               <Stack spacing={0.5} sx={{ pl: 4 }}>
                 {requiresYoutubeTerms && (
                   <Typography variant="caption" color="text.secondary">
-                    YouTube Content ID policy: {distributionTermsAccepted ? 'Accepted' : 'Not accepted'}
+                    YouTube Content ID policy:{' '}
+                    {distributionTermsAccepted ? 'Accepted' : 'Not accepted'}
                   </Typography>
                 )}
                 {requiresFacebookTerms && (
@@ -4661,7 +4743,7 @@ export default function UploadPage() {
       <Paper
         variant="outlined"
         sx={{
-          p: { xs: 2.25, sm: 3.5, md: 4.5 },
+          p: { xs: 2.5, sm: 3, md: 4 },
           ...premiumSurfaceSx(theme),
           background:
             theme.palette.mode === 'dark'

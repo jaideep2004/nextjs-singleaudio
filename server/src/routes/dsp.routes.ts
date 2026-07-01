@@ -37,6 +37,10 @@ router.post('/providers', protect, authorize([UserRole.ADMIN]), dspController.re
 router.post('/providers/bootstrap-phase1', protect, authorize([UserRole.ADMIN]), dspController.bootstrapPhase1Providers);
 router.get('/broma/outlets', protect, authorize([UserRole.ADMIN]), dspController.listBromaOutlets);
 router.post('/broma/outlets/sync', protectAdminOrCronSecret, dspController.syncBromaOutlets);
+router.get('/broma/statistics/reports', protect, authorize([UserRole.ADMIN]), dspController.listBromaStatisticsReports);
+router.post('/broma/statistics/reports', protectAdminOrCronSecret, dspController.createBromaStatisticsReport);
+router.post('/broma/statistics/reports/:reportId/refresh', protectAdminOrCronSecret, dspController.refreshBromaStatisticsReport);
+router.delete('/broma/statistics/reports/:reportId', protect, authorize([UserRole.ADMIN]), dspController.deleteBromaStatisticsReport);
 
 router.get('/deliveries', protect, authorize([UserRole.ADMIN]), dspController.listDeliveries);
 router.get('/deliveries/:jobId', protect, authorize([UserRole.ADMIN]), dspController.getDeliveryById);

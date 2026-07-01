@@ -25,6 +25,12 @@ import {
   isPlainCredentialMap,
 } from './dspCredentialVault';
 import { listBromaOutlets, syncBromaOutlets } from './bromaOutlet.service';
+import {
+  createBromaStatisticsReport,
+  deleteBromaStatisticsReport,
+  listBromaStatisticsReports,
+  refreshBromaStatisticsReport,
+} from './bromaStatistics.service';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const WORKER_LOCK_MS = 5 * 60_000;
@@ -430,6 +436,55 @@ class DspDeliveryService {
 
   async listBromaOutlets() {
     return listBromaOutlets();
+  }
+
+  async createBromaStatisticsReport(input: {
+    payload?: Record<string, unknown>;
+    reportKind?: 'detail' | 'summary';
+    requestedBy?: string;
+  }) {
+    const providerRecord = await this.getProviderWithDecryptedCredentials('broma');
+    if (!providerRecord || !providerRecord.provider.enabled) {
+      throw new Error('Broma provider is not active');
+    }
+
+    return createBromaStatisticsReport({
+      credentials: providerRecord.credentials,
+      config: providerRecord.provider.config || {},
+      payload: input.payload || {},
+      reportKind: input.reportKind || 'summary',
+      requestedBy: input.requestedBy,
+    });
+  }
+
+  async refreshBromaStatisticsReport(reportId: string) {
+    const providerRecord = await this.getProviderWithDecryptedCredentials('broma');
+    if (!providerRecord || !providerRecord.provider.enabled) {
+      throw new Error('Broma provider is not active');
+    }
+
+    return refreshBromaStatisticsReport({
+      credentials: providerRecord.credentials,
+      config: providerRecord.provider.config || {},
+      reportId,
+    });
+  }
+
+  async deleteBromaStatisticsReport(reportId: string) {
+    const providerRecord = await this.getProviderWithDecryptedCredentials('broma');
+    if (!providerRecord || !providerRecord.provider.enabled) {
+      throw new Error('Broma provider is not active');
+    }
+
+    return deleteBromaStatisticsReport({
+      credentials: providerRecord.credentials,
+      config: providerRecord.provider.config || {},
+      reportId,
+    });
+  }
+
+  async listBromaStatisticsReports(limit?: number) {
+    return listBromaStatisticsReports(limit);
   }
 
   async dispatchDelivery(trackId: string, providerKey: string, operation: DspDeliveryOperation, createdBy?: string) {

@@ -47,6 +47,7 @@ import {
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import Link from 'next/link';
 import { adminAPI, releaseAPI } from '@/services/api';
+import { getNormalizedReleaseStatus } from '@/lib/releaseStatus';
 
 type ExportState = 'queued' | 'running' | 'completed' | 'completed_with_warnings' | 'failed';
 
@@ -66,7 +67,7 @@ type ExportJob = {
     releaseIds?: string[];
     userId?: string;
     userIds?: string[];
-    statuses?: Array<'approved' | 'pending' | 'rejected'>;
+    statuses?: Array<'approved' | 'pending' | 'pending_review' | 'rejected'>;
     zipGrouping?: 'per_release' | 'per_user';
   };
   counts: {
@@ -228,10 +229,12 @@ export default function AdminExportPage() {
         exportScope === 'user' && selectedUserReleaseIds.length > 0 ? 'user' : exportScope;
       const statuses =
         exportScope === 'user'
-          ? ['pending']
+          ? ['pending', 'pending_review']
           : exportStatus === 'all'
-            ? ['approved', 'pending', 'rejected']
-            : [exportStatus];
+            ? ['approved', 'pending', 'pending_review', 'rejected']
+            : exportStatus === 'pending'
+              ? ['pending', 'pending_review']
+              : [exportStatus];
       const response = await fetch('/api/admin/export/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -302,7 +305,7 @@ export default function AdminExportPage() {
       selectedUserId
         ? releases.filter(
             (release) =>
-              getReleaseUserId(release) === selectedUserId && String(release.status) === 'pending'
+              getReleaseUserId(release) === selectedUserId && getNormalizedReleaseStatus(release.status) === 'pending'
           )
         : [],
     [releases, selectedUserId]

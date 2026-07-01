@@ -16,7 +16,7 @@
     "start:client": "next start",
     "start:server": "cd server && npm run start",
     "start": "concurrently \"npm run start:client\" \"npm run start:server\"",
-    "lint:client": "next lint",
+    "lint:client": "eslint src --ext .ts,.tsx",
     "lint:server": "cd server && npm run lint",
     "lint": "npm run lint:client && npm run lint:server",
     "install:server": "cd server && npm install",

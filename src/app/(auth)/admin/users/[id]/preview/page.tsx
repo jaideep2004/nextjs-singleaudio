@@ -19,6 +19,7 @@ import {
 import { adminAPI } from '@/services/api';
 import { PremiumHeader, PremiumPanel, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import AdminKycFileDialog from '../components/AdminKycFileDialog';
+import { getNormalizedReleaseStatus, getReleaseStatusLabel } from '@/lib/releaseStatus';
 
 export default function UserPreviewPage() {
   const params = useParams<{ id: string }>();
@@ -46,9 +47,9 @@ export default function UserPreviewPage() {
   const headingText = isDark ? '#f1f5f9' : '#0f172a';
   const mutedText = isDark ? 'rgba(255,255,255,0.54)' : 'rgba(15,23,42,0.54)';
   const releasesStats = useMemo(() => {
-    const approved = releases.filter((release) => release.status === 'approved').length;
-    const rejected = releases.filter((release) => release.status === 'rejected').length;
-    const pending = releases.filter((release) => release.status === 'pending').length;
+    const approved = releases.filter((release) => getNormalizedReleaseStatus(release.status) === 'approved').length;
+    const rejected = releases.filter((release) => getNormalizedReleaseStatus(release.status) === 'rejected').length;
+    const pending = releases.filter((release) => getNormalizedReleaseStatus(release.status) === 'pending').length;
     const tracks = releases.reduce((sum, release) => sum + Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0)), 0);
     const revenue = releases.reduce(
       (sum, release) => sum + Number(release.revenue || release.totalRevenue || release.royaltyAmount || release.earnings || 0),
@@ -365,7 +366,12 @@ export default function UserPreviewPage() {
                       </Typography>
                     </Box>
                   </Stack>
-                  <Chip label={release.status || 'pending'} size="small" sx={{ borderRadius: '999px', fontWeight: 900 }} color={release.status === 'approved' ? 'success' : release.status === 'rejected' ? 'error' : 'warning'} />
+                  <Chip
+                    label={getReleaseStatusLabel(release.status)}
+                    size="small"
+                    sx={{ borderRadius: '999px', fontWeight: 900 }}
+                    color={getNormalizedReleaseStatus(release.status) === 'approved' ? 'success' : getNormalizedReleaseStatus(release.status) === 'rejected' ? 'error' : 'warning'}
+                  />
                 </Stack>
               </Box>
             ))

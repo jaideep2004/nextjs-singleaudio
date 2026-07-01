@@ -580,7 +580,7 @@ const normalizeBromaCompositionContributors = (
 export class BromaConnector extends BaseDspConnector {
   key = 'broma';
   displayName = 'Broma';
-  capabilities: DspCapability[] = ['audio_delivery', 'reporting', 'takedown'];
+  capabilities: DspCapability[] = ['audio_delivery', 'reporting'];
 
   async validateCredentials(credentials: Record<string, unknown>): Promise<{ valid: boolean; error?: string }> {
     const missing = ['email', 'password'].filter((key) => !credentials[key]);
@@ -665,6 +665,22 @@ export class BromaConnector extends BaseDspConnector {
         bromaStep: delivered ? 'done' : 'poll_status',
         bromaModerationStatus: normalized || 'processing',
         bromaLastStatusAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  async takedown(payload: DspDeliveryPayload, context: DspConnectorContext): Promise<DspDeliveryResult> {
+    const metadata = { ...(context.jobMetadata || {}) };
+    const externalId = metadata.bromaReleaseId ? String(metadata.bromaReleaseId) : undefined;
+    return {
+      state: 'needs_attention',
+      externalId,
+      message: 'Broma takedown requires manual handling: public partner docs do not expose a confirmed release takedown endpoint.',
+      metadata: {
+        ...metadata,
+        bromaTakedownMode: 'manual_required',
+        bromaTakedownRequestedAt: new Date().toISOString(),
+        requestedStores: 'stores' in payload ? payload.stores : undefined,
       },
     };
   }

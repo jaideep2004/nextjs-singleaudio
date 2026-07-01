@@ -55,6 +55,7 @@ import { DspLogo } from '@/components/dsp/DspLogo';
 import { getDspDisplayName } from '@/lib/platforms';
 import PremiumAudioPlayer from '@/components/audio/PremiumAudioPlayer';
 import { resolveMediaUrl } from '@/lib/urlConfig';
+import { getNormalizedReleaseStatus, getReleaseStatusLabel } from '@/lib/releaseStatus';
 
 const formatAcrProbability = (value?: number) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 'n/a';
@@ -87,12 +88,6 @@ const formatTrackDuration = (value?: string | number) => {
   const minutes = Math.floor(value / 60);
   const seconds = Math.round(value % 60);
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-
-const IN_PROCESS_RELEASE_STATUSES = new Set(['uploading_to_broma', 'broma_moderation', 'dsp_processing']);
-const getReleaseDisplayStatus = (status?: string) => {
-  if (IN_PROCESS_RELEASE_STATUSES.has(String(status || ''))) return 'in_process';
-  return status || 'pending';
 };
 
 export default function AdminReleaseDetailPage() {
@@ -136,7 +131,7 @@ export default function AdminReleaseDetailPage() {
 
   const statusColor = useMemo(() => {
     if (!release?.status) return "default" as const;
-    const displayStatus = getReleaseDisplayStatus(release.status);
+    const displayStatus = getNormalizedReleaseStatus(release.status);
     return displayStatus === "approved"
       ? ("success" as const)
       : displayStatus === "pending"
@@ -231,7 +226,7 @@ export default function AdminReleaseDetailPage() {
         const nextStatus = resp.release?.status || resp.data?.status || "uploading_to_broma";
         setRelease((r: any) => (r ? { ...r, status: nextStatus, rejectReason: undefined, rejectionReason: undefined } : r));
         const list = await releaseAPI.getReleases({ summary: '1' });
-        const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => item.status === 'pending');
+        const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => getNormalizedReleaseStatus(item.status) === 'pending');
         router.push(hasPending ? '/admin/releases?status=pending' : '/admin/releases');
       } else {
         setError(resp?.message || resp?.error || "Failed to approve release");
@@ -1002,12 +997,12 @@ export default function AdminReleaseDetailPage() {
         
         <Chip
           icon={
-            getReleaseDisplayStatus(release.status) === "approved" ? <CheckCircle /> :
-            getReleaseDisplayStatus(release.status) === "pending" ? <Pending /> :
-            getReleaseDisplayStatus(release.status) === "in_process" ? <Sync /> :
+            getNormalizedReleaseStatus(release.status) === "approved" ? <CheckCircle /> :
+            getNormalizedReleaseStatus(release.status) === "pending" ? <Pending /> :
+            getNormalizedReleaseStatus(release.status) === "in_process" ? <Sync /> :
             <Cancel />
           }
-          label={getReleaseDisplayStatus(release.status).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+          label={getReleaseStatusLabel(release.status)}
           color={statusColor}
           size="medium"
           sx={{ fontWeight: 600 }}
@@ -1100,7 +1095,7 @@ export default function AdminReleaseDetailPage() {
               </Card>
             )}
             
-            {!["approved", "in_process"].includes(getReleaseDisplayStatus(release.status)) && (
+            {!["approved", "in_process"].includes(getNormalizedReleaseStatus(release.status)) && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
                 <Button
                   variant="contained"
@@ -1126,7 +1121,7 @@ export default function AdminReleaseDetailPage() {
                 )}
               </Box>
             )}
-            {getReleaseDisplayStatus(release.status) === "approved" && (
+            {getNormalizedReleaseStatus(release.status) === "approved" && (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
                 <Button
                   variant="outlined"

@@ -17,6 +17,12 @@ const REQUIRED_CREATE_PRODUCT_FIELDS = [
 
 const GS1_MASS_UNITS = new Set(['', 'g', 'kg', 'mg', 'lb']);
 const GS1_NET_CONTENT_UNITS = new Set(['g', 'kg', 'mg', 'lb', 'ml', 'l', 'each']);
+const GS1_PRODUCT_CHANNELS = new Map([
+  ['general trade', 'General Trade'],
+  ['modern trade', 'Modern Trade'],
+  ['ecommerce', 'Ecommerce'],
+  ['institutional sale', 'Institutional Sale'],
+]);
 const GS1_UNIT_ALIASES: Record<string, string> = {
   each: 'each',
   ea: 'each',
@@ -262,7 +268,7 @@ function readConfig(): Gs1Config {
     contactDistrict: getOptionalEnv('GS1_DATAKART_CONTACT_DISTRICT'),
     contactCity: getOptionalEnv('GS1_DATAKART_CONTACT_CITY'),
     productPackaging: getOptionalEnv('GS1_DATAKART_PRODUCT_PACKAGING') || 'Primary',
-    productChannel: getOptionalEnv('GS1_DATAKART_PRODUCT_CHANNEL') || 'General trade',
+    productChannel: normalizeGs1ProductChannel(getOptionalEnv('GS1_DATAKART_PRODUCT_CHANNEL')),
     targetMarket: normalizeGs1TargetMarket(
       getOptionalEnv('GS1_DATAKART_TARGET_MARKET') || 'India'
     ),
@@ -323,6 +329,25 @@ function normalizeGs1TargetMarket(value: unknown) {
   }
 
   return normalized;
+}
+
+function normalizeGs1ProductChannel(value: unknown) {
+  const raw = cleanString(value);
+  if (!raw) return 'General Trade';
+
+  const channels = raw
+    .split(',')
+    .map((entry) => GS1_PRODUCT_CHANNELS.get(entry.trim().toLowerCase()))
+    .filter(Boolean) as string[];
+
+  if (!channels.length) {
+    throw new Gs1DatakartError(
+      'GS1_DATAKART_PRODUCT_CHANNEL must be one or more of: General Trade, Modern Trade, Ecommerce, Institutional Sale',
+      500
+    );
+  }
+
+  return Array.from(new Set(channels)).join(',');
 }
 
 function toDateOnly(value: unknown, fallback = new Date()) {
@@ -702,11 +727,13 @@ function buildCreateProductPayload(input: Gs1CreateProductInput) {
 
   if (config.includeOptionalCreateFields) {
     payload.packaging_type = config.productPackaging;
+    payload.product_channel = config.productChannel;
     payload.target_market = config.targetMarket;
     payload.sku_id = input.releaseId;
 
     if (config.includeUiFieldAliases) {
       Object.assign(payload, {
+        channel: config.productChannel,
         country_of_origin: config.contactCountry,
         sku_number: input.releaseId,
         count: config.netContent,
