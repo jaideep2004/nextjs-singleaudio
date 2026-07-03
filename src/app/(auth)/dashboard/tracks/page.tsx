@@ -11,15 +11,19 @@ import {
   CircularProgress,
   IconButton,
   Paper,
+  InputAdornment,
+  Tab,
+  Tabs,
+  TextField,
   Stack,
   Typography,
   useTheme,
 } from '@mui/material';
-import { Album, CloudUpload, Pause, PlayArrow } from '@mui/icons-material';
+import { Album, CloudUpload, Pause, PlayArrow, Search } from '@mui/icons-material';
 import AuthGuard from '@/components/AuthGuard';
 import { PremiumHeader, premiumSurfaceSx } from '@/components/premium/PremiumSurface';
 import RouteTabs from '@/components/navigation/RouteTabs';
-import { releaseAPI } from '@/services/api';
+import { trackAPI } from '@/services/api';
 
 type TrackRow = {
   id: string;
@@ -54,6 +58,9 @@ function TracksContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [rows, setRows] = useState<TrackRow[]>([]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [counts, setCounts] = useState({ all: 0, pending: 0, in_process: 0, approved: 0, rejected: 0, other: 0 });
   const [playing, setPlaying] = useState<string | null>(null);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
 
@@ -61,23 +68,24 @@ function TracksContent() {
     const load = async () => {
       try {
         setLoading(true);
-        const response = await releaseAPI.getReleases();
+        const response = await trackAPI.getTracks({
+          page: 1,
+          limit: 100,
+          status: statusFilter !== 'all' ? statusFilter : undefined,
+          search: search.trim() || undefined,
+        });
         if (!response.success) throw new Error(response.error || 'Failed to load tracks');
-        const tracks = (response.data || []).flatMap((release: any, releaseIndex: number) =>
-          (Array.isArray(release.tracks) ? release.tracks : []).map((track: any, trackIndex: number) => ({
-            id: track._id || `${release._id || releaseIndex}-${trackIndex}`,
-            title: track.title || `Track ${trackIndex + 1}`,
-            artist: track.primaryArtist || release.primaryArtist || release.artist || 'Unknown artist',
-            releaseTitle: release.releaseTitle || 'Untitled release',
-            releaseId: release._id,
-            artworkUrl: track.artworkUrl || release.artworkUrl,
-            audioUrl: track.audioUrl,
-            isrc: track.isrc,
-            status: track.status || release.status,
-            releaseDate: track.releaseDate || release.releaseDate,
-          }))
-        );
-        setRows(tracks);
+        setRows(Array.isArray(response.data) ? response.data : []);
+        if (response.counts) {
+          setCounts({
+            all: Number(response.counts.all || 0),
+            pending: Number(response.counts.pending || 0),
+            in_process: Number(response.counts.in_process || 0),
+            approved: Number(response.counts.approved || 0),
+            rejected: Number(response.counts.rejected || 0),
+            other: Number(response.counts.other || 0),
+          });
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load tracks');
       } finally {
@@ -85,15 +93,15 @@ function TracksContent() {
       }
     };
     void load();
-  }, []);
+  }, [statusFilter, search]);
 
   useEffect(() => () => audio?.pause(), [audio]);
 
-  const counts = useMemo(() => ({
-    total: rows.length,
-    approved: rows.filter((row) => row.status === 'approved').length,
-    pending: rows.filter((row) => row.status === 'pending').length,
-  }), [rows]);
+  const activeCounts = useMemo(() => ({
+    total: counts.all,
+    approved: counts.approved,
+    pending: counts.pending,
+  }), [counts]);
 
   const togglePlay = (row: TrackRow) => {
     if (!row.audioUrl) return;
@@ -132,11 +140,56 @@ function TracksContent() {
         ]}
       />
 
+      <Paper
+        elevation={0}
+        sx={{ ...premiumSurfaceSx(theme), p: 1.25, mb: 2.5, borderRadius: '16px' }}
+      >
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }}>
+          <Tabs
+            value={statusFilter}
+            onChange={(_, value) => setStatusFilter(value)}
+            variant="scrollable"
+            scrollButtons="auto"
+            aria-label="track status filters"
+            sx={{
+              minHeight: 42,
+              flex: 1,
+              '& .MuiTab-root': { minHeight: 42, textTransform: 'none', fontWeight: 850, borderRadius: '10px' },
+              '& .Mui-selected': { bgcolor: isDark ? 'rgba(74,108,247,0.18)' : 'rgba(74,108,247,0.10)' },
+            }}
+          >
+            {[
+              ['all', `All (${counts.all})`],
+              ['pending', `Pending (${counts.pending})`],
+              ['in_process', `In Process (${counts.in_process})`],
+              ['approved', `Approved (${counts.approved})`],
+              ['rejected', `Rejected (${counts.rejected})`],
+            ].map(([value, label]) => (
+              <Tab key={value} value={value} label={label} />
+            ))}
+          </Tabs>
+          <TextField
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search tracks, releases, artists, ISRC..."
+            size="small"
+            sx={{ minWidth: { xs: '100%', md: 360 } }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search fontSize="small" />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Stack>
+      </Paper>
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1.5, mb: 2.5 }}>
         {[
-          ['Total tracks', counts.total, '#4f46e5'],
-          ['Approved', counts.approved, '#10b981'],
-          ['Pending review', counts.pending, '#f59e0b'],
+          ['Total tracks', activeCounts.total, '#4f46e5'],
+          ['Approved', activeCounts.approved, '#10b981'],
+          ['Pending review', activeCounts.pending, '#f59e0b'],
         ].map(([label, value, color]) => (
           <Paper
             key={label}

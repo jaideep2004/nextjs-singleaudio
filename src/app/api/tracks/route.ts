@@ -1,61 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { connectToDatabase } from '@/utils/mongodb';
+import { getCurrentBackendUser } from '@/lib/currentUser';
+import { getReleaseOwnerQuery } from '@/lib/repositories/releases';
+import { listTracksPage } from '@/lib/repositories/tracks';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get('status');
-  const limit = searchParams.get('limit') || '5';
-  const sort = searchParams.get('sort') || '-createdAt';
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentBackendUser();
+    const { db } = await connectToDatabase();
+    const { searchParams } = new URL(request.url);
+    const isAdminLike = user.role === 'admin' || user.role === 'subadmin';
+    const requestedUserId = searchParams.get('userId');
+    const baseQuery = isAdminLike
+      ? requestedUserId
+        ? getReleaseOwnerQuery({ _id: requestedUserId })
+        : {}
+      : getReleaseOwnerQuery(user);
 
-  // Mock data for pending tracks
-  const pendingTracks = [
-    {
-      id: '1',
-      title: 'Track 1',
-      artist: 'Artist 1',
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: '2',
-      title: 'Track 2',
-      artist: 'Artist 2',
-      status: 'pending',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
+    const result = await listTracksPage(db, baseQuery, {
+      page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
+      limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined,
+      status: searchParams.get('status') || undefined,
+      search: searchParams.get('search') || searchParams.get('q') || undefined,
+    });
 
-  // Filter by status if provided
-  let filteredTracks = pendingTracks;
-  if (status) {
-    filteredTracks = pendingTracks.filter(track => track.status === status);
+    return NextResponse.json({
+      success: true,
+      data: result.tracks,
+      tracks: result.tracks,
+      pagination: result.pagination,
+      counts: result.counts,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch tracks';
+    const status = message === 'Authentication required' ? 401 : 500;
+    return NextResponse.json({ success: false, error: message, data: [] }, { status });
   }
-
-  // Sort the tracks
-  const [sortField, sortOrder] = sort.startsWith('-') 
-    ? [sort.slice(1), 'desc'] 
-    : [sort, 'asc'];
-
-  const sortedTracks = [...filteredTracks].sort((a: any, b: any) => {
-    if (a[sortField] < b[sortField]) return sortOrder === 'asc' ? -1 : 1;
-    if (a[sortField] > b[sortField]) return sortOrder === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  // Apply limit
-  const limitedTracks = sortedTracks.slice(0, parseInt(limit));
-
-  return NextResponse.json({
-    success: true,
-    data: limitedTracks,
-    pagination: {
-      total: pendingTracks.length,
-      page: 1,
-      limit: parseInt(limit),
-      totalPages: 1,
-    },
-  });
 }
 
 export const dynamic = 'force-dynamic';

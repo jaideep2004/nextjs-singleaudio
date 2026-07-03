@@ -6,6 +6,7 @@ import { appUrl, sendUserAndAdminEmail } from '@/lib/emailNotifications';
 import {
   createRelease,
   getReleaseOwnerQuery,
+  listReleasesPage,
   listReleasesWithTracks,
 } from '@/lib/repositories/releases';
 import { buildReleasePolicyProof } from '@/lib/releaseConsent';
@@ -96,12 +97,24 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const requestedUserId = searchParams.get('userId');
     const summary = searchParams.get('summary') === '1';
+    const hasPagination = searchParams.has('page') || searchParams.has('limit') || searchParams.has('status') || searchParams.has('type') || searchParams.has('search');
     const isAdminLike = user.role === 'admin' || user.role === 'subadmin';
     const query = isAdminLike
       ? requestedUserId
         ? getReleaseOwnerQuery({ _id: requestedUserId })
         : {}
       : getReleaseOwnerQuery(user);
+    if (hasPagination) {
+      const result = await listReleasesPage(db, query, {
+        summary,
+        page: searchParams.get('page') ? Number(searchParams.get('page')) : undefined,
+        limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : undefined,
+        status: searchParams.get('status') || undefined,
+        type: searchParams.get('type') || undefined,
+        search: searchParams.get('search') || undefined,
+      });
+      return NextResponse.json({ success: true, releases: result.releases, pagination: result.pagination, counts: result.counts });
+    }
     const releases = await listReleasesWithTracks(db, query, { summary });
     return NextResponse.json({ success: true, releases });
   } catch (error: unknown) {

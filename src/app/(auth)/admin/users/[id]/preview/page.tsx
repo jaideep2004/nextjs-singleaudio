@@ -109,19 +109,7 @@ export default function UserPreviewPage() {
         void fetch(`/api/admin/users/${params.id}/preview-audit`, { method: 'POST' });
         const releaseResponse = await fetch(`/api/releases?userId=${encodeURIComponent(params.id)}&summary=1`, { cache: 'no-store' });
         const releasePayload = await releaseResponse.json().catch(() => null);
-        let allReleases = Array.isArray(releasePayload?.releases) ? releasePayload.releases : [];
-        if (allReleases.length === 0) {
-          const fallbackResponse = await fetch('/api/releases?summary=1', { cache: 'no-store' });
-          const fallbackPayload = await fallbackResponse.json().catch(() => null);
-          allReleases = Array.isArray(fallbackPayload?.releases) ? fallbackPayload.releases : [];
-        }
-        const userNames = [response.data?.artistName, response.data?.name].filter(Boolean).map((item: string) => item.toLowerCase());
-        setReleases(
-          allReleases.filter((release: any) =>
-            [release.userId, release.artistId, release.ownerId, release.createdBy].some((value) => String(value || '') === String(params.id)) ||
-            userNames.some((name: string) => String(release.primaryArtist || release.artist || release.label || '').toLowerCase() === name)
-          )
-        );
+        setReleases(Array.isArray(releasePayload?.releases) ? releasePayload.releases : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load user');
       } finally {
@@ -362,7 +350,7 @@ export default function UserPreviewPage() {
                     <Box>
                       <Typography sx={{ fontWeight: 900, color: headingText }}>{release.releaseTitle || 'Untitled Release'}</Typography>
                       <Typography variant="body2" sx={{ color: mutedText }}>
-                        {release.primaryArtist || 'Unknown artist'} · {Array.isArray(release.tracks) ? release.tracks.length : 0} tracks
+                        {release.primaryArtist || 'Unknown artist'} · {Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0))} tracks
                       </Typography>
                     </Box>
                   </Stack>

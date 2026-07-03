@@ -895,7 +895,25 @@ class DspDeliveryService {
     return result.modifiedCount;
   }
 
-  async processDueDeliveryJobs(input: { maxJobs?: number; workerId?: string } = {}) {
+  private processJobDetached(jobId: string) {
+    void this.processJob(jobId).catch(async (error) => {
+      const message = error instanceof Error ? error.message : 'Detached delivery worker failed';
+      await DeliveryJob.findByIdAndUpdate(jobId, {
+        state: 'failed',
+        errorMessage: message,
+        $unset: { lockedAt: '', lockedBy: '', lockExpiresAt: '' },
+        $push: {
+          events: {
+            state: 'failed',
+            message,
+            source: 'system',
+          },
+        },
+      });
+    });
+  }
+
+  async processDueDeliveryJobs(input: { maxJobs?: number; workerId?: string; dispatchOnly?: boolean } = {}) {
     const workerId = input.workerId || `dsp-worker:${process.pid}:${Date.now()}`;
     const maxJobs = Math.min(50, Math.max(1, input.maxJobs || DEFAULT_WORKER_BATCH_SIZE));
     const expiredLocksReleased = await this.releaseExpiredLocks();
@@ -904,6 +922,14 @@ class DspDeliveryService {
     for (let index = 0; index < maxJobs; index += 1) {
       const job = await this.claimNextDeliveryJob(workerId);
       if (!job) break;
+      if (input.dispatchOnly) {
+        this.processJobDetached(job._id.toString());
+        processed.push({
+          jobId: job._id.toString(),
+          state: 'processing',
+        });
+        continue;
+      }
       const result = await this.processJob(job._id.toString());
       processed.push({
         jobId: job._id.toString(),
@@ -1120,17 +1146,47 @@ class DspDeliveryService {
     query.hiddenFromOps = { $ne: true };
     query['metadata.resetForApproval'] = { $ne: true };
     if (filters.providerKey) query.providerKey = filters.providerKey;
-    if (filters.state) query.state = filters.state;
 
-    const [items, total] = await Promise.all([
-      DeliveryJob.find(query)
-        .select('-attempts -events')
-        .populate('trackId', 'title artistName isrc')
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
-      DeliveryJob.countDocuments(query),
-    ]);
+    const pipeline: any[] = [
+      { $match: query },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: {
+            providerKey: '$providerKey',
+            targetType: '$targetType',
+            releaseId: '$releaseId',
+            trackId: '$trackId',
+            operation: '$operation',
+          },
+          doc: { $first: '$$ROOT' },
+        },
+      },
+      { $replaceRoot: { newRoot: '$doc' } },
+    ];
+
+    if (filters.state) pipeline.push({ $match: { state: filters.state } });
+
+    pipeline.push(
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          data: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+            { $project: { attempts: 0, events: 0 } },
+          ],
+          total: [{ $count: 'count' }],
+        },
+      }
+    );
+
+    const [result] = await DeliveryJob.aggregate(pipeline);
+    const items = await DeliveryJob.populate(result?.data || [], {
+      path: 'trackId',
+      select: 'title artistName isrc',
+    });
+    const total = Number(result?.total?.[0]?.count || 0);
 
     return {
       data: items,

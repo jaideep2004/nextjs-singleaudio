@@ -28,6 +28,7 @@ import {
   CloudUpload as CloudUploadIcon,
   BarChart as AnalyticsIcon,
   AccountBalanceWallet,
+  MusicNote,
   Person as PersonIcon,
   LibraryMusic,
   VideoLibrary,
@@ -61,6 +62,11 @@ const menuSections = [
         text: 'Releases',
         icon: <Album />,
         path: '/dashboard/releases',
+      },
+      {
+        text: 'Tracks',
+        icon: <MusicNote />,
+        path: '/dashboard/tracks',
       },
       {
         text: 'Analytics',
@@ -146,7 +152,7 @@ export default function UserSidebar() {
       return pathname === path;
     }
     if (path === '/dashboard/releases') {
-      return pathname.startsWith('/dashboard/releases') || pathname.startsWith('/dashboard/tracks');
+      return pathname.startsWith('/dashboard/releases');
     }
     return pathname.startsWith(path);
   };

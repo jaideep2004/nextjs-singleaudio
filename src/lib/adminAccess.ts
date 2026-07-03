@@ -25,6 +25,7 @@ const ADMIN_ROUTE_RULES: Array<{ prefix: string; access: AdminRouteAccess }> = [
   { prefix: '/admin/users', access: { kind: 'permission', permission: 'users' } },
   { prefix: '/admin/releases', access: { kind: 'permission', permission: 'review' } },
   { prefix: '/admin/tracks', access: { kind: 'permission', permission: 'review' } },
+  { prefix: '/admin/tracks', access: { kind: 'permission', permission: 'review' } },
   { prefix: '/admin/dsp-deliveries', access: { kind: 'permission', permission: 'dsp_delivery' } },
   { prefix: '/admin/analytics', access: { kind: 'permission', permission: 'analytics' } },
   { prefix: '/admin/payouts', access: { kind: 'permission', permission: 'payouts' } },

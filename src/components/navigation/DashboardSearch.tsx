@@ -90,18 +90,12 @@ export default function DashboardSearch({ audience, iconColor }: DashboardSearch
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setLoading(true);
-      const normalized = query.trim().toLowerCase();
+      const search = query.trim();
       try {
-        const releasePromise = fetch('/api/releases?summary=1', { cache: 'no-store' })
+        const releasePromise = fetch(`/api/releases?summary=1&page=1&limit=8&search=${encodeURIComponent(search)}`, { cache: 'no-store' })
           .then(response => response.json())
           .then(payload =>
             (payload?.releases || payload?.data || [])
-              .filter((release: any) =>
-                [release.releaseTitle, release.title, release.primaryArtist, release.ownerName]
-                  .filter(Boolean)
-                  .some(value => String(value).toLowerCase().includes(normalized))
-              )
-              .slice(0, 8)
               .map((release: any) => ({
                 id: `release-${release._id}`,
                 label: release.releaseTitle || release.title || 'Untitled Release',

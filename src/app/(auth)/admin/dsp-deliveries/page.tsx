@@ -21,6 +21,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -242,6 +243,9 @@ export default function AdminDspDeliveriesPage() {
   const [loading, setLoading] = useState(true);
   const [providerFilter, setProviderFilter] = useState('broma');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [paginationTotal, setPaginationTotal] = useState(0);
   const [processingDue, setProcessingDue] = useState(false);
   const [syncingOutlets, setSyncingOutlets] = useState(false);
   const [savingBroma, setSavingBroma] = useState(false);
@@ -259,7 +263,22 @@ export default function AdminDspDeliveriesPage() {
   });
   const providerMap = useMemo(() => new Map(providers.map((p) => [p.key, p.displayName])), [providers]);
   const visibleProviders = useMemo(
-    () => providers.filter((provider) => provider.key !== 'mock_dsp'),
+    () => {
+      const filtered = providers.filter((provider) => provider.key !== 'mock_dsp');
+      return filtered.some((provider) => provider.key === 'broma')
+        ? filtered
+        : [
+            {
+              key: 'broma',
+              displayName: 'Broma',
+              enabled: false,
+              integrationMode: 'sandbox',
+              configuredCredentialKeys: [],
+              config: {},
+            },
+            ...filtered,
+          ];
+    },
     [providers]
   );
   const bromaProvider = useMemo(() => providers.find((provider) => provider.key === 'broma'), [providers]);
@@ -274,8 +293,8 @@ export default function AdminDspDeliveriesPage() {
         adminAPI.listDspDeliveries({
           providerKey: providerFilter !== 'all' ? providerFilter : '',
           state: statusFilter !== 'all' ? statusFilter : '',
-          limit: 50,
-          page: 1,
+          limit: rowsPerPage,
+          page: page + 1,
         }),
         adminAPI.listBromaOutlets(),
       ]);
@@ -283,6 +302,7 @@ export default function AdminDspDeliveriesPage() {
       const nextJobs = jobsRes?.data?.data || [];
       setProviders(providerRes?.data || []);
       setJobs(nextJobs);
+      setPaginationTotal(Number(jobsRes?.data?.pagination?.total || nextJobs.length || 0));
       setJobDetails({});
       setBromaOutlets(outletRes?.data || []);
     } catch (error) {
@@ -295,7 +315,11 @@ export default function AdminDspDeliveriesPage() {
   useEffect(() => {
     if (isAdmin) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, providerFilter, statusFilter]);
+  }, [isAdmin, providerFilter, statusFilter, page, rowsPerPage]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [providerFilter, statusFilter]);
 
   useEffect(() => {
     if (!bromaProvider) return;
@@ -401,18 +425,12 @@ export default function AdminDspDeliveriesPage() {
   };
 
   const handleRefreshStatus = async (jobId: string) => {
-    const job = jobDetails[jobId] || jobs.find((item) => item._id === jobId);
-    if (job && !getBromaReleaseId(job)) {
-      toast.info('Broma release id missing. Run worker first to create the release at Broma.');
-      return;
-    }
-
     try {
       setRefreshingStatusId(jobId);
       const response = await adminAPI.refreshDspDeliveryStatus(jobId);
       const state = response?.data?.state || 'updated';
       const bromaStatus = response?.data?.metadata?.bromaModerationStatus;
-      toast.success(`Broma status refreshed: ${bromaStatus || state}`);
+      toast.success(`Broma status loaded: ${bromaStatus || state}`);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Status refresh failed');
@@ -451,14 +469,14 @@ export default function AdminDspDeliveriesPage() {
   const handleProcessDue = async () => {
     try {
       setProcessingDue(true);
-      const response = await adminAPI.processDueDspDeliveries({ maxJobs: 10 });
+      const response = await adminAPI.processDueDspDeliveries({ maxJobs: 5, dispatchOnly: true });
       const processedItems = response?.data?.processed || [];
       const processed = processedItems.length || 0;
       const issue = processedItems.find((item: any) => ['failed', 'needs_attention'].includes(item.state) && item.error);
       const processing = processedItems.filter((item: any) => item.state === 'processing').length;
       if (issue?.error) toast.error(`Broma delivery issue: ${String(issue.error).slice(0, 220)}`);
-      else if (processing > 0) toast.success(`${processing} release${processing === 1 ? '' : 's'} moved to processing`);
-      else toast.success(`Processed ${processed} delivery job${processed === 1 ? '' : 's'}`);
+      else if (processing > 0) toast.success(`${processing} release${processing === 1 ? '' : 's'} started processing`);
+      else toast.success(`Started ${processed} delivery job${processed === 1 ? '' : 's'}`);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Worker run failed');
@@ -715,8 +733,9 @@ export default function AdminDspDeliveriesPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <Table size="small">
-            <TableHead>
+          <>
+            <Table size="small">
+              <TableHead>
               <TableRow>
                 <TableCell width={44} />
                 <TableCell>Track</TableCell>
@@ -736,7 +755,7 @@ export default function AdminDspDeliveriesPage() {
                 const isExpanded = expandedJobId === listJob._id;
                 const isLoadingDetails = loadingJobDetailsId === listJob._id && !jobDetails[listJob._id];
                 const bromaProgress = getBromaProgress(job);
-                const canRefreshBromaStatus = job.providerKey === 'broma' && Boolean(getBromaReleaseId(job));
+                const canRefreshBromaStatus = job.providerKey === 'broma';
 
                 return (
                 <Fragment key={listJob._id}>
@@ -818,7 +837,7 @@ export default function AdminDspDeliveriesPage() {
                         <Tooltip
                           title={
                             canRefreshBromaStatus
-                              ? 'Fetch fresh Broma status'
+                              ? (getBromaReleaseId(job) ? 'Fetch fresh Broma status' : 'Load latest saved Broma job state')
                               : 'Broma release id missing. Run worker first.'
                           }
                         >
@@ -994,7 +1013,20 @@ export default function AdminDspDeliveriesPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+            </Table>
+            <TablePagination
+              component="div"
+              count={paginationTotal}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              onPageChange={(_, nextPage) => setPage(nextPage)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(Number(event.target.value));
+                setPage(0);
+              }}
+            />
+          </>
         )}
       </Paper>
     </Box>

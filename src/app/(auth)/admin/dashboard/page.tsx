@@ -91,7 +91,7 @@ const statGridStyles = {
   gridTemplateColumns: {
     xs: 'repeat(2, minmax(0, 1fr))',
     sm: 'repeat(2, minmax(0, 1fr))',
-    md: 'repeat(4, minmax(0, 1fr))',
+    md: 'repeat(5, minmax(0, 1fr))',
   },
 } as const;
 
@@ -122,8 +122,16 @@ export default function AdminDashboard() {
     pendingReleases: 0,
   });
   const [recentUsers, setRecentUsers] = useState<DashboardUser[]>([]);
+  const [recentReleases, setRecentReleases] = useState<DashboardRelease[]>([]);
   const [pendingReleases, setPendingReleases] = useState<DashboardRelease[]>([]);
-  const [allReleases, setAllReleases] = useState<DashboardRelease[]>([]);
+  const [releaseCounts, setReleaseCounts] = useState({
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  });
 
   // Fetch data on component mount
   useEffect(() => {
@@ -185,18 +193,32 @@ export default function AdminDashboard() {
       }
 
       try {
-        const releasesResponse = await releaseAPI.getReleases({ summary: '1' });
-        if (releasesResponse.success && Array.isArray(releasesResponse.data)) {
-          const releases = releasesResponse.data as DashboardRelease[];
-          setAllReleases(releases);
-          setPendingReleases(releases.filter(release => getNormalizedReleaseStatus(release.status) === 'pending'));
-        } else {
-          setAllReleases([]);
-          setPendingReleases([]);
+        const [recentResponse, pendingResponse] = await Promise.all([
+          releaseAPI.getReleases({ summary: '1', page: 1, limit: 5 }),
+          releaseAPI.getReleases({ summary: '1', page: 1, limit: 5, status: 'pending' }),
+        ]);
+
+        setRecentReleases(recentResponse.success && Array.isArray(recentResponse.data)
+          ? recentResponse.data as DashboardRelease[]
+          : []);
+        setPendingReleases(pendingResponse.success && Array.isArray(pendingResponse.data)
+          ? pendingResponse.data as DashboardRelease[]
+          : []);
+
+        const nextCounts = recentResponse.counts || pendingResponse.counts;
+        if (nextCounts) {
+            setReleaseCounts({
+              all: Number(nextCounts.all || 0),
+              pending: Number(nextCounts.pending || 0),
+              in_process: Number(nextCounts.in_process || 0),
+              approved: Number(nextCounts.approved || 0),
+              rejected: Number(nextCounts.rejected || 0),
+              other: Number(nextCounts.other || 0),
+            });
         }
       } catch (releasesError) {
         console.error('Error fetching releases:', releasesError);
-        setAllReleases([]);
+        setRecentReleases([]);
         setPendingReleases([]);
       }
     } catch (error) {
@@ -219,10 +241,11 @@ export default function AdminDashboard() {
 
   const statCards: StatCardConfig[] = [
     { label: 'Total Users', value: stats.totalUsers, icon: Group, avatarColor: 'primary' },
-    { label: 'Total Releases', value: allReleases.length, icon: Album, avatarColor: 'secondary' },
+    { label: 'Total Releases', value: releaseCounts.all || stats.totalReleases, icon: Album, avatarColor: 'secondary' },
+    { label: 'Total Tracks', value: stats.totalTracks, icon: MusicNote, avatarColor: 'primary' },
     {
       label: 'Pending Approvals',
-      value: pendingReleases.length,
+      value: releaseCounts.pending || stats.pendingReleases,
       icon: PendingActions,
       avatarColor: 'warning',
     },
@@ -234,10 +257,12 @@ export default function AdminDashboard() {
     },
   ];
 
-  const approvedReleases = allReleases.filter(release => getNormalizedReleaseStatus(release.status) === 'approved').length;
-  const rejectedReleases = allReleases.filter(release => getNormalizedReleaseStatus(release.status) === 'rejected').length;
+  const approvedReleases = releaseCounts.approved;
+  const rejectedReleases = releaseCounts.rejected;
   const reviewLoad =
-    allReleases.length > 0 ? Math.round((pendingReleases.length / allReleases.length) * 100) : 0;
+    releaseCounts.all > 0 ? Math.round((releaseCounts.pending / releaseCounts.all) * 100) : 0;
+  const bromaLoad =
+    releaseCounts.all > 0 ? Math.round((releaseCounts.in_process / releaseCounts.all) * 100) : 0;
   const surfaceSx = {
     ...premiumSurfaceSx(theme),
     borderRadius: '14px',
@@ -319,7 +344,7 @@ export default function AdminDashboard() {
         </Box>
 
         <Box sx={statGridStyles}>
-          {[...Array(4)].map((_, index) => (
+          {[...Array(5)].map((_, index) => (
             <Skeleton key={index} variant="rounded" height={120} />
           ))}
         </Box>
@@ -408,7 +433,7 @@ export default function AdminDashboard() {
             {[
               {
                 label: 'Pending',
-                value: pendingReleases.length,
+                value: releaseCounts.pending || stats.pendingReleases,
                 icon: <PendingActions />,
                 color: '#f59e0b',
               },
@@ -451,6 +476,7 @@ export default function AdminDashboard() {
             ))}
           </Box>
 
+          <Stack spacing={2}>
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
               <Typography variant="body2" sx={{ fontWeight: 900, color: headingText }}>
@@ -477,6 +503,33 @@ export default function AdminDashboard() {
               }}
             />
           </Box>
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+              <Typography variant="body2" sx={{ fontWeight: 900, color: headingText }}>
+                Broma Moderation
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ fontWeight: 800, color: releaseCounts.in_process > 0 ? '#0ea5e9' : 'success.main' }}
+              >
+                {releaseCounts.in_process} active · {bromaLoad}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={bromaLoad}
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 4,
+                  bgcolor: '#0ea5e9',
+                },
+              }}
+            />
+          </Box>
+          </Stack>
         </Paper>
 
         <Paper
@@ -840,7 +893,7 @@ export default function AdminDashboard() {
               sx={{ mb: 2, borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)' }}
             />
 
-            {allReleases.length > 0 ? (
+            {recentReleases.length > 0 ? (
               <TableContainer
                 sx={{
                   borderRadius: '12px',
@@ -868,7 +921,7 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {allReleases.slice(0, 5).map(release => {
+                    {recentReleases.map(release => {
                       const displayStatus = getNormalizedReleaseStatus(release.status);
 
                       return (

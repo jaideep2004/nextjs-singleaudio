@@ -19,21 +19,14 @@ export function getReleaseOwnerQuery(user: {
   email?: string;
 }) {
   const userId = String(user._id);
-  const legacyNames = [user.artistName, user.name]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .map((value) => value.trim());
 
   return {
     $or: [
+      { ownerUserId: userId },
       { userId },
       { artistId: userId },
       { ownerId: userId },
       { createdBy: userId },
-      ...legacyNames.flatMap((name) => [
-        { primaryArtist: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-        { artist: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-        { label: { $regex: `^${escapeRegex(name)}$`, $options: 'i' } },
-      ]),
     ],
   };
 }

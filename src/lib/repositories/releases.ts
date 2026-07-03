@@ -8,6 +8,7 @@ import {
   upsertCanonicalTracksFromRelease,
 } from '@/lib/repositories/tracks';
 import { getDefaultOrganizationIdForUser } from '@/lib/repositories/organizations';
+import { getNormalizedReleaseStatus, RELEASE_STATUS_GROUPS, type ReleaseDisplayStatus } from '@/lib/releaseStatus';
 
 export type ReleaseDocument = Record<string, any> & {
   _id?: ObjectId;
@@ -125,6 +126,125 @@ export async function listReleasesWithTracks(
   return hydrateReleasesWithCanonicalTracks(db, releases);
 }
 
+type ReleaseListOptions = {
+  summary?: boolean;
+  page?: number;
+  limit?: number;
+  status?: string;
+  type?: string;
+  search?: string;
+};
+
+export type ReleaseListPage = {
+  releases: Record<string, any>[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  counts: Record<'all' | 'pending' | 'in_process' | 'approved' | 'rejected' | 'other', number>;
+};
+
+const RELEASE_SEARCH_FIELDS = [
+  'releaseTitle',
+  'title',
+  'primaryArtist',
+  'artist',
+  'label',
+  'upc',
+  'ownerName',
+  'ownerArtistName',
+  'ownerEmail',
+];
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizedStatusQuery(status: string) {
+  const normalized = getNormalizedReleaseStatus(status);
+  if (normalized === 'pending') {
+    return {
+      $or: [
+        { status: { $in: RELEASE_STATUS_GROUPS.pending } },
+        { status: { $exists: false } },
+        { status: null },
+      ],
+    };
+  }
+  if (normalized === 'in_process' || normalized === 'approved' || normalized === 'rejected') {
+    return { status: { $in: RELEASE_STATUS_GROUPS[normalized] } };
+  }
+  return {};
+}
+
+function buildReleaseListQuery(
+  baseQuery: Record<string, any>,
+  options: Pick<ReleaseListOptions, 'status' | 'type' | 'search'>,
+  includeStatus = true
+) {
+  const clauses: Record<string, any>[] = [baseQuery];
+  const type = String(options.type || '').trim().toLowerCase();
+  const search = String(options.search || '').trim();
+
+  if (includeStatus && options.status && options.status !== 'all') {
+    const statusClause = normalizedStatusQuery(options.status);
+    if (Object.keys(statusClause).length) clauses.push(statusClause);
+  }
+
+  if (type && type !== 'all') {
+    clauses.push({
+      $or: [
+        { releaseType: { $regex: `^${escapeRegex(type)}$`, $options: 'i' } },
+        { type: { $regex: `^${escapeRegex(type)}$`, $options: 'i' } },
+      ],
+    });
+  }
+
+  if (search) {
+    const regex = new RegExp(escapeRegex(search), 'i');
+    clauses.push({ $or: RELEASE_SEARCH_FIELDS.map((field) => ({ [field]: regex })) });
+  }
+
+  return clauses.length === 1 ? clauses[0] : { $and: clauses };
+}
+
+async function attachSummaryTrackCounts(db: Db, releases: Record<string, any>[]) {
+  const releaseIds = releases
+    .map((release) => toObjectId(release._id))
+    .filter((value): value is ObjectId => Boolean(value));
+
+  const canonicalCounts = releaseIds.length
+    ? await tracksCollection(db)
+        .aggregate<{ _id: ObjectId; count: number }>([
+          {
+            $match: {
+              releaseId: { $in: releaseIds },
+              deletedAt: { $exists: false },
+              source: 'release_embed',
+            },
+          },
+          { $group: { _id: '$releaseId', count: { $sum: 1 } } },
+        ])
+        .toArray()
+    : [];
+
+  const countsByReleaseId = new Map(
+    canonicalCounts.map((row) => [row._id.toHexString(), row.count])
+  );
+
+  return releases.map((release) => {
+    const releaseId = String(release._id);
+    const { legacyTrackCount, ...summary } = release;
+    return {
+      ...summary,
+      ownerUserId: release.ownerUserId || release.userId || release.artistId || release.ownerId || release.createdBy,
+      trackCount: countsByReleaseId.get(releaseId) ?? Number(legacyTrackCount || 0),
+    };
+  });
+}
+
 async function listReleaseSummaries(db: Db, query: Record<string, any>) {
   const releases = await releasesCollection(db)
     .aggregate<Record<string, any>>([
@@ -164,38 +284,107 @@ async function listReleaseSummaries(db: Db, query: Record<string, any>) {
     ])
     .toArray();
 
-  const releaseIds = releases
-    .map((release) => toObjectId(release._id))
-    .filter((value): value is ObjectId => Boolean(value));
+  return attachSummaryTrackCounts(db, releases);
+}
 
-  const canonicalCounts = releaseIds.length
-    ? await tracksCollection(db)
-        .aggregate<{ _id: ObjectId; count: number }>([
-          {
-            $match: {
-              releaseId: { $in: releaseIds },
-              deletedAt: { $exists: false },
-              source: 'release_embed',
-            },
-          },
-          { $group: { _id: '$releaseId', count: { $sum: 1 } } },
-        ])
-        .toArray()
-    : [];
+export async function listReleasesPage(
+  db: Db,
+  baseQuery: Record<string, any>,
+  options: ReleaseListOptions = {}
+): Promise<ReleaseListPage> {
+  await ensureReleaseIndexes(db);
 
-  const countsByReleaseId = new Map(
-    canonicalCounts.map((row) => [row._id.toHexString(), row.count])
-  );
+  const page = Math.max(1, Number(options.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(options.limit || 20)));
+  const skip = (page - 1) * limit;
+  const query = buildReleaseListQuery(baseQuery, options, true);
+  const countQuery = buildReleaseListQuery(baseQuery, options, false);
+  const collection = releasesCollection(db);
 
-  return releases.map((release) => {
-    const releaseId = String(release._id);
-    const { legacyTrackCount, ...summary } = release;
-    return {
-      ...summary,
-      ownerUserId: release.ownerUserId || release.userId || release.artistId || release.ownerId || release.createdBy,
-      trackCount: countsByReleaseId.get(releaseId) ?? Number(legacyTrackCount || 0),
-    };
+  const summaryProjection = {
+    releaseTitle: 1,
+    title: 1,
+    releaseType: 1,
+    type: 1,
+    status: 1,
+    releaseDate: 1,
+    originalReleaseDate: 1,
+    label: 1,
+    upc: 1,
+    ownerUserId: 1,
+    organizationId: 1,
+    userId: 1,
+    artistId: 1,
+    ownerId: 1,
+    createdBy: 1,
+    ownerName: 1,
+    ownerArtistName: 1,
+    ownerEmail: 1,
+    primaryArtist: 1,
+    artist: 1,
+    territories: 1,
+    artworkUrl: 1,
+    stores: 1,
+    updatedAt: 1,
+    createdAt: 1,
+    legacyTrackCount: {
+      $cond: [{ $isArray: '$tracks' }, { $size: '$tracks' }, 0],
+    },
+  };
+
+  const [rows, total, groupedCounts] = await Promise.all([
+    options.summary
+      ? collection
+          .aggregate<Record<string, any>>([
+            { $match: query },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+            { $project: summaryProjection },
+          ])
+          .toArray()
+      : collection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .toArray(),
+    collection.countDocuments(query),
+    collection
+      .aggregate<{ _id: string | null; count: number }>([
+        { $match: countQuery },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ])
+      .toArray(),
+  ]);
+
+  const releases = options.summary
+    ? await attachSummaryTrackCounts(db, rows)
+    : await hydrateReleasesWithCanonicalTracks(db, rows as Array<ReleaseDocument & { _id: ObjectId }>);
+  const counts = {
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  };
+  groupedCounts.forEach((row) => {
+    const normalized = getNormalizedReleaseStatus(row._id) as Exclude<ReleaseDisplayStatus, never>;
+    counts[normalized] += row.count;
+    counts.all += row.count;
   });
+
+  return {
+    releases,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+    counts,
+  };
 }
 
 export async function listApprovedReleasesForPublishing(db: Db) {

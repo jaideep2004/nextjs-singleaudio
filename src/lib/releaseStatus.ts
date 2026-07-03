@@ -1,10 +1,20 @@
 export type ReleaseDisplayStatus = 'pending' | 'in_process' | 'approved' | 'rejected' | 'other';
 
 const IN_PROCESS_RELEASE_STATUSES = new Set([
+  'in_process',
+  'processing',
   'uploading_to_broma',
   'broma_moderation',
   'dsp_processing',
 ]);
+
+export const RELEASE_STATUS_GROUPS: Record<ReleaseDisplayStatus, string[]> = {
+  pending: ['pending', 'pending_review', 'pending review', ''],
+  in_process: Array.from(IN_PROCESS_RELEASE_STATUSES),
+  approved: ['approved'],
+  rejected: ['rejected'],
+  other: [],
+};
 
 function rawReleaseStatus(status: unknown) {
   return String(status ?? '').trim().toLowerCase();

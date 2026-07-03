@@ -85,9 +85,19 @@ export default function AdminReleasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [paginationTotal, setPaginationTotal] = useState(0);
+  const [counts, setCounts] = useState({
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  });
   const [pendingExporting, setPendingExporting] = useState(false);
   const [pendingExportMessage, setPendingExportMessage] = useState('');
   const [syncingBromaStatuses, setSyncingBromaStatuses] = useState(false);
@@ -117,24 +127,53 @@ export default function AdminReleasesPage() {
     }
   }, [statusFilter]);
 
+  const statusKeys = ['', 'pending', 'in_process', 'approved', 'rejected'];
+
   useEffect(() => {
-    fetchReleases();
-  }, []);
+    const timer = window.setTimeout(() => setDebouncedSearchTerm(searchTerm.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    void fetchReleases();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, tabValue, typeFilter, debouncedSearchTerm]);
 
   const fetchReleases = async () => {
     try {
       setLoading(true);
-      const response = await releaseAPI.getReleases({ summary: '1' });
+      setError(null);
+      const response = await releaseAPI.getReleases({
+        summary: '1',
+        page: page + 1,
+        limit: rowsPerPage,
+        status: statusKeys[tabValue] || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        search: debouncedSearchTerm || undefined,
+      });
       if (response && response.success) {
         const data = Array.isArray(response.data) ? response.data : [];
         setReleases(data);
+        setPaginationTotal(response.pagination?.total ?? data.length);
+        if (response.counts) {
+          setCounts({
+            all: Number(response.counts.all || 0),
+            pending: Number(response.counts.pending || 0),
+            in_process: Number(response.counts.in_process || 0),
+            approved: Number(response.counts.approved || 0),
+            rejected: Number(response.counts.rejected || 0),
+            other: Number(response.counts.other || 0),
+          });
+        }
       } else {
         setError('Failed to load releases');
         setReleases([]);
+        setPaginationTotal(0);
       }
     } catch {
       setError('An error occurred while fetching releases');
       setReleases([]);
+      setPaginationTotal(0);
     } finally {
       setLoading(false);
     }
@@ -144,13 +183,8 @@ export default function AdminReleasesPage() {
     try {
       setSyncingBromaStatuses(true);
       setSyncMessage('');
-      const inProcessReleaseIds = releases
-        .filter((release) => getNormalizedReleaseStatus(release.status) === 'in_process')
-        .map((release) => String(release._id))
-        .filter(Boolean);
       const response = await adminAPI.syncBromaReleaseStatuses({
-        releaseIds: inProcessReleaseIds,
-        limit: Math.max(150, inProcessReleaseIds.length),
+        limit: 150,
       });
       if (!response?.success) {
         throw new Error(response?.error || response?.message || 'Failed to sync Broma statuses');
@@ -191,59 +225,13 @@ export default function AdminReleasesPage() {
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
   const getReleaseArtwork = (release: any) =>
     release.artworkUrl || release.artwork || release.coverArt || release.artworkFile || '';
-  const pendingCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending').length;
-  const inProcessCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process').length;
-  const approvedCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved').length;
-  const rejectedCount = releases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected').length;
+  const pendingCount = counts.pending;
+  const inProcessCount = counts.in_process;
+  const approvedCount = counts.approved;
+  const rejectedCount = counts.rejected;
 
-  const statusFilteredReleases = useMemo(() => {
-    switch (tabValue) {
-      case 1: // Pending
-        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending');
-      case 2: // In Process
-        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process');
-      case 3: // Approved
-        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved');
-      case 4: // Rejected
-        return releases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected');
-      default: // All
-        return releases;
-    }
-  }, [releases, tabValue]);
-
-  const releaseTypeOptions = useMemo(() => {
-    const values = new Set<string>(['single', 'ep', 'album']);
-    releases.forEach((release) => {
-      if (release.releaseType || release.type) values.add(String(release.releaseType || release.type).toLowerCase());
-    });
-    return Array.from(values).sort();
-  }, [releases]);
-
-  const filteredReleases = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    const searchSource = query ? releases : statusFilteredReleases;
-    return searchSource.filter((release) => {
-      const haystack = [
-        release.releaseTitle,
-        release.title,
-        release.primaryArtist,
-        release.artist,
-        release.label,
-        release.upc,
-        release.ownerName,
-        release.ownerArtistName,
-        release.ownerEmail,
-      ].filter(Boolean).join(' ').toLowerCase();
-      const matchesSearch = !query || haystack.includes(query);
-      const matchesType = typeFilter === 'all' || String(release.releaseType || release.type || '').toLowerCase() === typeFilter;
-      return matchesSearch && matchesType;
-    });
-  }, [releases, searchTerm, statusFilteredReleases, typeFilter]);
-
-  const paginatedReleases = useMemo(
-    () => filteredReleases.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [filteredReleases, page, rowsPerPage]
-  );
+  const releaseTypeOptions = useMemo(() => ['single', 'ep', 'album'], []);
+  const paginatedReleases = releases;
 
   const resetPage = () => setPage(0);
   const handlePendingExport = async () => {
@@ -272,7 +260,7 @@ export default function AdminReleasesPage() {
   };
 
   const tabItems = [
-    { label: 'All', count: releases.length, icon: <Album fontSize="small" />, color: '#5b5ff7' },
+    { label: 'All', count: counts.all, icon: <Album fontSize="small" />, color: '#5b5ff7' },
     { label: 'Pending', count: pendingCount, icon: <Pending fontSize="small" />, color: '#f59e0b' },
     { label: 'In Process', count: inProcessCount, icon: <Sync fontSize="small" />, color: '#0ea5e9' },
     { label: 'Approved', count: approvedCount, icon: <CheckCircle fontSize="small" />, color: '#10b981' },
@@ -379,7 +367,7 @@ export default function AdminReleasesPage() {
               minHeight: 54,
               borderRadius: 2,
               mx: 0.5,
-              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'white',
+              color: mode === 'dark' ? 'rgba(255,255,255,0.74)' : 'rgba(15,23,42,0.72)',
               '&.Mui-selected': {
                 color: '#fff',
               },
@@ -403,18 +391,26 @@ export default function AdminReleasesPage() {
                 mx: 0.5,
                 mb: 0.75,
                 borderRadius: '14px',
-                bgcolor: item.color,
-                color: '#fff',
-                opacity: tabValue === index ? 1 : 0.88,
+                bgcolor: tabValue === index
+                  ? item.color
+                  : mode === 'dark'
+                    ? 'rgba(255,255,255,0.045)'
+                    : 'rgba(15,23,42,0.045)',
+                color: tabValue === index
+                  ? '#fff'
+                  : mode === 'dark'
+                    ? 'rgba(255,255,255,0.78)'
+                    : 'rgba(15,23,42,0.76)',
+                opacity: 1,
                 boxShadow: tabValue === index ? `0 14px 28px ${alpha(item.color, 0.34)}` : 'none',
-                transition: 'transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease',
+                transition: 'transform 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease',
                 '&.Mui-selected': {
                   bgcolor: item.color,
                   color: '#fff',
                   opacity: 1,
                 },
                 '&:hover': {
-                  opacity: 1,
+                  bgcolor: tabValue === index ? item.color : alpha(item.color, mode === 'dark' ? 0.18 : 0.11),
                   transform: 'translateY(-1px)',
                 },
                 '& .MuiTab-iconWrapper': { mr: 0.75 },
@@ -546,7 +542,7 @@ export default function AdminReleasesPage() {
       );
     }
 
-    if (filteredReleases.length === 0) {
+    if (releases.length === 0) {
       return (
         <Box sx={{ py: 8, textAlign: 'center' }}>
           <MusicNote sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
@@ -688,7 +684,7 @@ export default function AdminReleasesPage() {
         </TableContainer>
         <TablePagination
           component="div"
-          count={filteredReleases.length}
+          count={paginationTotal}
           page={page}
           rowsPerPage={rowsPerPage}
           rowsPerPageOptions={[5, 10, 25, 50]}

@@ -182,8 +182,9 @@ export const processDueDeliveries = async (req: AuthRequest, res: Response): Pro
     const result = await dspDeliveryService.processDueDeliveryJobs({
       maxJobs,
       workerId: typeof req.body?.workerId === 'string' ? req.body.workerId : undefined,
+      dispatchOnly: req.body?.dispatchOnly === true,
     });
-    successResponse(res, result, 'Due delivery jobs processed');
+    successResponse(res, result, req.body?.dispatchOnly === true ? 'Due delivery jobs started' : 'Due delivery jobs processed');
   } catch (error) {
     errorResponse(res, 'Failed to process due delivery jobs', error);
   }

@@ -68,6 +68,15 @@ function DashboardPage() {
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [releases, setReleases] = useState<any[]>([]);
+  const [releaseCounts, setReleaseCounts] = useState({
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  });
+  const [totalTracks, setTotalTracks] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [releaseLoading, setReleaseLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,11 +88,26 @@ function DashboardPage() {
       try {
         setIsLoading(true);
         const [tracksRes, releasesRes] = await Promise.all([
-          trackAPI.getTracks(),
-          releaseAPI.getReleases({ summary: '1' }),
+          trackAPI.getTracks({ page: 1, limit: 6 }),
+          releaseAPI.getReleases({ summary: '1', page: 1, limit: 5 }),
         ]);
-        if (tracksRes?.success) setTracks(Array.isArray(tracksRes.data) ? tracksRes.data : []);
-        if (releasesRes?.success) setReleases(Array.isArray(releasesRes.data) ? releasesRes.data : []);
+        if (tracksRes?.success) {
+          setTracks(Array.isArray(tracksRes.data) ? tracksRes.data : []);
+          setTotalTracks(Number(tracksRes.pagination?.total ?? tracksRes.data.length ?? 0));
+        }
+        if (releasesRes?.success) {
+          setReleases(Array.isArray(releasesRes.data) ? releasesRes.data : []);
+          if (releasesRes.counts) {
+            setReleaseCounts({
+              all: Number(releasesRes.counts.all || 0),
+              pending: Number(releasesRes.counts.pending || 0),
+              in_process: Number(releasesRes.counts.in_process || 0),
+              approved: Number(releasesRes.counts.approved || 0),
+              rejected: Number(releasesRes.counts.rejected || 0),
+              other: Number(releasesRes.counts.other || 0),
+            });
+          }
+        }
       } catch (err) {
         console.error('Dashboard fetch error:', err);
         setError('Failed to load dashboard data');
@@ -124,10 +148,11 @@ function DashboardPage() {
   const getReleaseTrackCount = (release: any) =>
     Number(release?.trackCount ?? (Array.isArray(release?.tracks) ? release.tracks.length : 0));
 
-  const approvedReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'approved').length;
-  const inProcessReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'in_process').length;
-  const pendingReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'pending').length;
-  const rejectedReleases = safeReleases.filter(r => getNormalizedReleaseStatus(r?.status) === 'rejected').length;
+  const totalReleases = releaseCounts.all || safeReleases.length;
+  const approvedReleases = releaseCounts.approved;
+  const inProcessReleases = releaseCounts.in_process;
+  const pendingReleases = releaseCounts.pending;
+  const rejectedReleases = releaseCounts.rejected;
 
   const recentReleases = safeReleases.slice(0, 5);
   const recentTracks = safeTracks.slice(0, 6);
@@ -136,10 +161,17 @@ function DashboardPage() {
   const metrics = [
     {
       label: 'Total Releases',
-      value: safeReleases.length,
+      value: totalReleases,
       icon: <AlbumIcon />,
       color: '#f59e0b',
       bgColor: isDark ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.08)',
+    },
+    {
+      label: 'Total Tracks',
+      value: totalTracks,
+      icon: <MusicNoteIcon />,
+      color: '#4a6cf7',
+      bgColor: isDark ? 'rgba(74, 108, 247, 0.12)' : 'rgba(74, 108, 247, 0.08)',
     },
     {
       label: 'In Process',
@@ -199,8 +231,8 @@ function DashboardPage() {
       <Box sx={{ px: { xs: 2, sm: 3 }, py: 3 }}>
         <Skeleton variant="text" width={280} height={40} sx={{ mb: 1 }} />
         <Skeleton variant="text" width={200} height={24} sx={{ mb: 4 }} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' }, gap: 2, mb: 4 }}>
-          {[1, 2, 3, 4, 5].map(i => (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(6, 1fr)' }, gap: 2, mb: 4 }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <Skeleton key={i} variant="rounded" height={110} sx={{ borderRadius: '14px' }} />
           ))}
         </Box>
@@ -223,7 +255,7 @@ function DashboardPage() {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(5, 1fr)' },
+          gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(6, 1fr)' },
           gap: 2,
           mb: 4,
         }}
@@ -405,10 +437,10 @@ function DashboardPage() {
               Release Status
             </Typography>
             {[
-              { label: 'Approved', count: approvedReleases, total: safeReleases.length, color: '#10b981' },
-              { label: 'In Process', count: inProcessReleases, total: safeReleases.length, color: '#0ea5e9' },
-              { label: 'Pending', count: pendingReleases, total: safeReleases.length, color: '#f59e0b' },
-              { label: 'Rejected', count: rejectedReleases, total: safeReleases.length, color: '#ef4444' },
+              { label: 'Approved', count: approvedReleases, total: totalReleases, color: '#10b981' },
+              { label: 'In Process', count: inProcessReleases, total: totalReleases, color: '#0ea5e9' },
+              { label: 'Pending', count: pendingReleases, total: totalReleases, color: '#f59e0b' },
+              { label: 'Rejected', count: rejectedReleases, total: totalReleases, color: '#ef4444' },
             ].map((item) => (
               <Box key={item.label} sx={{ mb: 2, '&:last-child': { mb: 0 } }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>

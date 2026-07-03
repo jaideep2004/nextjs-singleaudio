@@ -16,6 +16,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  TablePagination,
 } from '@mui/material';
 import {
   Album as AlbumIcon,
@@ -97,18 +98,51 @@ function ReleasesContent() {
   const [draftReleases, setDraftReleases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [paginationTotal, setPaginationTotal] = useState(0);
+  const [counts, setCounts] = useState({
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  });
   const [draftDeleteTarget, setDraftDeleteTarget] = useState<any | null>(null);
   const [deletingDraft, setDeletingDraft] = useState(false);
 
   const currentStatus = searchParams.get('status') || '';
 
   useEffect(() => {
+    setPage(0);
+  }, [currentStatus]);
+
+  useEffect(() => {
     const fetchReleases = async () => {
       try {
-        const res = await fetch('/api/releases?summary=1');
+        setLoading(true);
+        const params = new URLSearchParams({
+          summary: '1',
+          page: String(currentStatus === 'draft' ? 1 : page + 1),
+          limit: String(currentStatus === 'draft' ? 1 : rowsPerPage),
+        });
+        if (currentStatus && currentStatus !== 'draft') params.set('status', currentStatus);
+        const res = await fetch(`/api/releases?${params.toString()}`);
         const data = await res.json();
         if (data.success) {
-          setReleases(data.releases || data.data || []);
+          setReleases(currentStatus === 'draft' ? [] : data.releases || data.data || []);
+          setPaginationTotal(Number(data.pagination?.total || 0));
+          if (data.counts) {
+            setCounts({
+              all: Number(data.counts.all || 0),
+              pending: Number(data.counts.pending || 0),
+              in_process: Number(data.counts.in_process || 0),
+              approved: Number(data.counts.approved || 0),
+              rejected: Number(data.counts.rejected || 0),
+              other: Number(data.counts.other || 0),
+            });
+          }
         } else {
           setError(data.error || 'Failed to fetch releases');
         }
@@ -119,7 +153,7 @@ function ReleasesContent() {
       }
     };
     fetchReleases();
-  }, []);
+  }, [currentStatus, page, rowsPerPage]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !user?.id) return;
@@ -229,9 +263,19 @@ function ReleasesContent() {
     return [...visibleDrafts, ...releases];
   }, [draftReleases, releases]);
 
-  const filteredReleases = currentStatus
-    ? catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === currentStatus)
-    : catalogReleases;
+  const pagedDraftReleases = draftReleases.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const filteredReleases = currentStatus === 'draft'
+    ? pagedDraftReleases
+    : currentStatus
+      ? releases
+      : page === 0
+        ? catalogReleases
+        : releases;
+  const tableTotal = currentStatus === 'draft'
+    ? draftReleases.length
+    : currentStatus
+      ? paginationTotal
+      : paginationTotal + draftReleases.length;
   const getTrackCount = (release: any) =>
     Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
 
@@ -295,12 +339,12 @@ function ReleasesContent() {
   };
 
   const tabCounts = {
-    '': catalogReleases.length,
-    pending: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'pending').length,
-    in_process: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'in_process').length,
-    approved: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'approved').length,
-    rejected: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'rejected').length,
-    draft: catalogReleases.filter(r => getNormalizedReleaseStatus(r.status) === 'draft').length,
+    '': counts.all + draftReleases.length,
+    pending: counts.pending,
+    in_process: counts.in_process,
+    approved: counts.approved,
+    rejected: counts.rejected,
+    draft: draftReleases.length,
   };
 
   return (
@@ -539,6 +583,18 @@ function ReleasesContent() {
               </Box>
             </Box>
           ))}
+          <TablePagination
+            component="div"
+            count={tableTotal}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            onPageChange={(_, nextPage) => setPage(nextPage)}
+            onRowsPerPageChange={(event) => {
+              setRowsPerPage(Number(event.target.value));
+              setPage(0);
+            }}
+          />
         </Box>
       )}
       <Dialog

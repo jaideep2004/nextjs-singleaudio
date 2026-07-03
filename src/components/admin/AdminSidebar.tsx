@@ -27,6 +27,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Album,
+  MusicNote,
   TrendingUp,
   CloudUpload as CloudUploadIcon,
   LibraryMusic,
@@ -67,6 +68,12 @@ const menuSections = [
         text: 'Releases',
         icon: <Album />,
         path: '/admin/releases',
+        permission: 'review' as AdminPermission,
+      },
+      {
+        text: 'Tracks',
+        icon: <MusicNote />,
+        path: '/admin/tracks',
         permission: 'review' as AdminPermission,
       },
       {

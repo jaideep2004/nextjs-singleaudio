@@ -166,19 +166,22 @@ export interface PaginatedResponse<T> {
 
 // Track API
 export const trackAPI = {
-  getTracks: async (params: any = {}): Promise<{ success: boolean; data: any; error?: string }> => {
+  getTracks: async (params: any = {}): Promise<{ success: boolean; data: any[]; pagination?: any; counts?: any; error?: string }> => {
     try {
       const response = await api.get('/tracks', { params });
       return {
-        success: true,
-        data: response.data || []
+        success: response.data?.success !== false,
+        data: Array.isArray(response.data?.data) ? response.data.data : [],
+        pagination: response.data?.pagination,
+        counts: response.data?.counts,
+        error: response.data?.error,
       };
     } catch (error) {
       console.error('Error fetching tracks:', error);
-      // Return empty array for development
       return {
-        success: true,
-        data: []
+        success: false,
+        data: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch tracks',
       };
     }
   },
@@ -257,11 +260,15 @@ export const releaseAPI = {
         return {
           success: true,
           data: response.data.releases || [],
+          pagination: response.data.pagination,
+          counts: response.data.counts,
         };
       } else {
         return {
           success: false,
           data: [],
+          pagination: response.data?.pagination,
+          counts: response.data?.counts,
           error: response.data?.error || 'Failed to fetch releases',
         };
       }
@@ -270,6 +277,8 @@ export const releaseAPI = {
       return {
         success: false,
         data: [],
+        pagination: undefined,
+        counts: undefined,
         error: (error as any).message || 'Unknown error',
       };
     }
@@ -1147,7 +1156,7 @@ export const adminAPI = {
     }
   },
 
-  processDueDspDeliveries: async (payload: { maxJobs?: number; workerId?: string } = {}) => {
+  processDueDspDeliveries: async (payload: { maxJobs?: number; workerId?: string; dispatchOnly?: boolean } = {}) => {
     try {
       const response = await api.post<ApiResponse<any>>('/admin/dsp-delivery-process-due', payload);
       return response.data;

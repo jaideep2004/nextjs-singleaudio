@@ -1,5 +1,6 @@
 import { Db, ObjectId, type AnyBulkWriteOperation } from 'mongodb';
 import { asString, getMusicPublishingTrackKey } from '@/lib/musicPublishing';
+import { getNormalizedReleaseStatus, RELEASE_STATUS_GROUPS, type ReleaseDisplayStatus } from '@/lib/releaseStatus';
 import {
   listTrackAssetsForTrackIds,
   upsertTrackAssetsFromTracks,
@@ -45,6 +46,24 @@ export function tracksCollection(db: Db) {
   return db.collection<CanonicalTrackDocument>('tracks');
 }
 
+export type TrackListOptions = {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+};
+
+export type TrackListPage = {
+  tracks: Record<string, any>[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  counts: Record<'all' | 'pending' | 'in_process' | 'approved' | 'rejected' | 'other', number>;
+};
+
 export async function ensureCanonicalTrackIndexes(db: Db) {
   if (!indexesReady) {
     const collection = tracksCollection(db);
@@ -69,6 +88,165 @@ export function toObjectId(value: unknown): ObjectId | null {
   if (value instanceof ObjectId) return value;
   if (typeof value === 'string' && ObjectId.isValid(value)) return new ObjectId(value);
   return null;
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizedStatusQuery(status: string) {
+  const normalized = getNormalizedReleaseStatus(status);
+  if (normalized === 'pending') {
+    return {
+      $or: [
+        { status: { $in: RELEASE_STATUS_GROUPS.pending } },
+        { status: { $exists: false } },
+        { status: null },
+      ],
+    };
+  }
+  if (normalized === 'in_process' || normalized === 'approved' || normalized === 'rejected') {
+    return { status: { $in: RELEASE_STATUS_GROUPS[normalized] } };
+  }
+  return {};
+}
+
+function buildReleaseTrackQuery(
+  baseQuery: Record<string, any>,
+  options: Pick<TrackListOptions, 'status' | 'search'>,
+  includeStatus = true
+) {
+  const clauses: Record<string, any>[] = [baseQuery, { tracks: { $type: 'array', $ne: [] } }];
+  const search = String(options.search || '').trim();
+
+  if (includeStatus && options.status && options.status !== 'all') {
+    const statusClause = normalizedStatusQuery(options.status);
+    if (Object.keys(statusClause).length) clauses.push(statusClause);
+  }
+
+  if (search) {
+    const regex = new RegExp(escapeRegex(search), 'i');
+    clauses.push({
+      $or: [
+        { releaseTitle: regex },
+        { title: regex },
+        { primaryArtist: regex },
+        { artist: regex },
+        { label: regex },
+        { upc: regex },
+        { 'tracks.title': regex },
+        { 'tracks.name': regex },
+        { 'tracks.artist': regex },
+        { 'tracks.isrc': regex },
+        { 'tracks.ISRC': regex },
+      ],
+    });
+  }
+
+  return clauses.length === 1 ? clauses[0] : { $and: clauses };
+}
+
+function projectTrackRowStage() {
+  return {
+    $project: {
+      _id: {
+        $concat: [
+          { $toString: '$_id' },
+          ':',
+          { $toString: '$trackIndex' },
+        ],
+      },
+      releaseId: { $toString: '$_id' },
+      releaseObjectId: '$_id',
+      trackIndex: 1,
+      title: { $ifNull: ['$track.title', { $ifNull: ['$track.name', 'Untitled Track'] }] },
+      artist: { $ifNull: ['$track.artist', { $ifNull: ['$primaryArtist', { $ifNull: ['$artist', 'Unknown artist'] }] }] },
+      releaseTitle: { $ifNull: ['$releaseTitle', { $ifNull: ['$title', 'Untitled Release'] }] },
+      releaseType: { $ifNull: ['$releaseType', '$type'] },
+      ownerUserId: { $ifNull: ['$ownerUserId', { $ifNull: ['$userId', { $ifNull: ['$artistId', { $ifNull: ['$ownerId', '$createdBy'] }] }] }] },
+      ownerName: 1,
+      ownerEmail: 1,
+      artworkUrl: { $ifNull: ['$track.artworkUrl', { $ifNull: ['$track.artwork', '$artworkUrl'] }] },
+      audioUrl: { $ifNull: ['$track.audioUrl', { $ifNull: ['$track.audioFile', '$track.audio'] }] },
+      isrc: { $ifNull: ['$track.isrc', '$track.ISRC'] },
+      genre: { $ifNull: ['$track.genre', '$genre'] },
+      status: { $ifNull: ['$track.status', '$status'] },
+      releaseStatus: '$status',
+      releaseDate: { $ifNull: ['$track.releaseDate', '$releaseDate'] },
+      createdAt: { $ifNull: ['$track.createdAt', '$createdAt'] },
+      updatedAt: { $ifNull: ['$track.updatedAt', '$updatedAt'] },
+    },
+  };
+}
+
+export async function listTracksPage(
+  db: Db,
+  baseReleaseQuery: Record<string, any>,
+  options: TrackListOptions = {}
+): Promise<TrackListPage> {
+  const page = Math.max(1, Number(options.page || 1));
+  const limit = Math.min(100, Math.max(1, Number(options.limit || 20)));
+  const skip = (page - 1) * limit;
+  const query = buildReleaseTrackQuery(baseReleaseQuery, options, true);
+  const countQuery = buildReleaseTrackQuery(baseReleaseQuery, options, false);
+  const releases = db.collection('releases');
+
+  const basePipeline = [
+    { $match: query },
+    { $unwind: { path: '$tracks', includeArrayIndex: 'trackIndex' } },
+    { $set: { track: '$tracks' } },
+    projectTrackRowStage(),
+  ];
+
+  const [facetResult, groupedCounts] = await Promise.all([
+    releases
+      .aggregate<{ data: Record<string, any>[]; total: Array<{ count: number }> }>([
+        ...basePipeline,
+        { $sort: { updatedAt: -1, createdAt: -1, trackIndex: 1 } },
+        {
+          $facet: {
+            data: [{ $skip: skip }, { $limit: limit }],
+            total: [{ $count: 'count' }],
+          },
+        },
+      ])
+      .toArray(),
+    releases
+      .aggregate<{ _id: string | null; count: number }>([
+        { $match: countQuery },
+        { $unwind: '$tracks' },
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ])
+      .toArray(),
+  ]);
+
+  const first = facetResult[0];
+  const total = Number(first?.total?.[0]?.count || 0);
+  const counts = {
+    all: 0,
+    pending: 0,
+    in_process: 0,
+    approved: 0,
+    rejected: 0,
+    other: 0,
+  };
+
+  groupedCounts.forEach((row) => {
+    const normalized = getNormalizedReleaseStatus(row._id) as ReleaseDisplayStatus;
+    counts[normalized] += row.count;
+    counts.all += row.count;
+  });
+
+  return {
+    tracks: first?.data || [],
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    },
+    counts,
+  };
 }
 
 export function getReleaseIdString(release: ReleaseLike) {
