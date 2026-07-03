@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.middlew
 import { setupCors } from './middleware/cors.middleware';
 import { PORT, API_PREFIX, UPLOAD_DIR } from './config/constants';
 import settingsController from './controllers/settings.controller';
+import { startDspWorkerScheduler } from './services/dsp/dspWorkerScheduler';
 
 // .env already loaded by the side-effect import above
 
@@ -79,6 +80,7 @@ const connectDB = async (): Promise<void> => {
     // Initialize default settings after DB connection
     await settingsController.initializeDefaultSettings();
     console.log('Default settings initialized');
+    startDspWorkerScheduler();
   } catch (error) {
     console.error('MongoDB connection error:', error);
     process.exit(1);

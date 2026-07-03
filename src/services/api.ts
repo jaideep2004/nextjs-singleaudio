@@ -1093,6 +1093,15 @@ export const adminAPI = {
     }
   },
 
+  getDspDelivery: async (jobId: string) => {
+    try {
+      const response = await api.get<ApiResponse<any>>(`/admin/dsp-delivery-jobs/${jobId}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
   listBromaOutlets: async () => {
     try {
       const response = await api.get<ApiResponse<any>>('/admin/broma-outlets');

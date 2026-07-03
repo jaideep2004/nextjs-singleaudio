@@ -68,6 +68,7 @@ interface DashboardRelease {
   releaseTitle?: string;
   primaryArtist?: string;
   status: 'approved' | 'pending' | 'rejected' | string;
+  trackCount?: number;
   tracks?: unknown[];
   updatedAt: string;
 }
@@ -933,7 +934,7 @@ export default function AdminDashboard() {
                               fontVariantNumeric: 'tabular-nums',
                             }}
                           >
-                            {Array.isArray(release.tracks) ? release.tracks.length : 0}
+                            {Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0))}
                           </Typography>
                         </TableCell>
                         <TableCell>

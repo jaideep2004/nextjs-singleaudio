@@ -1048,11 +1048,14 @@ class DspDeliveryService {
     const attemptsCleared = job.attempts?.length || 0;
     const eventsCleared = job.events?.length || 0;
     const resetState: DspDeliveryState = 'cancelled';
+    let releaseReset = false;
+    let releaseMissing = false;
 
     await DeliveryJob.findByIdAndUpdate(jobId, {
       state: resetState,
       retryCount: 0,
       deadLettered: false,
+      hiddenFromOps: true,
       updatedAt: clearedAt,
       attempts: [],
       events: [
@@ -1084,7 +1087,7 @@ class DspDeliveryService {
     });
 
     if (job.targetType === 'release' && job.releaseId) {
-      await mongoose.connection.collection('releases').updateOne(
+      const releaseUpdate = await mongoose.connection.collection('releases').updateOne(
         { _id: job.releaseId },
         {
           $set: {
@@ -1095,20 +1098,33 @@ class DspDeliveryService {
           },
         }
       );
+      releaseReset = releaseUpdate.matchedCount > 0;
+      releaseMissing = releaseUpdate.matchedCount === 0;
     }
 
-    return DeliveryJob.findById(jobId);
+    return {
+      jobId,
+      cleared: true,
+      attemptsCleared,
+      eventsCleared,
+      releaseId: job.releaseId?.toString(),
+      releaseReset,
+      releaseMissing,
+    };
   }
 
   async listJobs(filters: { providerKey?: string; state?: string; page?: number; limit?: number }) {
     const page = Math.max(1, filters.page || 1);
     const limit = Math.min(100, Math.max(1, filters.limit || 20));
     const query: Record<string, unknown> = {};
+    query.hiddenFromOps = { $ne: true };
+    query['metadata.resetForApproval'] = { $ne: true };
     if (filters.providerKey) query.providerKey = filters.providerKey;
     if (filters.state) query.state = filters.state;
 
     const [items, total] = await Promise.all([
       DeliveryJob.find(query)
+        .select('-attempts -events')
         .populate('trackId', 'title artistName isrc')
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)

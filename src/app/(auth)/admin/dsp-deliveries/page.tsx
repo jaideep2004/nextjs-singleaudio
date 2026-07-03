@@ -12,6 +12,7 @@ import {
   FormControl,
   IconButton,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -76,6 +77,7 @@ type DeliveryJob = {
   operation: string;
   retryCount: number;
   deadLettered: boolean;
+  hiddenFromOps?: boolean;
   errorMessage?: string;
   createdAt: string;
   externalId?: string;
@@ -101,6 +103,8 @@ type DeliveryJob = {
     payloadHash?: string;
     bromaStep?: string;
     bromaModerationStatus?: string;
+    bromaReleaseId?: string;
+    bromaStatusSource?: string;
     bromaLastStatusAt?: string;
     bromaOutletIds?: string[];
     bromaOutletMappings?: Array<{
@@ -136,6 +140,45 @@ type BromaOutlet = {
 
 const DEFAULT_BROMA_BASE_URL = 'https://api-rod.broma16.com/api';
 const DEFAULT_BROMA_COUNTRY_ID = '32';
+const BROMA_STEP_ORDER = [
+  'create_release',
+  'upload_recordings',
+  'update_recordings',
+  'add_compositions',
+  'upload_cover',
+  'update_distribution',
+  'send_moderation',
+  'poll_status',
+  'done',
+] as const;
+
+const BROMA_STEP_LABELS: Record<string, string> = {
+  create_release: 'Create release',
+  upload_recordings: 'Upload audio',
+  update_recordings: 'Track metadata',
+  add_compositions: 'Compositions',
+  upload_cover: 'Cover upload',
+  update_distribution: 'Distribution',
+  send_moderation: 'Moderation sent',
+  poll_status: 'Broma review',
+  done: 'Live/done',
+};
+
+const BROMA_DONE_STATUSES = new Set([
+  'live',
+  'published',
+  'delivered',
+  'processed',
+  'done',
+  'accepted',
+  'active',
+  'success',
+  'moderated',
+  'approved',
+  'shipped',
+]);
+
+const BROMA_BLOCKED_STATUSES = new Set(['rejected', 'declined', 'failed', 'error', 'cancelled', 'not_ready']);
 
 const formatAttemptResponse = (value: unknown) => {
   if (!value) return '';
@@ -143,10 +186,58 @@ const formatAttemptResponse = (value: unknown) => {
   return text.length > 900 ? `${text.slice(0, 900)}...` : text;
 };
 
+const normalizeBromaStatusText = (value: unknown) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const humanizeBromaStatus = (value: unknown) => {
+  const text = normalizeBromaStatusText(value);
+  if (!text) return 'Awaiting Broma';
+  return text.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getBromaReleaseId = (job: DeliveryJob) =>
+  String(job.externalId || job.metadata?.bromaReleaseId || '').trim();
+
+const getBromaProgress = (job: DeliveryJob) => {
+  if (job.providerKey !== 'broma') {
+    return {
+      value: job.state === 'delivered' ? 100 : ['failed', 'needs_attention'].includes(job.state) ? 100 : 20,
+      label: job.state,
+      detail: 'Non-Broma job',
+      color: job.state === 'delivered' ? 'success' : ['failed', 'needs_attention'].includes(job.state) ? 'error' : 'primary',
+    } as const;
+  }
+
+  const status = normalizeBromaStatusText(job.metadata?.bromaModerationStatus);
+  const step = String(job.metadata?.bromaStep || (getBromaReleaseId(job) ? 'poll_status' : 'create_release'));
+  const stepIndex = Math.max(0, BROMA_STEP_ORDER.indexOf(step as (typeof BROMA_STEP_ORDER)[number]));
+  const baseValue = Math.round(((stepIndex + 1) / BROMA_STEP_ORDER.length) * 100);
+  const blocked = job.state === 'needs_attention' || job.state === 'failed' || BROMA_BLOCKED_STATUSES.has(status);
+  const done = job.state === 'delivered' || step === 'done' || BROMA_DONE_STATUSES.has(status);
+  const label = status ? humanizeBromaStatus(status) : BROMA_STEP_LABELS[step] || humanizeBromaStatus(job.state);
+  const source = job.metadata?.bromaStatusSource ? ` via ${job.metadata.bromaStatusSource}` : '';
+  const checked = job.metadata?.bromaLastStatusAt
+    ? `Checked ${new Date(job.metadata.bromaLastStatusAt).toLocaleString()}${source}`
+    : getBromaReleaseId(job)
+      ? 'Broma status not refreshed yet'
+      : 'Waiting for Broma release id';
+
+  return {
+    value: done ? 100 : blocked ? Math.max(baseValue, 92) : Math.min(baseValue, 96),
+    label,
+    detail: `${BROMA_STEP_LABELS[step] || step}${checked ? ` | ${checked}` : ''}`,
+    color: done ? 'success' : blocked ? 'error' : 'primary',
+  } as const;
+};
+
 export default function AdminDspDeliveriesPage() {
   const { isAdmin } = useAdminAuth();
   const [providers, setProviders] = useState<Provider[]>([]);
   const [jobs, setJobs] = useState<DeliveryJob[]>([]);
+  const [jobDetails, setJobDetails] = useState<Record<string, DeliveryJob>>({});
   const [bromaOutlets, setBromaOutlets] = useState<BromaOutlet[]>([]);
   const [loading, setLoading] = useState(true);
   const [providerFilter, setProviderFilter] = useState('broma');
@@ -157,6 +248,7 @@ export default function AdminDspDeliveriesPage() {
   const [refreshingStatusId, setRefreshingStatusId] = useState<string | null>(null);
   const [clearingLogsId, setClearingLogsId] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [loadingJobDetailsId, setLoadingJobDetailsId] = useState<string | null>(null);
   const [bromaForm, setBromaForm] = useState<BromaConfigForm>({
     baseUrl: DEFAULT_BROMA_BASE_URL,
     accountId: '',
@@ -191,6 +283,7 @@ export default function AdminDspDeliveriesPage() {
       const nextJobs = jobsRes?.data?.data || [];
       setProviders(providerRes?.data || []);
       setJobs(nextJobs);
+      setJobDetails({});
       setBromaOutlets(outletRes?.data || []);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load DSP data');
@@ -284,7 +377,36 @@ export default function AdminDspDeliveriesPage() {
     }
   };
 
+  const handleToggleJob = async (jobId: string) => {
+    if (expandedJobId === jobId) {
+      setExpandedJobId(null);
+      return;
+    }
+
+    setExpandedJobId(jobId);
+    if (jobDetails[jobId]) return;
+
+    try {
+      setLoadingJobDetailsId(jobId);
+      const response = await adminAPI.getDspDelivery(jobId);
+      if (!response?.success || !response?.data) {
+        throw new Error(response?.error || response?.message || 'Failed to load delivery details');
+      }
+      setJobDetails((current) => ({ ...current, [jobId]: response.data }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load delivery details');
+    } finally {
+      setLoadingJobDetailsId(null);
+    }
+  };
+
   const handleRefreshStatus = async (jobId: string) => {
+    const job = jobDetails[jobId] || jobs.find((item) => item._id === jobId);
+    if (job && !getBromaReleaseId(job)) {
+      toast.info('Broma release id missing. Run worker first to create the release at Broma.');
+      return;
+    }
+
     try {
       setRefreshingStatusId(jobId);
       const response = await adminAPI.refreshDspDeliveryStatus(jobId);
@@ -300,12 +422,25 @@ export default function AdminDspDeliveriesPage() {
   };
 
   const handleClearLogs = async (jobId: string) => {
-    if (!window.confirm('Clear attempts and events for this delivery job?')) return;
+    if (!window.confirm('Clear this delivery log and move the release back to pending?')) return;
     try {
       setClearingLogsId(jobId);
-      await adminAPI.clearDspDeliveryLogs(jobId);
-      toast.success('Delivery logs cleared');
-      await load();
+      const response = await adminAPI.clearDspDeliveryLogs(jobId);
+      setJobs((current) => current.filter((job) => job._id !== jobId));
+      setJobDetails((current) => {
+        const next = { ...current };
+        delete next[jobId];
+        return next;
+      });
+      if (expandedJobId === jobId) setExpandedJobId(null);
+      const result = response?.data || {};
+      if (result.releaseMissing) {
+        toast.warning('Delivery log cleared. Release record no longer exists.');
+      } else if (result.releaseReset) {
+        toast.success('Delivery log cleared. Release moved back to pending.');
+      } else {
+        toast.success('Delivery log cleared.');
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Log clear failed');
     } finally {
@@ -588,6 +723,7 @@ export default function AdminDspDeliveriesPage() {
                 <TableCell>Provider</TableCell>
                 <TableCell>Operation</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Broma Progress</TableCell>
                 <TableCell>Retries</TableCell>
                 <TableCell>Error</TableCell>
                 <TableCell>Created</TableCell>
@@ -595,17 +731,24 @@ export default function AdminDspDeliveriesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {jobs.map((job) => (
-                <Fragment key={job._id}>
+              {jobs.map((listJob) => {
+                const job = jobDetails[listJob._id] || listJob;
+                const isExpanded = expandedJobId === listJob._id;
+                const isLoadingDetails = loadingJobDetailsId === listJob._id && !jobDetails[listJob._id];
+                const bromaProgress = getBromaProgress(job);
+                const canRefreshBromaStatus = job.providerKey === 'broma' && Boolean(getBromaReleaseId(job));
+
+                return (
+                <Fragment key={listJob._id}>
                   <TableRow>
                     <TableCell>
-                      <Tooltip title={expandedJobId === job._id ? 'Collapse job details' : 'Expand job details'}>
+                      <Tooltip title={isExpanded ? 'Collapse job details' : 'Expand job details'}>
                         <IconButton
                           size="small"
-                          onClick={() => setExpandedJobId(expandedJobId === job._id ? null : job._id)}
-                          aria-label={`${expandedJobId === job._id ? 'Collapse' : 'Expand'} delivery job ${job._id}`}
+                          onClick={() => handleToggleJob(listJob._id)}
+                          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} delivery job ${listJob._id}`}
                         >
-                          {expandedJobId === job._id ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                          {isExpanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
                         </IconButton>
                       </Tooltip>
                     </TableCell>
@@ -638,6 +781,31 @@ export default function AdminDspDeliveriesPage() {
                     <TableCell>
                       <Chip label={job.state} color={job.state === 'delivered' ? 'success' : job.state === 'failed' ? 'error' : 'default'} size="small" />
                     </TableCell>
+                    <TableCell sx={{ width: 168, minWidth: 150, maxWidth: 180 }}>
+                      <Stack spacing={0.35}>
+                        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                          <Typography variant="caption" fontWeight={800} noWrap sx={{ fontSize: '0.68rem', maxWidth: 112 }}>
+                            {bromaProgress.label}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', fontVariantNumeric: 'tabular-nums' }}>
+                            {bromaProgress.value}%
+                          </Typography>
+                        </Stack>
+                        <Tooltip title={bromaProgress.detail}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={bromaProgress.value}
+                            color={bromaProgress.color}
+                            sx={{
+                              height: 4,
+                              borderRadius: 999,
+                              bgcolor: 'action.hover',
+                              '& .MuiLinearProgress-bar': { borderRadius: 999 },
+                            }}
+                          />
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
                     <TableCell>{job.retryCount}</TableCell>
                     <TableCell sx={{ maxWidth: 240 }}>
                       <Typography variant="caption" color={job.errorMessage ? 'error.main' : 'text.secondary'}>
@@ -647,11 +815,17 @@ export default function AdminDspDeliveriesPage() {
                     <TableCell>{new Date(job.createdAt).toLocaleString()}</TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.75} justifyContent="flex-end" alignItems="center">
-                        <Tooltip title="Fetch fresh Broma status">
+                        <Tooltip
+                          title={
+                            canRefreshBromaStatus
+                              ? 'Fetch fresh Broma status'
+                              : 'Broma release id missing. Run worker first.'
+                          }
+                        >
                           <span>
                             <IconButton
                               size="small"
-                              disabled={job.providerKey !== 'broma' || refreshingStatusId === job._id}
+                              disabled={!canRefreshBromaStatus || refreshingStatusId === job._id}
                               onClick={() => handleRefreshStatus(job._id)}
                               aria-label={`Refresh Broma status for delivery job ${job._id}`}
                             >
@@ -659,7 +833,7 @@ export default function AdminDspDeliveriesPage() {
                             </IconButton>
                           </span>
                         </Tooltip>
-                        <Tooltip title="Clear attempts and events">
+                        <Tooltip title="Clear log and move release back to pending">
                           <span>
                             <IconButton
                               size="small"
@@ -686,8 +860,13 @@ export default function AdminDspDeliveriesPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell colSpan={9} sx={{ p: 0, borderBottom: expandedJobId === job._id ? undefined : 0 }}>
-                      <Collapse in={expandedJobId === job._id} timeout="auto" unmountOnExit>
+                    <TableCell colSpan={10} sx={{ p: 0, borderBottom: isExpanded ? undefined : 0 }}>
+                      <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                        {isLoadingDetails ? (
+                          <Box display="flex" justifyContent="center" py={3} bgcolor="action.hover">
+                            <CircularProgress size={22} />
+                          </Box>
+                        ) : (
                         <Box sx={{ px: 3, py: 2, bgcolor: 'action.hover' }}>
                           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} mb={2}>
                             <Box>
@@ -800,14 +979,16 @@ export default function AdminDspDeliveriesPage() {
                             </Box>
                           </Stack>
                         </Box>
+                        )}
                       </Collapse>
                     </TableCell>
                   </TableRow>
                 </Fragment>
-              ))}
+                );
+              })}
               {jobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
+                  <TableCell colSpan={10} align="center">
                     No delivery jobs yet.
                   </TableCell>
                 </TableRow>

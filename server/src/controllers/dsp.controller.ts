@@ -163,8 +163,14 @@ export const syncBromaReleaseStatuses = async (req: AuthRequest, res: Response):
 
 export const clearDeliveryLogs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const job = await dspDeliveryService.clearJobLogs(req.params.jobId, req.user?._id?.toString());
-    successResponse(res, job, 'Delivery logs cleared');
+    const result = await dspDeliveryService.clearJobLogs(req.params.jobId, req.user?._id?.toString());
+    successResponse(
+      res,
+      result,
+      result.releaseMissing
+        ? 'Delivery log cleared. Release record no longer exists.'
+        : 'Delivery log cleared and release moved back to pending'
+    );
   } catch (error) {
     errorResponse(res, 'Failed to clear delivery logs', error);
   }

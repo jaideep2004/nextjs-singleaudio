@@ -38,6 +38,7 @@ export interface IDeliveryJob extends Document {
   maxRetries: number;
   retryCount: number;
   deadLettered: boolean;
+  hiddenFromOps: boolean;
   metadata: Record<string, unknown>;
   errorMessage?: string;
   attempts: IDeliveryAttempt[];
@@ -91,6 +92,7 @@ const DeliveryJobSchema = new Schema<IDeliveryJob>(
     maxRetries: { type: Number, default: 5 },
     retryCount: { type: Number, default: 0 },
     deadLettered: { type: Boolean, default: false, index: true },
+    hiddenFromOps: { type: Boolean, default: false, index: true },
     metadata: { type: Schema.Types.Mixed, default: {} },
     errorMessage: { type: String },
     attempts: { type: [DeliveryAttemptSchema], default: [] },
@@ -101,6 +103,9 @@ const DeliveryJobSchema = new Schema<IDeliveryJob>(
 );
 
 DeliveryJobSchema.index({ state: 1, providerKey: 1, createdAt: -1 });
+DeliveryJobSchema.index({ providerKey: 1, createdAt: -1 });
+DeliveryJobSchema.index({ providerKey: 1, state: 1, createdAt: -1 });
+DeliveryJobSchema.index({ providerKey: 1, hiddenFromOps: 1, createdAt: -1 });
 DeliveryJobSchema.index({ state: 1, nextRetryAt: 1, priority: 1, createdAt: 1 });
 DeliveryJobSchema.index({ lockExpiresAt: 1, state: 1 });
 DeliveryJobSchema.index({ providerKey: 1, trackId: 1, operation: 1 });

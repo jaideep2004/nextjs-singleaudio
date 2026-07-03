@@ -715,7 +715,7 @@ export default function AdminExportPage() {
                   {pendingUserReleases.map((release) => {
                     const releaseId = String(release._id);
                     const title = release.releaseTitle || release.title || 'Untitled release';
-                    const trackCount = Array.isArray(release.tracks) ? release.tracks.length : 0;
+                    const trackCount = Number(release.trackCount ?? (Array.isArray(release.tracks) ? release.tracks.length : 0));
                     const exported = exportedReleaseIds.has(releaseId);
                     return (
                       <MenuItem key={releaseId} value={releaseId}>
