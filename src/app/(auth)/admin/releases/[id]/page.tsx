@@ -229,9 +229,7 @@ export default function AdminReleaseDetailPage() {
         if (getNormalizedReleaseStatus(nextStatus) === 'in_process') {
           toast.success('Release moved to processing');
         }
-        const list = await releaseAPI.getReleases({ summary: '1' });
-        const hasPending = list.success && Array.isArray(list.data) && list.data.some((item: any) => getNormalizedReleaseStatus(item.status) === 'pending');
-        router.push(hasPending ? '/admin/releases?status=pending' : '/admin/releases');
+        router.push('/admin/releases?status=pending');
       } else {
         setError(resp?.message || resp?.error || "Failed to approve release");
       }

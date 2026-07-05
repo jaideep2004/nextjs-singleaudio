@@ -13,6 +13,15 @@ type ReleaseDoc = Record<string, any> & {
   tracks?: Array<Record<string, any>>;
 };
 
+type AssetReadiness = Awaited<ReturnType<typeof validateReleaseAssetsForDelivery>>;
+type BromaReadiness = Awaited<ReturnType<typeof evaluateBromaReleaseReadiness>>;
+
+type CreateReleaseDeliveryShellOptions = {
+  assetReadiness?: AssetReadiness;
+  bromaReadiness?: BromaReadiness;
+  defaultCreatedCountryId?: unknown;
+};
+
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -216,7 +225,12 @@ function evaluateNativeProviderReadiness(provider: any) {
   };
 }
 
-export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc, createdBy?: string) {
+export async function createReleaseDeliveryShellJobs(
+  db: Db,
+  release: ReleaseDoc,
+  createdBy?: string,
+  options: CreateReleaseDeliveryShellOptions = {}
+) {
   const [releaseForDelivery] = await hydrateReleasesWithCanonicalTracks(db, [release]);
   release = releaseForDelivery;
   const rawStores = Array.isArray(release.stores) ? release.stores : [];
@@ -225,10 +239,12 @@ export async function createReleaseDeliveryShellJobs(db: Db, release: ReleaseDoc
   }
   const providerKeys = ['broma'];
   const bromaProvider = await db.collection('dspproviders').findOne({ key: 'broma' });
-  const defaultCreatedCountryId = bromaProvider?.config?.createdCountryId;
+  const defaultCreatedCountryId = options.defaultCreatedCountryId ?? bromaProvider?.config?.createdCountryId;
 
-  const assetReadiness = await validateReleaseAssetsForDelivery(release);
-  const bromaReadiness = await evaluateBromaReleaseReadiness(db, release, { defaultCreatedCountryId });
+  const bromaReadiness =
+    options.bromaReadiness ?? (await evaluateBromaReleaseReadiness(db, release, { defaultCreatedCountryId }));
+  const assetReadiness =
+    options.assetReadiness ?? bromaReadiness.assetReadiness ?? (await validateReleaseAssetsForDelivery(release));
   await releasesCollection(db).updateOne(
     { _id: release._id },
     {

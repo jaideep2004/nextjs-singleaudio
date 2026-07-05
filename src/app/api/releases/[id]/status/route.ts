@@ -65,6 +65,8 @@ export async function PATCH(
     releaseForFailure = existing;
 
     let upcAuditDetails: Record<string, unknown> | null = null;
+    let deliveryReadiness: Awaited<ReturnType<typeof assertBromaReleaseReady>> | null = null;
+    let defaultCreatedCountryIdForDelivery: unknown;
 
     if (status === 'approved') {
       const tracks = Array.isArray(existing.tracks) ? existing.tracks : [];
@@ -92,11 +94,12 @@ export async function PATCH(
         { key: 'broma' },
         { projection: { 'config.createdCountryId': 1 } }
       );
-      await assertBromaReleaseReady(db, {
+      defaultCreatedCountryIdForDelivery = bromaProvider?.config?.createdCountryId;
+      deliveryReadiness = await assertBromaReleaseReady(db, {
         ...existing,
         ...update,
         tracks: assignedTracks,
-      }, { defaultCreatedCountryId: bromaProvider?.config?.createdCountryId });
+      }, { defaultCreatedCountryId: defaultCreatedCountryIdForDelivery });
       await replaceReleaseCanonicalTracks(db, existing, assignedTracks);
       await markIsrcsAssigned(
         db,
@@ -166,7 +169,11 @@ export async function PATCH(
 
     let deliveryShell = null;
     if (status === 'approved') {
-      deliveryShell = await createReleaseDeliveryShellJobs(db, res.value as any, String(user._id));
+      deliveryShell = await createReleaseDeliveryShellJobs(db, res.value as any, String(user._id), {
+        bromaReadiness: deliveryReadiness || undefined,
+        assetReadiness: deliveryReadiness?.assetReadiness,
+        defaultCreatedCountryId: defaultCreatedCountryIdForDelivery,
+      });
     }
 
     if (status === 'approved' || status === 'rejected') {

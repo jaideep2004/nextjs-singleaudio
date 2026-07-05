@@ -1,12 +1,12 @@
-# Graph Report - nextjs-singleaudio  (2026-07-03)
+# Graph Report - nextjs-singleaudio  (2026-07-05)
 
 ## Corpus Check
-- 397 files · ~1,944,658 words
+- 397 files · ~1,945,271 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1900 nodes · 3253 edges · 64 communities detected
-- Extraction: 77% EXTRACTED · 23% INFERRED · 0% AMBIGUOUS · INFERRED: 736 edges (avg confidence: 0.8)
+- 1900 nodes · 3257 edges · 64 communities detected
+- Extraction: 77% EXTRACTED · 23% INFERRED · 0% AMBIGUOUS · INFERRED: 741 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -79,9 +79,9 @@
 1. `errorResponse()` - 99 edges
 2. `successResponse()` - 95 edges
 3. `proxyBackend()` - 65 edges
-4. `connectToDatabase()` - 37 edges
+4. `connectToDatabase()` - 39 edges
 5. `DspDeliveryService` - 35 edges
-6. `getCurrentBackendUser()` - 32 edges
+6. `getCurrentBackendUser()` - 34 edges
 7. `BromaClient` - 29 edges
 8. `firstString()` - 27 edges
 9. `PATCH()` - 26 edges
@@ -107,7 +107,7 @@ Nodes (135): acrCloudCallbackHandler(), getAcrCloudScanResultHandler(), authPayl
 
 ### Community 1 - "Community 1"
 Cohesion: 0.02
-Nodes (81): PATCH(), POST(), POST(), GET(), getSecret(), POST(), runBromaOutletSync(), POST() (+73 more)
+Nodes (79): PATCH(), POST(), POST(), GET(), getSecret(), POST(), runBromaOutletSync(), POST() (+71 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.03
@@ -115,7 +115,7 @@ Nodes (93): canReadRelease(), DELETE(), GET(), getReleaseOwnerId(), PATCH(), PUT
 
 ### Community 3 - "Community 3"
 Cohesion: 0.04
-Nodes (70): canManageYoutube(), GET(), getClientKey(), normalizeRange(), GET(), getClientKey(), GET(), getClientKey() (+62 more)
+Nodes (72): canManageYoutube(), GET(), getClientKey(), normalizeRange(), GET(), getClientKey(), GET(), getClientKey() (+64 more)
 
 ### Community 4 - "Community 4"
 Cohesion: 0.06
@@ -130,12 +130,12 @@ Cohesion: 0.07
 Nodes (17): asDate(), DspDeliveryService, getErrorMessage(), getHeadersRecord(), getProviderErrorResponseBody(), hashPayload(), hasOwn(), normalizeConfigAndCredentials() (+9 more)
 
 ### Community 7 - "Community 7"
-Cohesion: 0.08
-Nodes (44): mapYoutubeAnalyticsRows(), queryYoutubeAnalyticsReport(), YoutubeAnalyticsApiError, fetchYoutubeVideosMetadata(), YoutubeDataApiError, addDays(), appendYoutubeAnalyticsSyncRun(), claimNextYoutubeAnalyticsSyncJob() (+36 more)
+Cohesion: 0.05
+Nodes (22): toAssetUrl(), toAssetUrl(), refreshPending(), fetchAcrCloudScanResult(), formatProbability(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudProviderMetadata() (+14 more)
 
 ### Community 8 - "Community 8"
-Cohesion: 0.05
-Nodes (21): toAssetUrl(), toAssetUrl(), refreshPending(), fetchAcrCloudScanResult(), formatProbability(), getAcrCloudColor(), getAcrCloudLabel(), getAcrCloudProviderMetadata() (+13 more)
+Cohesion: 0.08
+Nodes (44): mapYoutubeAnalyticsRows(), queryYoutubeAnalyticsReport(), YoutubeAnalyticsApiError, fetchYoutubeVideosMetadata(), YoutubeDataApiError, addDays(), appendYoutubeAnalyticsSyncRun(), claimNextYoutubeAnalyticsSyncJob() (+36 more)
 
 ### Community 9 - "Community 9"
 Cohesion: 0.06
@@ -194,8 +194,8 @@ Cohesion: 0.16
 Nodes (16): archiveArticle(), bulkArchiveArticles(), createBlankArticle(), createCategory(), createSection(), idOf(), load(), resetForm() (+8 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.17
-Nodes (16): clearUnread(), handleAssignToMe(), handleCloseTicket(), handleCreate(), handleNote(), handleReopen(), handleReply(), handleStatus() (+8 more)
+Cohesion: 0.18
+Nodes (15): clearUnread(), handleAssignToMe(), handleCloseTicket(), handleCreate(), handleNote(), handleReopen(), handleReply(), handleStatus() (+7 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.15
@@ -206,7 +206,7 @@ Cohesion: 0.16
 Nodes (13): applyDraft(), buildKycDraft(), goNext(), isArtistOrLabel(), loadDraft(), persistBeforeExit(), persistKycDraftLocally(), persistWhenHidden() (+5 more)
 
 ### Community 26 - "Community 26"
-Cohesion: 0.25
+Cohesion: 0.24
 Nodes (10): getBromaProgress(), getBromaReleaseId(), handleProcessDue(), handleRefreshStatus(), handleRetry(), handleSaveBromaConfig(), handleSyncBromaOutlets(), humanizeBromaStatus() (+2 more)
 
 ### Community 27 - "Community 27"
@@ -401,16 +401,16 @@ Nodes (2): handleSync(), load()
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Boolean()` connect `Community 9` to `Community 0`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 10`, `Community 11`, `Community 20`, `Community 24`, `Community 25`, `Community 26`, `Community 31`?**
-  _High betweenness centrality (0.169) - this node is a cross-community bridge._
+  _High betweenness centrality (0.171) - this node is a cross-community bridge._
 - **Why does `PATCH()` connect `Community 2` to `Community 0`, `Community 1`, `Community 3`, `Community 5`, `Community 10`, `Community 12`, `Community 18`?**
-  _High betweenness centrality (0.149) - this node is a cross-community bridge._
+  _High betweenness centrality (0.132) - this node is a cross-community bridge._
 - **Why does `sendUserAndAdminEmail()` connect `Community 0` to `Community 2`, `Community 12`?**
-  _High betweenness centrality (0.126) - this node is a cross-community bridge._
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
 - **Are the 96 inferred relationships involving `errorResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`errorResponse()` has 96 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 94 inferred relationships involving `successResponse()` (e.g. with `identifyWithAcrCloudHandler()` and `scanWithAcrCloudHandler()`) actually correct?**
   _`successResponse()` has 94 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 63 inferred relationships involving `proxyBackend()` (e.g. with `GET()` and `POST()`) actually correct?**
   _`proxyBackend()` has 63 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 35 inferred relationships involving `connectToDatabase()` (e.g. with `GET()` and `GET()`) actually correct?**
-  _`connectToDatabase()` has 35 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 37 inferred relationships involving `connectToDatabase()` (e.g. with `GET()` and `GET()`) actually correct?**
+  _`connectToDatabase()` has 37 INFERRED edges - model-reasoned connections that need verification._
