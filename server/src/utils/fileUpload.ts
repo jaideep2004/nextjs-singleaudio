@@ -52,6 +52,20 @@ const createUniqueFilename = (file: Express.Multer.File) =>
 const createReadableUniqueFilename = (file: Express.Multer.File) =>
   `${sanitizeUploadBasename(file.originalname)}-${uuidv4().slice(0, 8)}${path.extname(file.originalname).toLowerCase()}`;
 
+const createOriginalNameFilename = (destination: string, file: Express.Multer.File) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const base = sanitizeUploadBasename(file.originalname);
+  const preferred = `${base}${ext}`;
+  if (!fs.existsSync(path.join(destination, preferred))) return preferred;
+
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${base}-${index}${ext}`;
+    if (!fs.existsSync(path.join(destination, candidate))) return candidate;
+  }
+
+  return createReadableUniqueFilename(file);
+};
+
 const createStorage = (
   destination: string,
   filenameFactory: (file: Express.Multer.File) => string = createUniqueFilename
@@ -65,8 +79,8 @@ const createStorage = (
     }
   });
 
-const audioStorage = createStorage(TRACKS_DIR, createReadableUniqueFilename);
-const imageStorage = createStorage(ARTWORK_DIR, createReadableUniqueFilename);
+const audioStorage = createStorage(TRACKS_DIR, (file) => createOriginalNameFilename(TRACKS_DIR, file));
+const imageStorage = createStorage(ARTWORK_DIR, (file) => createOriginalNameFilename(ARTWORK_DIR, file));
 
 const mixedTrackStorage = multer.diskStorage({
   destination: (_req, file, cb) => {
@@ -83,7 +97,7 @@ const mixedTrackStorage = multer.diskStorage({
     cb(new ApiError(`Unsupported upload field: ${file.fieldname}`, 400), TRACKS_DIR);
   },
   filename: (_req, file, cb) => {
-    cb(null, createReadableUniqueFilename(file));
+    cb(null, createOriginalNameFilename(file.fieldname === 'artwork' ? ARTWORK_DIR : TRACKS_DIR, file));
   }
 });
 

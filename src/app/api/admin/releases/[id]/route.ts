@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { connectToDatabase } from '@/utils/mongodb';
+import { fetchBackend } from '@/app/api/_lib/backend';
 import { getCurrentBackendUser } from '@/lib/currentUser';
 import { auditLogsCollection } from '@/lib/repositories/audit';
 import { findReleaseByIdRaw, releasesCollection } from '@/lib/repositories/releases';
 import { tracksCollection } from '@/lib/repositories/tracks';
+
+const firstString = (...values: unknown[]) =>
+  values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim();
 
 export async function DELETE(
   _req: NextRequest,
@@ -31,6 +35,35 @@ export async function DELETE(
     }
 
     const now = new Date();
+    const bromaJob = await (db.collection('deliveryjobs') as any)
+      .find({ releaseId: { $in: [releaseObjectId, id] }, providerKey: 'broma', targetType: 'release' })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(1)
+      .next();
+    const bromaReleaseId = firstString(
+      release.bromaDelivery?.releaseId,
+      bromaJob?.externalId,
+      bromaJob?.metadata?.bromaReleaseId
+    );
+    let bromaDraftDelete: Record<string, unknown> | null = null;
+    if (bromaReleaseId) {
+      const bromaDeleteResult = await fetchBackend(
+        `/api/dsp/broma/drafts/release/${encodeURIComponent(bromaReleaseId)}`,
+        { method: 'DELETE' }
+      ).catch((error) => ({
+        ok: false,
+        status: 500,
+        data: { success: false, error: error instanceof Error ? error.message : 'Broma draft delete failed' },
+      }));
+      bromaDraftDelete = {
+        attempted: true,
+        releaseId: bromaReleaseId,
+        ok: bromaDeleteResult.ok,
+        status: bromaDeleteResult.status,
+        response: bromaDeleteResult.data,
+      };
+    }
+
     const [releaseDelete, trackUpdate, deliveryJobUpdate] = await Promise.all([
       releasesCollection(db).deleteOne({ _id: releaseObjectId }),
       (tracksCollection(db) as any).updateMany(
@@ -68,6 +101,7 @@ export async function DELETE(
         ownerUserId: release.ownerUserId || release.userId || release.artistId || release.ownerId,
         tracksSoftDeleted: trackUpdate.modifiedCount,
         deliveryJobsCancelled: deliveryJobUpdate.modifiedCount,
+        bromaDraftDelete,
       },
       createdAt: now,
     });
@@ -78,6 +112,7 @@ export async function DELETE(
         releaseDeleted: releaseDelete.deletedCount,
         tracksSoftDeleted: trackUpdate.modifiedCount,
         deliveryJobsCancelled: deliveryJobUpdate.modifiedCount,
+        bromaDraftDelete,
       },
     });
   } catch (error) {

@@ -52,6 +52,19 @@ export const listBromaOutlets = async (_req: AuthRequest, res: Response): Promis
   }
 };
 
+export const deleteBromaDraft = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const draftType = req.params.draftType === 'composition' ? 'composition' : 'release';
+    const result = await dspDeliveryService.deleteBromaDraft({
+      draftType,
+      draftId: req.params.draftId,
+    });
+    successResponse(res, result, 'Broma draft deleted');
+  } catch (error) {
+    errorResponse(res, 'Failed to delete Broma draft', error);
+  }
+};
+
 export const createBromaStatisticsReport = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const result = await dspDeliveryService.createBromaStatisticsReport({

@@ -296,6 +296,15 @@ export const releaseAPI = {
     }
   },
 
+  deleteRelease: async (id: string) => {
+    try {
+      const response = await api.delete(`/admin/releases/${id}`);
+      return response.data;
+    } catch (error) {
+      return handleApiError(error);
+    }
+  },
+
   updateReleaseStatus: async (
     id: string,
     status: 'approved' | 'rejected' | 'pending',

@@ -112,6 +112,8 @@ export default function AdminReleaseDetailPage() {
   const [trackDeleteTarget, setTrackDeleteTarget] = useState<{ index: number; title: string } | null>(null);
   const [trackDeleteReason, setTrackDeleteReason] = useState("");
   const [deletingTrack, setDeletingTrack] = useState(false);
+  const [deleteReleaseOpen, setDeleteReleaseOpen] = useState(false);
+  const [deletingRelease, setDeletingRelease] = useState(false);
   const [showAllTerritories, setShowAllTerritories] = useState(false);
   const [takedownTarget, setTakedownTarget] = useState<{
     target: 'release' | 'track';
@@ -349,6 +351,23 @@ export default function AdminReleaseDetailPage() {
       setError(e?.message || "Failed to delete track from release");
     } finally {
       setDeletingTrack(false);
+    }
+  };
+
+  const handleDeleteRelease = async () => {
+    try {
+      setDeletingRelease(true);
+      const resp = await releaseAPI.deleteRelease(releaseId);
+      if (!resp?.success) {
+        throw new Error(resp?.error || resp?.message || 'Failed to delete release');
+      }
+      toast.success('Release deleted permanently');
+      router.push('/admin/releases?status=rejected');
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete release');
+    } finally {
+      setDeletingRelease(false);
+      setDeleteReleaseOpen(false);
     }
   };
 
@@ -1122,6 +1141,18 @@ export default function AdminReleaseDetailPage() {
                     Reject
                   </Button>
                 )}
+                {release.status === 'rejected' && (
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<Delete />}
+                    onClick={() => setDeleteReleaseOpen(true)}
+                    disabled={deletingRelease}
+                    sx={{ minWidth: 170 }}
+                  >
+                    {deletingRelease ? <CircularProgress size={20} /> : 'Delete Permanently'}
+                  </Button>
+                )}
               </Box>
             )}
             {getNormalizedReleaseStatus(release.status) === "approved" && (
@@ -1271,6 +1302,23 @@ export default function AdminReleaseDetailPage() {
           </Paper>
         </Box>
       </Box>
+
+      <Dialog open={deleteReleaseOpen} onClose={() => !deletingRelease && setDeleteReleaseOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Delete Release Permanently</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This permanently deletes "{release.releaseTitle || release.title || 'this release'}" from the database and cancels active delivery jobs. If a Broma draft id is stored, the Broma draft delete API is called first.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteReleaseOpen(false)} disabled={deletingRelease}>
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteRelease} color="error" variant="contained" disabled={deletingRelease}>
+            {deletingRelease ? <CircularProgress size={20} /> : 'Delete Permanently'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Takedown Dialog */}
       <Dialog open={!!takedownTarget} onClose={() => !lifecycleSaving && setTakedownTarget(null)} maxWidth="sm" fullWidth>

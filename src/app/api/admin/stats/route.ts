@@ -32,7 +32,10 @@ export async function GET() {
         pendingPayouts: stats?.pendingPayouts || 0,
         totalRevenue: stats?.totalRevenue || 0,
         totalReleases: localStats.totalReleases || stats?.totalReleases || 0,
-        pendingReleases: localStats.pendingReleases || stats?.pendingReleases || 0
+        pendingReleases: localStats.pendingReleases || stats?.pendingReleases || 0,
+        releaseCounts: localStats.releaseCounts,
+        releaseTypeCounts: localStats.releaseTypeCounts,
+        bromaSync: localStats.bromaSync,
       }
     }, { status: result.ok ? result.status : 200 });
   } catch (error) {
@@ -55,9 +58,24 @@ export async function GET() {
 
 async function getLocalCatalogStats() {
   const { db } = await connectToDatabase();
+  const bromaSync = await fetchBackend(
+    '/api/dsp/broma/release-statuses/sync',
+    {
+      method: 'POST',
+      body: JSON.stringify({ limit: 300 }),
+    }
+  ).catch(() => null);
   const [releaseStats, canonicalTracks] = await Promise.all([
     releasesCollection(db)
-      .aggregate<{ _id: null; totalReleases: number; totalTracks: number; pendingReleases: number }>([
+      .aggregate<{
+        _id: null;
+        totalReleases: number;
+        totalTracks: number;
+        pendingReleases: number;
+        approvedReleases: number;
+        rejectedReleases: number;
+        processingReleases: number;
+      }>([
         {
           $group: {
             _id: null,
@@ -82,16 +100,71 @@ async function getLocalCatalogStats() {
                 ],
               },
             },
+            approvedReleases: {
+              $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] },
+            },
+            rejectedReleases: {
+              $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] },
+            },
+            processingReleases: {
+              $sum: {
+                $cond: [
+                  { $in: ['$status', ['uploading_to_broma', 'broma_moderation', 'dsp_processing']] },
+                  1,
+                  0,
+                ],
+              },
+            },
           },
         },
       ])
       .toArray(),
     tracksCollection(db).countDocuments({ deletedAt: { $exists: false }, source: 'release_embed' }),
   ]);
-  const stats = releaseStats[0] || { totalReleases: 0, totalTracks: 0, pendingReleases: 0 };
+  const stats = releaseStats[0] || {
+    totalReleases: 0,
+    totalTracks: 0,
+    pendingReleases: 0,
+    approvedReleases: 0,
+    rejectedReleases: 0,
+    processingReleases: 0,
+  };
+  const releaseTypeCounts = await releasesCollection(db)
+    .aggregate<{ _id: { status: string; type: string }; count: number }>([
+      {
+        $match: {
+          status: { $in: ['approved', 'rejected', 'uploading_to_broma', 'broma_moderation', 'dsp_processing'] },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            status: '$status',
+            type: { $toLower: { $ifNull: ['$releaseType', { $ifNull: ['$metadata.releaseType', 'unknown'] }] } },
+          },
+          count: { $sum: 1 },
+        },
+      },
+    ])
+    .toArray();
   return {
     totalReleases: Number(stats.totalReleases || 0),
     totalTracks: Math.max(Number(stats.totalTracks || 0), Number(canonicalTracks || 0)),
     pendingReleases: Number(stats.pendingReleases || 0),
+    releaseCounts: {
+      all: Number(stats.totalReleases || 0),
+      pending: Number(stats.pendingReleases || 0),
+      in_process: Number(stats.processingReleases || 0),
+      approved: Number(stats.approvedReleases || 0),
+      rejected: Number(stats.rejectedReleases || 0),
+      shipped: Number(stats.approvedReleases || 0),
+      other: 0,
+    },
+    releaseTypeCounts: releaseTypeCounts.map((row) => ({
+      status: row._id.status,
+      type: row._id.type || 'unknown',
+      count: row.count,
+    })),
+    bromaSync: bromaSync?.data || null,
   };
 }

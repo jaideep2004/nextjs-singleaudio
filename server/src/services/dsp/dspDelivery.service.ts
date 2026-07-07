@@ -31,6 +31,7 @@ import {
   listBromaStatisticsReports,
   refreshBromaStatisticsReport,
 } from './bromaStatistics.service';
+import { BromaClient } from './connectors/bromaClient';
 
 const BASE_RETRY_DELAY_MS = 15_000;
 const WORKER_LOCK_MS = 5 * 60_000;
@@ -487,6 +488,19 @@ class DspDeliveryService {
     return listBromaStatisticsReports(limit);
   }
 
+  async deleteBromaDraft(input: { draftType: 'composition' | 'release'; draftId: string | number }) {
+    const providerRecord = await this.getProviderWithDecryptedCredentials('broma');
+    if (!providerRecord || !providerRecord.provider.enabled) {
+      throw new Error('Broma provider is not active');
+    }
+
+    const client = new BromaClient({
+      credentials: providerRecord.credentials,
+      config: providerRecord.provider.config || {},
+    });
+    return client.deleteDraft(input.draftType, input.draftId);
+  }
+
   async dispatchDelivery(trackId: string, providerKey: string, operation: DspDeliveryOperation, createdBy?: string) {
     const normalizedProviderKey = providerKey.toLowerCase().trim();
     const providerRecord = await this.getProviderWithDecryptedCredentials(normalizedProviderKey);
@@ -627,12 +641,14 @@ class DspDeliveryService {
     let releaseStatus: string | null = null;
     const step = String(metadata.bromaStep || '');
     const moderationStatus = String(metadata.bromaModerationStatus || '').toLowerCase();
-    const bromaRejected = ['rejected', 'declined', 'cancelled'].includes(moderationStatus);
+    const bromaRejected = ['rejected', 'declined', 'cancelled', 'failed', 'error', 'not_ready'].includes(moderationStatus);
     if (bromaRejected) releaseStatus = 'rejected';
     else if (state === 'delivered') releaseStatus = 'approved';
     else if (step === 'send_moderation') releaseStatus = 'broma_moderation';
     else if (step === 'poll_status') {
-      releaseStatus = ['accepted', 'approved', 'processing', 'distributed', 'in_distribution'].includes(moderationStatus)
+      releaseStatus = ['approved', 'live', 'published', 'delivered', 'processed', 'done', 'active', 'success', 'shipped'].includes(moderationStatus)
+        ? 'approved'
+        : ['accepted', 'processing', 'distributed', 'in_distribution'].includes(moderationStatus)
         ? 'dsp_processing'
         : 'broma_moderation';
     }
@@ -1019,7 +1035,6 @@ class DspDeliveryService {
     const query: Record<string, any> = {
       providerKey: 'broma',
       targetType: 'release',
-      state: { $in: ['processing', 'needs_attention'] },
       $or: [
         { externalId: { $exists: true, $ne: '' } },
         { 'metadata.bromaReleaseId': { $exists: true, $ne: '' } },

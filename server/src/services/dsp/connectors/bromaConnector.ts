@@ -54,10 +54,8 @@ const BROMA_DELIVERED_STATUSES = new Set([
   'delivered',
   'processed',
   'done',
-  'accepted',
   'active',
   'success',
-  'moderated',
   'approved',
   'shipped',
 ]);
@@ -92,13 +90,26 @@ const normalizeMatchText = (value: unknown) =>
   firstString(value)?.toLowerCase().replace(/\s+/g, ' ').trim() || '';
 
 const getBromaAssetStatus = (asset: any) =>
-  firstBromaReleaseStatus(
+  chooseBromaStatus(
     asset?.moderation_status,
     asset?.moderationStatus,
     asset?.release_status,
     asset?.status,
     ...(Array.isArray(asset?.statuses) ? asset.statuses : [])
   );
+
+function chooseBromaStatus(...values: unknown[]) {
+  const normalized = values
+    .flatMap((value) => (Array.isArray(value) ? value : [value]))
+    .map(normalizeBromaStatus)
+    .filter((value) => value && value !== 'ok');
+  return (
+    normalized.find((value) => BROMA_REJECTED_STATUSES.has(value)) ||
+    normalized.find((value) => BROMA_DELIVERED_STATUSES.has(value)) ||
+    normalized[0] ||
+    ''
+  );
+}
 
 const findBromaAssetRow = (rows: any[], detail: any) => {
   const ean = firstString(detail?.ean, detail?.upc, detail?.catalogue_number);
@@ -200,7 +211,7 @@ const fetchBromaStatusSnapshot = async (
 
   const accountId = firstString(config.accountId, config.account_id);
   const search = firstString(detail?.ean, detail?.upc, detail?.catalogue_number, detail?.title);
-  if (accountId && search && !BROMA_DELIVERED_STATUSES.has(normalized) && !BROMA_REJECTED_STATUSES.has(normalized)) {
+  if (accountId && search) {
     const assets = await client.getAccountReleaseAssets(accountId, {
       search,
       page: 1,
@@ -797,9 +808,9 @@ export class BromaConnector extends BaseDspConnector {
     const errors = [...base.errors];
     if (!('releaseId' in payload)) errors.push('Broma delivery requires release payload');
     if ('releaseId' in payload) {
-      if (!payload.upc) errors.push('Missing release UPC/EAN');
+      if (!firstString(payload.upc)) errors.push('Missing release UPC/EAN');
       payload.tracks.forEach((track, index) => {
-        if (!track.isrc) errors.push(`Track ${index + 1}: missing ISRC`);
+        if (!firstString(track.isrc)) errors.push(`Track ${index + 1}: missing ISRC`);
         if (!track.audioFile) errors.push(`Track ${index + 1}: missing audio file`);
       });
     }
@@ -1110,6 +1121,7 @@ export class BromaConnector extends BaseDspConnector {
 
   private async buildReleasePayload(client: BromaClient, payload: DspReleasePayload, config: Record<string, unknown>) {
     const year = contentYear(payload.releaseDate);
+    const releaseUpc = requireBromaString(payload.upc, 'Broma release EAN/UPC');
     const releaseCatalogNumber = catalogNumber(payload);
     const rightsholder = payloadRightsholder(payload);
     const createdDate = nonFutureDateOnly(
@@ -1127,7 +1139,7 @@ export class BromaConnector extends BaseDspConnector {
       performers: bromaArtists(payload.primaryArtist),
       genres: bromaGenres(payload.genre, payload.metadata?.genre),
       created_country_id: createdCountryId(payload, config),
-      ean: payload.upc,
+      ean: releaseUpc,
       parental_warning_type: payload.tracks.some((track) => track.explicit) ? 1 : 0,
       account_id: Number(config.accountId),
       p_line: String(payload.metadata?.pline || rightsholder || payload.primaryArtist || payload.releaseTitle),
@@ -1135,7 +1147,7 @@ export class BromaConnector extends BaseDspConnector {
       date_p_line: year,
       date_c_line: year,
       created_date: createdDate,
-      generate_ean: !payload.upc,
+      generate_ean: 0,
       various_artists: Boolean(payload.metadata?.variousArtists),
     };
   }
@@ -1146,6 +1158,7 @@ export class BromaConnector extends BaseDspConnector {
     config: Record<string, unknown> = {},
     recordingId?: unknown
   ) {
+    const trackIsrc = requireBromaString(track.isrc, `Broma ISRC for ${track.title || 'track'}`);
     const trackCatalogNumber = catalogNumber(payload, track);
     const primaryArtist = firstString(track.artistName, payload.primaryArtist);
     const featuredArtist = firstString(track.metadata?.featuredArtist, track.metadata?.featuring, payload.metadata?.featuredArtist, payload.metadata?.featuring);
@@ -1183,8 +1196,8 @@ export class BromaConnector extends BaseDspConnector {
       performers: bromaArtists(primaryArtist),
       main_performer: bromaArtists(primaryArtist),
       featured_artist: bromaArtists(featuredArtist),
-      isrc: track.isrc,
-      generate_isrc: !track.isrc,
+      isrc: trackIsrc,
+      generate_isrc: 0,
       is_instrumental: Boolean(track.metadata?.instrumental || track.metadata?.isInstrumental),
       catalog_number: trackCatalogNumber,
       generate_catalog_number: !trackCatalogNumber,

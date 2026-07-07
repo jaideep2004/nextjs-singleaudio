@@ -53,6 +53,15 @@ interface DashboardStats {
   totalRevenue: number;
   totalReleases: number;
   pendingReleases: number;
+  releaseCounts?: {
+    all?: number;
+    pending?: number;
+    in_process?: number;
+    approved?: number;
+    rejected?: number;
+    shipped?: number;
+    other?: number;
+  };
 }
 
 interface DashboardUser {
@@ -130,6 +139,7 @@ export default function AdminDashboard() {
     in_process: 0,
     approved: 0,
     rejected: 0,
+    shipped: 0,
     other: 0,
   });
 
@@ -165,6 +175,18 @@ export default function AdminDashboard() {
             ...defaultStats,
             ...statsResponse.data,
           });
+          const syncedCounts = statsResponse.data.releaseCounts;
+          if (syncedCounts) {
+            setReleaseCounts({
+              all: Number(syncedCounts.all || 0),
+              pending: Number(syncedCounts.pending || 0),
+              in_process: Number(syncedCounts.in_process || 0),
+              approved: Number(syncedCounts.approved || 0),
+              rejected: Number(syncedCounts.rejected || 0),
+              shipped: Number(syncedCounts.shipped || syncedCounts.approved || 0),
+              other: Number(syncedCounts.other || 0),
+            });
+          }
         } else {
           setStats(defaultStats);
         }
@@ -213,6 +235,7 @@ export default function AdminDashboard() {
               in_process: Number(nextCounts.in_process || 0),
               approved: Number(nextCounts.approved || 0),
               rejected: Number(nextCounts.rejected || 0),
+              shipped: Number((nextCounts as any).shipped || nextCounts.approved || 0),
               other: Number(nextCounts.other || 0),
             });
         }
@@ -259,6 +282,7 @@ export default function AdminDashboard() {
 
   const approvedReleases = releaseCounts.approved;
   const rejectedReleases = releaseCounts.rejected;
+  const shippedReleases = releaseCounts.shipped || releaseCounts.approved;
   const reviewLoad =
     releaseCounts.all > 0 ? Math.round((releaseCounts.pending / releaseCounts.all) * 100) : 0;
   const bromaLoad =
@@ -425,7 +449,7 @@ export default function AdminDashboard() {
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(5, 1fr)' },
               gap: 2,
               mb: 2.5,
             }}
@@ -436,6 +460,18 @@ export default function AdminDashboard() {
                 value: releaseCounts.pending || stats.pendingReleases,
                 icon: <PendingActions />,
                 color: '#f59e0b',
+              },
+              {
+                label: 'Processing',
+                value: releaseCounts.in_process,
+                icon: <PendingActions />,
+                color: '#0ea5e9',
+              },
+              {
+                label: 'Shipped',
+                value: shippedReleases,
+                icon: <CheckCircle />,
+                color: '#10b981',
               },
               {
                 label: 'Approved',

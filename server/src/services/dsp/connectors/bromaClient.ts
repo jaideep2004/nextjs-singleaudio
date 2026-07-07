@@ -201,6 +201,20 @@ export class BromaClient {
     });
   }
 
+  async getAccountAssetStatistics(accountId: string | number) {
+    return this.request<any>({
+      method: 'GET',
+      url: `/accounts/${accountId}/asset-statistics`,
+    });
+  }
+
+  async deleteDraft(draftType: 'composition' | 'release', draftId: string | number) {
+    return this.request<any>({
+      method: 'DELETE',
+      url: `/assets/draft/${draftType}/${draftId}/remove`,
+    });
+  }
+
   async getReleaseModeration(accountId: string | number, assetId: string | number) {
     return this.request<any>({
       method: 'GET',
